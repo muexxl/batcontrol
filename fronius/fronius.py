@@ -4,7 +4,6 @@ import json
 from requests.auth import HTTPDigestAuth
 import hashlib
 
-
 def hash_utf8(x):
     if isinstance(x, str):
         x = x.encode("utf-8")
