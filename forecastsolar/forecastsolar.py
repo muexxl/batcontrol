@@ -3,14 +3,16 @@ import time
 import math
 import requests
 import json
-print("importing ForecastSolar..")
+import logging
 
+
+logger = logging.getLogger('__main__')
+logger.info(f'[FCSolar] loading module ')
 
 class ForecastSolar(object):
-    def __init__(self, token=None) -> None:
-        self.access_token = token
-        self.result_e = {}
-        self.result_w = {}
+    def __init__(self, pvinstallations) -> None:
+        self.pvinstallations = pvinstallations
+        self.results = {}
         self.last_update = 0
         self.seconds_between_updates = 900
 
@@ -20,21 +22,24 @@ class ForecastSolar(object):
         if dt > self.seconds_between_updates:
             self.get_raw_forecast()
             self.last_update = t0
-        prediction={}
+        prediction = {}
         for hour in range(48+1):
-            prediction[hour]=0
-        if self.result_e=={}:
-            return prediction   
-        if self.result_w=={}:
-            return prediction   
-        
+            prediction[hour] = 0
+
+        # return empty prediction if results have not been obtained
+        if self.results == {}:
+            logger.warning(f'[FCSolar] Returning zeroed prediction')
+            return prediction
+
+        prediction={}
         now = datetime.datetime.now()
         current_hour = datetime.datetime(
             now.year, now.month, now.day, now.hour).astimezone()
-        response_time_string = self.result_e['message']['info']['time']
+        result = next(iter(self.results.values()))
+        response_time_string = result['message']['info']['time']
         response_time = datetime.datetime.fromisoformat(response_time_string)
         response_timezone = response_time.tzinfo
-        for result in [self.result_e, self.result_w]:
+        for name, result in self.results.items():
             for isotime, value in result['result'].items():
                 timestamp = datetime.datetime.fromisoformat(
                     isotime).astimezone(response_timezone)
@@ -42,31 +47,51 @@ class ForecastSolar(object):
                 rel_hour = math.ceil(diff.total_seconds()/3600)-1
                 if rel_hour >= 0:
                     if rel_hour in prediction.keys():
-                        prediction[rel_hour]+=value
+                        prediction[rel_hour] += value
                     else:
-                        prediction[rel_hour]=value
-        return prediction
+                        prediction[rel_hour] = value
+        #complete hours without production with 0 values
+        max_hour=max(prediction.keys())
+        for h in range(max_hour+1):
+            if h not in prediction.keys():
+                prediction[h]=0        
+        #sort output
+        output=dict(sorted(prediction.items()))
+        
+        return output
 
     def get_raw_forecast(self):
-        lat = '49.634580'
-        lon = '8.6315182'
-        dec = '32'  # declination
-        az = '87'  # 90 =W -90 = E
-        kwp = '5.695'
-        url = f"https://api.forecast.solar/estimate/watthours/period/{lat}/{lon}/{dec}/{az}/{kwp}"
-        response = requests.get(url)
-        if response.status_code == 200:
-            self.result_w = json.loads(response.text)
-        else:
-            return
+        unit: dict
+        for unit in self.pvinstallations:
+            name = unit['name']
+            lat = unit['lat']
+            lon = unit['lon']
+            dec = unit['declination']  # declination
+            az = unit['azimuth']  # 90 =W -90 = E
+            kwp = unit['kWp']
+            logger.info(
+                f'[FCSolar] Requesting Information for PV Installation {name}')
+            url = f"https://api.forecast.solar/estimate/watthours/period/{lat}/{lon}/{dec}/{az}/{kwp}"
+            response = requests.get(url)
+            if response.status_code == 200:
+                self.results[name] = json.loads(response.text)
+            else:
+                logger.warn(
+                    f'[ForecastSolar] forecast solar API returned {response.status_code} - {response.text}')
 
-        dec = '32'  # declination
-        az = '-93'  # 90 =W -90 = E
-        kwp = '6.030'  # 5.695
-        url = f"https://api.forecast.solar/estimate/watthours/period/{lat}/{lon}/{dec}/{az}/{kwp}"
-        response = requests.get(url)
-        if response.status_code == 200:
-            self.result_e = json.loads(response.text)
-            self.last_update = datetime.datetime.now()
-        else:
-            return
+
+if __name__ == '__main__':
+    pvinstallations = [{'name': 'Ostdach',
+                        'lat': '49.634580',
+                        'lon': '8.6315182',
+                        'declination': '32',
+                        'azimuth': '-93',
+                        'kWp': '5.695'},
+                       {'name': 'Westdach',
+                           'lat': '49.634580',
+                           'lon': '8.6315182',
+                           'declination': '32',
+                           'azimuth': '87',
+                           'kWp': '6.030'}]
+    fcs=ForecastSolar(pvinstallations)
+    print (fcs.get_forecast())

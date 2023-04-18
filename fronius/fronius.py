@@ -3,6 +3,10 @@ import requests
 import json
 from requests.auth import HTTPDigestAuth
 import hashlib
+import logging
+
+logger = logging.getLogger('__main__')
+logger.info(f'[Fronius] loading module ')
 
 def hash_utf8(x):
     if isinstance(x, str):
@@ -13,6 +17,10 @@ class FroniusWR(object):
     def __init__(self, address, user, password) -> None:
         self.address = address
         self.capacity = -1
+        self.min_soc = 8 # in percent
+        self.max_soc = 100
+        self.max_charge_rate=2500 #Watt
+        self.max_grid_power=5000 #Watt
         self.nonce = 0
         self.user = user
         self.password = password
@@ -24,7 +32,22 @@ class FroniusWR(object):
         result = json.loads(response.text)
         soc = result['Body']['Data']['Inverters']['1']['SOC']
         return soc
+    def get_free_capacity(self):
+        current_soc=self.get_SOC()
+        capa=self.get_capacity()
+        free_capa=(self.max_soc-current_soc)/100*capa
+        return free_capa
     
+    def get_stored_energy(self):
+        current_soc=self.get_SOC()
+        capa=self.get_capacity()
+        energy=(current_soc-self.min_soc)/100*capa
+        return energy
+    
+    def get_usable_capacity(self):
+        usable_capa=(self.max_soc-self.min_soc)/100*self.get_capacity()
+        return usable_capa
+        
     def get_battery_config(self):
         path='/config/batteries'
         response = self.send_request(path, auth=True)
@@ -48,6 +71,7 @@ class FroniusWR(object):
                 RuntimeError(f"Unable to restore settings. Parameter {key} is missing")
         path='/config/batteries'
         payload=json.dumps(settings)
+        logger.info(f'[Fronius] Restoring previous battery configuration: {payload} ')
         response = self.send_request(path,method='POST',payload=payload, auth=True)
         response_dict=json.loads(response.text)
         expected_write_successes=settings_to_restore
@@ -104,6 +128,45 @@ class FroniusWR(object):
                 raise RuntimeError(f'failed to set {expected_write_success}')
         return response
     
+    def set_wr_parameters(self, minsoc, maxsoc,allow_grid_charging,grid_power):
+        """set power at grid-connection point negative values for Feed-In"""
+        path='/config/batteries'
+        if not type(allow_grid_charging) == bool:
+            raise RuntimeError(f'Expected type: bool actual type: {type(allow_grid_charging)}')
+        
+        grid_power=int(grid_power)
+        minsoc=int(minsoc)
+        maxsoc=int(maxsoc)
+        
+        if not 0<=grid_power<=self.max_charge_rate:
+            raise RuntimeError(f'gridpower out of allowed limits {grid_power}')
+        
+        if minsoc>maxsoc:
+            raise RuntimeError(f'Min SOC needs to be higher than Max SOC')
+        
+        if minsoc<self.min_soc:
+            raise RuntimeError(f'Min SOC not allowed below {self.min_soc}')
+        
+        if maxsoc>self.max_soc:
+            raise RuntimeError(f'Max SOC not allowed above {self.max_soc}')
+                    
+        parameters={'HYB_EVU_CHARGEFROMGRID':allow_grid_charging,
+                    'HYB_EM_POWER':grid_power,
+                    'HYB_EM_MODE':1,
+                    'BAT_M0_SOC_MIN':minsoc,
+                    'BAT_M0_SOC_MAX':maxsoc,
+                    'BAT_M0_SOC_MODE':'manual'                    
+                    }
+        
+        payload=json.dumps(parameters)
+        logger.info(f'[Fronius] Setting battery parameters: {payload} ')
+        
+        response = self.send_request(path,method='POST',payload=payload, auth=True)
+        response_dict=json.loads(response.text)
+        for expected_write_success in parameters.keys():
+            if not expected_write_success in response_dict['writeSuccess']:
+                raise RuntimeError(f'failed to set {expected_write_success}')
+        return response
         
     def get_capacity(self):
         if self.capacity >= 0:
@@ -133,9 +196,9 @@ class FroniusWR(object):
                 self.nonce = self.get_nonce(response)
                 response = self.login()
                 if (response.status_code==200):
-                    print ("Login successful")
+                    logger.info('[Fronius] Login successful')
                 else:
-                    print ("Login failed")
+                    logger.info('[Fronius] Login failed')
             else:
                 raise RuntimeError(
                     f"Server {self.address} returned {response.status_code}")
@@ -148,8 +211,12 @@ class FroniusWR(object):
     def logout(self):
         params = {"user": self.user}
         path='/commands/Logout'
-        return self.send_request(path, auth=True)
-
+        response= self.send_request(path, auth=True)
+        if response.status_code==200:
+            logger.info('[Fronius] Logout successful')
+        else:
+            logger.info('[Fronius] Logout failed')
+        return response
 
     def get_nonce(self, response):
         auth_string = response.headers['X-WWW-Authenticate']

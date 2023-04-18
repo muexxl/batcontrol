@@ -1,1 +1,6 @@
 credentials.py
+settings.yaml
+config.yaml
+*.log
+*.yaml
+*__pycache__*

@@ -4,7 +4,12 @@ import datetime
 import math
 import requests
 import json
-print ("importing Tibber..")
+import logging
+
+logger = logging.getLogger('__main__')
+logger.info(f'[Tibber] loading module ')
+
+
 class Tibber(object):
     def __init__(self,token=None) -> None:
         self.access_token=token
