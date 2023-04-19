@@ -50,12 +50,15 @@ class Batcontrol(object):
         self.config=config['battery_control']
         
     def __del__(self):
-        del self.inverter
+        try:
+            del self.inverter
+        except:
+            pass
             
     def load_config(self, configfile):
         
         if not os.path.isfile(configfile):
-            raise RuntimeError('Configfile {configfile} not found')
+            raise RuntimeError(f'Configfile {configfile} not found')
         
         with open(configfile, 'r') as f:
             config_str=f.read()
@@ -124,14 +127,7 @@ class Batcontrol(object):
         #current price as reference
         current_price=prices[0]
         
-        #find first hour with price< current price
-        for h in range(1,max_hour):
-            future_price=prices[h]
-            if future_price <=current_price:
-                max_hour=h
-                break
-        if self.is_discharge_allowed(wr, net_consumption[:max_hour], prices):
-            logger.debug(f'[BatCTRL] Evaluated until hour now+{max_hour}')
+        if self.is_discharge_allowed(wr, net_consumption, prices):
             logger.debug(f'[BatCTRL] Mode: Allow Discharging' )
             allow_grid_charging=False
             min_SOC=wr.min_soc
@@ -220,7 +216,10 @@ class Batcontrol(object):
     def is_discharge_allowed(self, wr:fronius.FroniusWR, net_consumption:np.ndarray, prices:dict):
         #always allow discharging when battery is >90% maxsoc
         allow_discharge_limit=self.config['always_allow_discharge_limit']
-        if wr.get_SOC() >wr.max_soc*allow_discharge_limit:
+        discharge_limit=wr.max_soc*allow_discharge_limit
+        soc=wr.get_SOC()
+        if soc >discharge_limit:
+            logger.debug(f'[BatCTRL] Battery level ({soc}) above discharge limit {discharge_limit}')
             return True
         
         current_price=prices[0]
@@ -233,6 +232,7 @@ class Batcontrol(object):
                 max_hour=h
                 break
         
+        logger.debug(f'[BatCTRL] Evaluating until hour now+{max_hour}')
         #distribute remaining energy
         consumption=np.array(net_consumption)
         consumption[consumption<0]=0

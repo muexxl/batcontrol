@@ -1,7 +1,6 @@
 
 import requests
 import json
-from requests.auth import HTTPDigestAuth
 import hashlib
 import logging
 
@@ -25,10 +24,15 @@ class FroniusWR(object):
         self.user = user
         self.password = password
         self.previous_config=self.get_battery_config()
+        if not self.previous_config:
+            raise RuntimeError(f'[Fronius] failed to load Battery config from Inverter at {self.address}')
 
     def get_SOC(self):
         path='/solar_api/v1/GetPowerFlowRealtimeData.fcgi'
         response = self.send_request(path)
+        if not response:
+            logger.error(f'[Fronius] Failed to get SOC. Returning default value of 99.0')
+            return 99.0
         result = json.loads(response.text)
         soc = result['Body']['Data']['Inverters']['1']['SOC']
         return soc
@@ -51,7 +55,12 @@ class FroniusWR(object):
     def get_battery_config(self):
         path='/config/batteries'
         response = self.send_request(path, auth=True)
+        if not response:
+            logger.error(f'[Fronius] Failed to get SOC. Returning empty dict')
+            return {}
         result = json.loads(response.text)
+        with open('battery_config.json','w') as f:
+            f.write(response.text)
         return result
     def restore_battery_config(self):
         settings_to_restore=[
@@ -73,6 +82,9 @@ class FroniusWR(object):
         payload=json.dumps(settings)
         logger.info(f'[Fronius] Restoring previous battery configuration: {payload} ')
         response = self.send_request(path,method='POST',payload=payload, auth=True)
+        if not response:
+            raise RuntimeError(f'failed to restore battery config')
+        
         response_dict=json.loads(response.text)
         expected_write_successes=settings_to_restore
         for expected_write_success in expected_write_successes:
@@ -80,53 +92,53 @@ class FroniusWR(object):
                 raise RuntimeError(f'failed to set {expected_write_success}')
         return response
     
-    def set_min_soc(self, soc):
-        path='/config/batteries'
-        payload=f'{{"BAT_M0_SOC_MIN": {soc:d}, "BAT_M0_SOC_MODE": "manual"}}'
-        response = self.send_request(path,method='POST',payload=payload, auth=True)
-        response_dict=json.loads(response.text)
-        expected_write_successes=['BAT_M0_SOC_MIN','BAT_M0_SOC_MODE']
-        for expected_write_success in expected_write_successes:
-            if not expected_write_success in response_dict['writeSuccess']:
-                raise RuntimeError(f'failed to set {expected_write_success}')
-        return response
+    # def set_min_soc(self, soc):
+    #     path='/config/batteries'
+    #     payload=f'{{"BAT_M0_SOC_MIN": {soc:d}, "BAT_M0_SOC_MODE": "manual"}}'
+    #     response = self.send_request(path,method='POST',payload=payload, auth=True)
+    #     response_dict=json.loads(response.text)
+    #     expected_write_successes=['BAT_M0_SOC_MIN','BAT_M0_SOC_MODE']
+    #     for expected_write_success in expected_write_successes:
+    #         if not expected_write_success in response_dict['writeSuccess']:
+    #             raise RuntimeError(f'failed to set {expected_write_success}')
+    #     return response
     
-    def set_max_soc(self, soc):
-        path='/config/batteries'
-        payload=f'{{"BAT_M0_SOC_MAX": {soc:d}, "BAT_M0_SOC_MODE": "manual"}}'
-        response = self.send_request(path,method='POST',payload=payload, auth=True)
-        response_dict=json.loads(response.text)
-        expected_write_successes=['BAT_M0_SOC_MAX','BAT_M0_SOC_MODE']
-        for expected_write_success in expected_write_successes:
-            if not expected_write_success in response_dict['writeSuccess']:
-                raise RuntimeError(f'failed to set {expected_write_success}')
-        return response
+    # # def set_max_soc(self, soc):
+    #     path='/config/batteries'
+    #     payload=f'{{"BAT_M0_SOC_MAX": {soc:d}, "BAT_M0_SOC_MODE": "manual"}}'
+    #     response = self.send_request(path,method='POST',payload=payload, auth=True)
+    #     response_dict=json.loads(response.text)
+    #     expected_write_successes=['BAT_M0_SOC_MAX','BAT_M0_SOC_MODE']
+    #     for expected_write_success in expected_write_successes:
+    #         if not expected_write_success in response_dict['writeSuccess']:
+    #             raise RuntimeError(f'failed to set {expected_write_success}')
+    #     return response
     
-    def set_allow_grid_charging(self, value:bool):
-        if value:
-            payload='{"HYB_EVU_CHARGEFROMGRID": true}'
-        else:
-            payload='{"HYB_EVU_CHARGEFROMGRID": false}'
-        path='/config/batteries'
-        response = self.send_request(path,method='POST',payload=payload, auth=True)
-        response_dict=json.loads(response.text)
-        expected_write_successes=['HYB_EVU_CHARGEFROMGRID']
-        for expected_write_success in expected_write_successes:
-            if not expected_write_success in response_dict['writeSuccess']:
-                raise RuntimeError(f'failed to set {expected_write_success}')
-        return response
+    # def set_allow_grid_charging(self, value:bool):
+    #     if value:
+    #         payload='{"HYB_EVU_CHARGEFROMGRID": true}'
+    #     else:
+    #         payload='{"HYB_EVU_CHARGEFROMGRID": false}'
+    #     path='/config/batteries'
+    #     response = self.send_request(path,method='POST',payload=payload, auth=True)
+    #     response_dict=json.loads(response.text)
+    #     expected_write_successes=['HYB_EVU_CHARGEFROMGRID']
+    #     for expected_write_success in expected_write_successes:
+    #         if not expected_write_success in response_dict['writeSuccess']:
+    #             raise RuntimeError(f'failed to set {expected_write_success}')
+    #     return response
     
-    def set_em_power(self,power:int):
-        """set power at grid-connection point negative values for Feed-In"""
-        path='/config/batteries'
-        payload=f'{{"HYB_EM_POWER": {power:d}, "HYB_EM_MODE": 1}}' #HYB_EM_MODE 1=manual 0=automatic
-        response = self.send_request(path,method='POST',payload=payload, auth=True)
-        response_dict=json.loads(response.text)
-        expected_write_successes=['HYB_EM_POWER','HYB_EM_MODE']
-        for expected_write_success in expected_write_successes:
-            if not expected_write_success in response_dict['writeSuccess']:
-                raise RuntimeError(f'failed to set {expected_write_success}')
-        return response
+    # def set_em_power(self,power:int):
+    #     """set power at grid-connection point negative values for Feed-In"""
+    #     path='/config/batteries'
+    #     payload=f'{{"HYB_EM_POWER": {power:d}, "HYB_EM_MODE": 1}}' #HYB_EM_MODE 1=manual 0=automatic
+    #     response = self.send_request(path,method='POST',payload=payload, auth=True)
+    #     response_dict=json.loads(response.text)
+    #     expected_write_successes=['HYB_EM_POWER','HYB_EM_MODE']
+    #     for expected_write_success in expected_write_successes:
+    #         if not expected_write_success in response_dict['writeSuccess']:
+    #             raise RuntimeError(f'failed to set {expected_write_success}')
+    #     return response
     
     def set_wr_parameters(self, minsoc, maxsoc,allow_grid_charging,grid_power):
         """set power at grid-connection point negative values for Feed-In"""
@@ -162,6 +174,9 @@ class FroniusWR(object):
         logger.info(f'[Fronius] Setting battery parameters: {payload} ')
         
         response = self.send_request(path,method='POST',payload=payload, auth=True)
+        if not response:
+            logger.error(f'[Fronius] Failed to set parameters. No response from server')
+            return response
         response_dict=json.loads(response.text)
         for expected_write_success in parameters.keys():
             if not expected_write_success in response_dict['writeSuccess']:
@@ -171,7 +186,11 @@ class FroniusWR(object):
     def get_capacity(self):
         if self.capacity >= 0:
             return self.capacity
+        
         response = self.send_request('/solar_api/v1/GetStorageRealtimeData.cgi')
+        if not response:
+            logger.warn(f'[Fronius] capacity request failed. Returning default value')
+            return 1000
         result = json.loads(response.text)
         capacity = result['Body']['Data']['0']['Controller']['DesignedCapacity']
         self.capacity = capacity
@@ -188,21 +207,25 @@ class FroniusWR(object):
             if auth:
                 headers['Authorization'] = self.get_auth_header(
                     method=method, path=fullpath)
-
-            response = requests.request(method=method, url=url, params=params, headers=headers,data=payload)
-            if response.status_code == 200:
-                return response
-            elif 400 <= response.status_code < 500:
-                self.nonce = self.get_nonce(response)
-                response = self.login()
-                if (response.status_code==200):
-                    logger.info('[Fronius] Login successful')
+            try:
+                response = requests.request(method=method, url=url, params=params, headers=headers,data=payload)
+                if response.status_code == 200:
+                    return response
+                elif 400 <= response.status_code < 500:
+                    self.nonce = self.get_nonce(response)
+                    response = self.login()
+                    if (response.status_code==200):
+                        logger.info('[Fronius] Login successful')
+                    else:
+                        logger.info('[Fronius] Login failed')
                 else:
-                    logger.info('[Fronius] Login failed')
-            else:
-                raise RuntimeError(
-                    f"Server {self.address} returned {response.status_code}")
-    
+                    raise RuntimeError(
+                        f"Server {self.address} returned {response.status_code}")
+            except:
+                logger.error(f'[Fronius] an Error occured while trying to communicate with Inverter on {self.address}')
+        response=None
+        return response
+                
     def login(self):
         params = {"user": self.user}
         path='/commands/Login'
@@ -212,6 +235,8 @@ class FroniusWR(object):
         params = {"user": self.user}
         path='/commands/Logout'
         response= self.send_request(path, auth=True)
+        if not response:
+            logger.warn('[Fronius] Logout failed. No response from server')
         if response.status_code==200:
             logger.info('[Fronius] Logout successful')
         else:
