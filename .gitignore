@@ -1,0 +1,6 @@
+*batcontrol_config.yaml
+*.log
+*.json
+*__pycache__*
+*.vscode*
+
