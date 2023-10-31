@@ -3,4 +3,4 @@
 *.json
 *__pycache__*
 *.vscode*
-
+*venv*
