@@ -29,8 +29,9 @@ class ForecastSolar(object):
 
         # return empty prediction if results have not been obtained
         if self.results == {}:
-            logger.warning(f'[FCSolar] Returning zeroed prediction')
-            return prediction
+            logger.warning(f'[FCSolar] No results from FC Solar API available')
+            raise RuntimeWarning('[FCSolar] No results from FC Solar API available')
+            
 
         prediction={}
         now = datetime.datetime.now().astimezone(self.timezone)
