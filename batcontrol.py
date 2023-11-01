@@ -30,8 +30,8 @@ from tibber import tibber
 from fronius import fronius
 
 CONFIGFILE = "config/batcontrol_config.yaml"
-ERROR_IGNORE_TIME = 20
-TIME_BETWEEN_EVALUATIONS = 5
+ERROR_IGNORE_TIME = 600
+TIME_BETWEEN_EVALUATIONS = 120
 
 logger.info(f'[Main] Starting Batcontrol ')
 
