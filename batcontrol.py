@@ -30,6 +30,8 @@ from tibber import tibber
 from fronius import fronius
 
 CONFIGFILE = "config/batcontrol_config.yaml"
+ERROR_IGNORE_TIME = 20
+TIME_BETWEEN_EVALUATIONS = 5
 
 logger.info(f'[Main] Starting Batcontrol ')
 
@@ -68,6 +70,7 @@ class Batcontrol(object):
             self.load_profile, timezone, annual_consumption)
 
         self.config = config['battery_control']
+        self.time_at_forecast_error=-1
 
     def __del__(self):
         try:
@@ -125,20 +128,45 @@ class Batcontrol(object):
                 f"Config Entry in general: timezone {config['general']['timezone']} not valid. Try e.g. 'Europe/Berlin'")
         self.config = config
 
+    def reset_forecast_error(self):
+        self.time_at_forecast_error=-1
+    
+    def handle_forecast_error(self):
+        now=time.time()
+        
+        #set time_at_forecast_error if it is at the default value of -1
+        if self.time_at_forecast_error == -1:
+            self.time_at_forecast_error=now
+        
+        # get time delta since error
+        time_passed= now-self.time_at_forecast_error
+        
+        if time_passed < ERROR_IGNORE_TIME :
+            #keep current mode
+            logger.info(f"[BatCtrl] An API Error occured {time_passed:.0f}s ago. Keeping inverter mode unchanged.")          
+        else:
+            #set default mode
+            logger.warning(f"[BatCtrl] An API Error occured {time_passed:.0f}s ago. Setting inverter to default mode (Allow Discharging)")
+            self.inverter.set_mode_allow_discharge()
+    
     def run(self):
-        price_dict = self.tibber.get_prices()
 
-        production_forecast = self.fc_solar.get_forecast()      
+        #get forecasts
+        try:
+            price_dict = self.tibber.get_prices()
+            production_forecast = self.fc_solar.get_forecast()      
+            # harmonize forecast horizon
+            fc_period = min(max(price_dict.keys()), max(production_forecast.keys()))
+            consumption_forecast = self.fc_consumption.get_forecast(fc_period+1)
+        except Exception as e:
+            logger.warning(f'[BatCtrl] Following Exception occurred when trying to get forecasts: \n\t{e}')
+            self.handle_forecast_error()
+            return
+            
+        self.reset_forecast_error()
         
-        # #### UNDO THIS CRAP !!! ONLY TO NOT STRESS OUT THE API DURING TESTING!!
-        # production_forecast = {}
-        # for i in range(30):
-        #     production_forecast[i]=0
         
-        fc_period = min(max(price_dict.keys()),
-                        max(production_forecast.keys()))
-        consumption_forecast = self.fc_consumption.get_forecast(fc_period+1)
-
+        #initialize arrays
         net_consumption = np.zeros(fc_period+1)
         production = np.zeros(fc_period+1)
         consumption = np.zeros(fc_period+1)
@@ -348,6 +376,6 @@ if __name__ == '__main__':
     try:
         while (1):
             bc.run()
-            time.sleep(60)
+            time.sleep(TIME_BETWEEN_EVALUATIONS)
     finally:
         del bc
