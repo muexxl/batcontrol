@@ -273,7 +273,7 @@ class Batcontrol(object):
         # start with latest hour
         high_price_hours.sort()
         high_price_hours.reverse()
-        required_recharge_energy = 0
+        required_energy = 0
         for high_price_hour in high_price_hours:
             energy_to_shift = consumption[high_price_hour]
 
@@ -289,10 +289,11 @@ class Batcontrol(object):
                     energy_to_shift -= production[hour]
                     production[hour]
             # add_remaining energy to shift to recharge amount
-            required_recharge_energy += energy_to_shift
+            required_energy += energy_to_shift
 
         free_capacity = wr.get_free_capacity()
-        recharge_energy = min(free_capacity, required_recharge_energy)
+        required_energy = min(free_capacity, required_energy)
+        recharge_energy =  required_energy-wr.get_stored_energy()
 
         return recharge_energy
 
@@ -354,6 +355,7 @@ class Batcontrol(object):
                 if production[hour] >= required_energy:
                     production[hour] -= required_energy
                     required_energy = 0
+                    break
                 else:
                     required_energy -= production[hour]
                     production[hour] = 0
