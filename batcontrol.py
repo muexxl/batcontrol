@@ -41,7 +41,7 @@ class Batcontrol(object):
         self.load_config(configfile)
         config = self.config
 
-        timezone = pytz.timezone(config['general']['timezone'])
+        timezone = pytz.timezone(config['timezone'])
         self.timezone = timezone
 
         self.is_simulation = is_simulation
@@ -116,7 +116,7 @@ class Batcontrol(object):
                 f"[Config] Specified Load Profile file '{config['consumption_forecast']['load_profile']}' not found")
 
         try:
-            tzstring = config['general']['timezone']
+            tzstring = config['timezone']
         except KeyError:
             raise RuntimeError(
                 'No entry for time zone found under general:timezone')
@@ -124,9 +124,9 @@ class Batcontrol(object):
             tz = pytz.timezone(tzstring)
         except pytz.exceptions.UnknownTimeZoneError:
             raise RuntimeError(
-                f"Config Entry in general: timezone {config['general']['timezone']} not valid. Try e.g. 'Europe/Berlin'")
+                f"Config Entry in general: timezone {config['timezone']} not valid. Try e.g. 'Europe/Berlin'")
         try:
-            loglevel=config['general']['loglevel']
+            loglevel=config['loglevel']
         except KeyError:
             loglevel='info'
             
