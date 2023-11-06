@@ -110,7 +110,7 @@ class Batcontrol(object):
             logger.info(
                 f"[Config] No load profile provided. Proceeding with default profile from default_load_profile.csv")
             config['consumption_forecast']['load_profile'] = 'default_load_profile.csv'
-
+        
         if not os.path.isfile(config['consumption_forecast']['load_profile']):
             raise RuntimeError(
                 f"[Config] Specified Load Profile file '{config['consumption_forecast']['load_profile']}' not found")
@@ -120,12 +120,28 @@ class Batcontrol(object):
         except KeyError:
             raise RuntimeError(
                 'No entry for time zone found under general:timezone')
-
         try:
             tz = pytz.timezone(tzstring)
         except pytz.exceptions.UnknownTimeZoneError:
             raise RuntimeError(
                 f"Config Entry in general: timezone {config['general']['timezone']} not valid. Try e.g. 'Europe/Berlin'")
+        try:
+            loglevel=config['general']['loglevel']
+        except KeyError:
+            loglevel='info'
+            
+        if loglevel=='debug':
+            logger.setLevel(logging.DEBUG)
+        elif loglevel =='warning':
+            logger.setLevel(logging.WARNING)
+        elif loglevel =='error':
+            logger.setLevel(logging.ERROR)
+        elif loglevel =='info':
+            logger.setLevel(logging.INFO)
+        else :
+            logger.setLevel(logging.INFO)
+            logger.info(f'[BATCtrl] Provided loglevel "{loglevel}" not valid. Defaulting to loglevel "info"')
+            
         self.config = config
 
     def reset_forecast_error(self):
