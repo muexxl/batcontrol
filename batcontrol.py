@@ -13,13 +13,13 @@ loglevel = logging.DEBUG
 logger = logging.getLogger(__name__)
 formatter = logging.Formatter("%(asctime)s %(levelname)s %(message)s",
                               "%Y-%m-%d %H:%M:%S")
-filehandler = logging.FileHandler('batcontrol.log')
-filehandler.setFormatter(formatter)
+# filehandler = logging.FileHandler('batcontrol.log')
+# filehandler.setFormatter(formatter)
+# logger.addHandler(filehandler)
 
 streamhandler = logging.StreamHandler(sys.stdout)
-streamhandler.setLevel(logging.DEBUG)
+streamhandler.setFormatter(formatter)
 
-logger.addHandler(filehandler)
 logger.addHandler(streamhandler)
 
 logger.setLevel(loglevel)
@@ -307,10 +307,14 @@ class Batcontrol(object):
             # add_remaining energy to shift to recharge amount
             required_energy += energy_to_shift
 
-        free_capacity = wr.get_free_capacity()
-        required_energy = min(free_capacity, required_energy)
         recharge_energy =  required_energy-wr.get_stored_energy()
-
+        free_capacity = wr.get_free_capacity()
+        
+        if recharge_energy > free_capacity:
+            recharge_energy=free_capacity
+        if recharge_energy <0: 
+            recharge_energy =0
+            
         return recharge_energy
 
 # %%
