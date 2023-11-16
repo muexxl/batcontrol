@@ -26,12 +26,15 @@ logger.setLevel(loglevel)
 
 from forecastconsumption import forecastconsumption
 from forecastsolar import forecastsolar
-from tibber import tibber
+from dynamictariff import dynamictariff
 from fronius import fronius
 
 CONFIGFILE = "config/batcontrol_config.yaml"
+VALID_UTILITIES = ['tibber','awattar_at','awattar_de']
+VALID_INVERTERS = ['fronius_gen24']
 ERROR_IGNORE_TIME = 600
 TIME_BETWEEN_EVALUATIONS = 120
+TIME_BETWEEN_UTILITY_API_CALLS=900 #15 Minutes
 
 logger.info(f'[Main] Starting Batcontrol ')
 
@@ -45,10 +48,12 @@ class Batcontrol(object):
         self.timezone = timezone
 
         self.is_simulation = is_simulation
-
-        tibber_token = config['utility']['apikey']
-        self.tibber = tibber.Tibber(tibber_token, timezone)
-
+        
+        
+        apikey = config['utility']['apikey']
+        provider = config['utility']['type']
+        self.dynamic_tariff = dynamictariff.DynamicTariff(config['utility'],timezone,TIME_BETWEEN_UTILITY_API_CALLS)
+        
         fronius_address = config['inverter']['address']
         fronius_user = config['inverter']['user']
         fronius_password = config['inverter']['password']
@@ -88,10 +93,21 @@ class Batcontrol(object):
 
         config = yaml.safe_load(config_str)
 
-        if config['utility']['type'] == 'tibber':
+        if config['utility']['type'] in VALID_UTILITIES:
             pass
         else:
             raise RuntimeError('Unkonwn Utility')
+        
+        if config['utility']['type'] =='tibber':
+            if 'apikey' in config['utility'].keys():
+                pass
+            else:
+                raise RuntimeError(f'[BatCtrl] Utility Tibber requires an apikey. Please provide the apikey in your configuration file')
+            
+        else:
+            config['utility']['apikey']=None
+            
+        
 
         if config['inverter']['type'] == 'fronius_gen24':
             pass
@@ -169,7 +185,7 @@ class Batcontrol(object):
 
         #get forecasts
         try:
-            price_dict = self.tibber.get_prices()
+            price_dict = self.dynamic_tariff.get_prices()
             production_forecast = self.fc_solar.get_forecast()      
             # harmonize forecast horizon
             fc_period = min(max(price_dict.keys()), max(production_forecast.keys()))

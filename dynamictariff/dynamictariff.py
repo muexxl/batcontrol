@@ -2,15 +2,35 @@
 from .awattar import Awattar
 from .tibber import Tibber
 class DynamicTariff(object):
-    def __new__(cls,  provider:str, timezone, min_time_between_API_calls=0, token=None):
+    def __new__(cls,  config:dict, timezone,min_time_between_API_calls):
         selected_tariff=None
+        provider=config['type']
+        
         if provider.lower()=='awattar_at':
-            selected_tariff= Awattar(timezone,'at',min_time_between_API_calls)
+            required_fields=['vat', 'markup', 'fees']
+            for field in required_fields:
+                if not field in config.keys():
+                    raise RuntimeError(f'[DynTariff] Please include {field} in your configuration file')           
+            vat = float(config['vat'])
+            markup = float(config['markup'])
+            fees = float(config['fees'])
+            
+            selected_tariff= Awattar(timezone,'at',fees,markup,vat,min_time_between_API_calls)
+        
         elif provider.lower()=='awattar_de':
-            selected_tariff= Awattar(timezone,'de',min_time_between_API_calls)
+            required_fields=['vat', 'markup', 'fees']
+            for field in required_fields:
+                if not field in config.keys():
+                    raise RuntimeError(f'[DynTariff] Please include {field} in your configuration file')           
+            vat = float(config['vat'])
+            markup = float(config['markup'])
+            fees = float(config['fees'])
+            
+            selected_tariff= Awattar(timezone,'de',fees,markup,vat,min_time_between_API_calls)
         elif provider.lower()=='tibber':
-            if not token:
-                raise RuntimeError (f'[Dynamic Tariff] Tibber requires an API token. No token provided')
+            if not 'apikey' in config.keys() :
+                raise RuntimeError (f'[Dynamic Tariff] Tibber requires an API token. Please provide "apikey :YOURKEY" in your configuration file')
+            token = config['apikey']
             selected_tariff=Tibber(timezone,token,min_time_between_API_calls)
         else:
             raise RuntimeError(f'[DynamicTariff] Unkown provider {provider}')
