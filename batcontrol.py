@@ -13,9 +13,9 @@ loglevel = logging.DEBUG
 logger = logging.getLogger(__name__)
 formatter = logging.Formatter("%(asctime)s %(levelname)s %(message)s",
                               "%Y-%m-%d %H:%M:%S")
-# filehandler = logging.FileHandler('batcontrol.log')
-# filehandler.setFormatter(formatter)
-# logger.addHandler(filehandler)
+filehandler = logging.FileHandler('batcontrol.log')
+filehandler.setFormatter(formatter)
+logger.addHandler(filehandler)
 
 streamhandler = logging.StreamHandler(sys.stdout)
 streamhandler.setFormatter(formatter)
