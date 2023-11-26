@@ -3,7 +3,7 @@
 # Preconditions: 
 
 1. You have a PV Installation with a BYD Battery and a Fronius inverter  
-1. You have a Tibber contract with hourly electricity pricing. (Use this link if you want 50€ Bonus on sign up https://invite.tibber.com/x8ci52nj.)  
+1. You have a Tibber or aWattar contract with hourly electricity pricing. (Use this link if you want 50€ Bonus on sign up https://invite.tibber.com/x8ci52nj.)  
 
 # Preparations:
 
