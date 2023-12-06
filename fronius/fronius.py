@@ -32,8 +32,8 @@ class FroniusWR(object):
         self.login_attempts=0
         self.address = address
         self.capacity = -1
-        self.max_charge_rate=4000 #Watt
-        self.max_grid_power=5000 #Watt
+        self.max_charge_rate=5500 #4000 #Watt
+        self.max_grid_power=25000 #5000 #Watt
         self.nonce = 0
         self.user = user
         self.password = password
