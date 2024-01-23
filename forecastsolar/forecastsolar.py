@@ -74,7 +74,7 @@ class ForecastSolar(object):
             api = unit['api'] # ForecastSolar api 
             logger.info(
                 f'[FCSolar] Requesting Information for PV Installation {name}')
-            if api == NULL:
+            if api == string.empty:
                 url = f"https://api.forecast.solar/estimate/watthours/period/{lat}/{lon}/{dec}/{az}/{kwp}"
             else:
                 url = f"https://api.forecast.solar/" + api + f"estimate/watthours/period/{lat}/{lon}/{dec}/{az}/{kwp}"
