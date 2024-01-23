@@ -68,7 +68,7 @@ class Batcontrol(object):
         fronius_max_grid_power = config['inverter']['max_grid_power']
 
         self.inverter = fronius.FroniusWR(
-            fronius_address, fronius_user, fronius_password, max_charge_rate, max_grid_power)
+            fronius_address, fronius_user, fronius_password, fronius_max_charge_rate, fronius_max_grid_power)
 
         self.pvsettings = config['pvinstallations']
         self.fc_solar = forecastsolar.ForecastSolar(self.pvsettings, timezone)
