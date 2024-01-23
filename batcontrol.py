@@ -9,11 +9,20 @@ import numpy as np
 import logging
 import sys
 
+LOGFILE = "batcontrol.log"
+CONFIGFILE = "config/batcontrol_config.yaml"
+VALID_UTILITIES = ['tibber','awattar_at','awattar_de']
+VALID_INVERTERS = ['fronius_gen24']
+ERROR_IGNORE_TIME = 600
+TIME_BETWEEN_EVALUATIONS = 120
+TIME_BETWEEN_UTILITY_API_CALLS=900 #15 Minutes
+
 loglevel = logging.DEBUG
 logger = logging.getLogger(__name__)
 formatter = logging.Formatter("%(asctime)s %(levelname)s %(message)s",
                               "%Y-%m-%d %H:%M:%S")
-filehandler = logging.FileHandler('batcontrol.log')
+
+filehandler = logging.FileHandler(LOGFILE)
 filehandler.setFormatter(formatter)
 logger.addHandler(filehandler)
 
@@ -28,13 +37,8 @@ from forecastconsumption import forecastconsumption
 from forecastsolar import forecastsolar
 from dynamictariff import dynamictariff
 from fronius import fronius
+from logfilelimiter import logfilelimiter
 
-CONFIGFILE = "config/batcontrol_config.yaml"
-VALID_UTILITIES = ['tibber','awattar_at','awattar_de']
-VALID_INVERTERS = ['fronius_gen24']
-ERROR_IGNORE_TIME = 600
-TIME_BETWEEN_EVALUATIONS = 120
-TIME_BETWEEN_UTILITY_API_CALLS=900 #15 Minutes
 
 logger.info(f'[Main] Starting Batcontrol ')
 
@@ -44,11 +48,14 @@ class Batcontrol(object):
         self.load_config(configfile)
         config = self.config
 
+        if config['max_logfile_size'] > 0:
+            self.logfilelimiter =logfilelimiter.LogFileLimiter(LOGFILE,config['max_logfile_size'])
+            
+        
         timezone = pytz.timezone(config['timezone'])
         self.timezone = timezone
 
         self.is_simulation = is_simulation
-        
         
         apikey = config['utility']['apikey']
         provider = config['utility']['type']
@@ -74,7 +81,7 @@ class Batcontrol(object):
         self.fc_consumption = forecastconsumption.ForecastConsumption(
             self.load_profile, timezone, annual_consumption)
 
-        self.config = config['battery_control']
+        self.batconfig = config['battery_control']
         self.time_at_forecast_error=-1
 
     def __del__(self):
@@ -134,13 +141,7 @@ class Batcontrol(object):
         try:
             tzstring = config['timezone']
         except KeyError:
-            raise RuntimeError(
-                'No entry for time zone found under general:timezone')
-        try:
-            tz = pytz.timezone(tzstring)
-        except pytz.exceptions.UnknownTimeZoneError:
-            raise RuntimeError(
-                f"Config Entry in general: timezone {config['timezone']} not valid. Try e.g. 'Europe/Berlin'")
+            raise RuntimeError(f"Config Entry in general: timezone {config['timezone']} not valid. Try e.g. 'Europe/Berlin'")
         try:
             loglevel=config['loglevel']
         except KeyError:
@@ -157,7 +158,16 @@ class Batcontrol(object):
         else :
             logger.setLevel(logging.INFO)
             logger.info(f'[BATCtrl] Provided loglevel "{loglevel}" not valid. Defaulting to loglevel "info"')
-            
+        
+        if 'max_logfile_size' in config.keys():
+            if type(config['max_logfile_size']) == int:
+                pass
+            else:
+                raise RuntimeError(
+                f"Config Entry in general: max_logfile_size {config['max_logfile_size']} not valid. Only integer values allowed")
+        #default to unlimited filesize
+        else :
+            config['max_logfile_size']=-1
         self.config = config
 
     def reset_forecast_error(self):
@@ -183,6 +193,10 @@ class Batcontrol(object):
     
     def run(self):
 
+        #prune log file if file is too large
+        if self.config['max_logfile_size'] > 0:
+            self.logfilelimiter.run()
+            
         #get forecasts
         try:
             price_dict = self.dynamic_tariff.get_prices()
@@ -208,21 +222,6 @@ class Batcontrol(object):
             production[h] = production_forecast[h]
             consumption[h] = consumption_forecast[h]
             prices[h] = price_dict[h]
-
-        # ##remove later .. for testing only
-        # production = np.array([0.0, 0.0, 10.0, 84.0, 209.0, 306.0, 364.0, 396.0, 388.0, 358.0, 302.0, 209.0, 11.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
-        # consumption = np.array([204.70490011, 185.31730578, 443.84659586, 556.12060001, 491.22851159, 
-        #                 517.71839668, 438.69218739, 554.47133462, 490.90137988, 561.20282996,
-        #                 519.94881476, 374.33791913, 457.29143499, 493.78277419, 474.20234129,
-        #                 408.80821079, 366.37285727, 241.7048589,  184.14018146])
-        
-        # prices = np.array([0.159, 0.1591, 0.1594, 0.1594, 0.1594, 0.1592, 0.1593, 0.1594, 0.1602, 0.1714, 0.2071, 0.251, 0.2593, 0.251, 0.2396, 0.2334, 0.2237, 0.2212, 0.2051])
-        # price_dict={}
-        # for i in range(len(prices)):
-        #     price_dict[i]=prices[i]
-        
-        ##/ remove later .. for testing only
-        
         
         net_consumption = consumption-production
         logger.debug(f'[BatCTRL] Production FCST {production}')
@@ -236,6 +235,8 @@ class Batcontrol(object):
         net_consumption[0] *= 1 - \
             datetime.datetime.now().astimezone(self.timezone).minute/60
         self.set_wr_parameters(self.inverter, net_consumption, price_dict)
+        
+
 
         # %%
     def set_wr_parameters(self, wr: fronius.FroniusWR, net_consumption: np.ndarray, prices: dict):
@@ -252,7 +253,7 @@ class Batcontrol(object):
             wr.set_mode_allow_discharge()
 
         else:  # discharge not allowed
-            charging_limit = self.config['max_charging_from_grid_limit']
+            charging_limit = self.batconfig['max_charging_from_grid_limit']
             required_recharge_energy = self.get_required_required_recharge_energy(
                 wr, net_consumption[:max_hour], prices)
             is_charging_possible = wr.get_SOC() < (wr.max_soc*charging_limit)
@@ -286,7 +287,7 @@ class Batcontrol(object):
 
         production = -np.array(net_consumption)
         production[production < 0] = 0
-        min_price_difference = self.config['min_price_difference']
+        min_price_difference = self.batconfig['min_price_difference']
 
         # evaluation period until price is first time lower then current price
         for h in range(1, max_hour):
@@ -337,7 +338,7 @@ class Batcontrol(object):
 
     def is_discharge_allowed(self, wr: fronius.FroniusWR, net_consumption: np.ndarray, prices: dict):
         # always allow discharging when battery is >90% maxsoc
-        allow_discharge_limit = self.config['always_allow_discharge_limit']
+        allow_discharge_limit = self.batconfig['always_allow_discharge_limit']
         discharge_limit = wr.max_soc*allow_discharge_limit
         soc = wr.get_SOC()
         if soc > discharge_limit:
@@ -346,7 +347,7 @@ class Batcontrol(object):
             return True
 
         current_price = prices[0]
-        min_price_difference = self.config['min_price_difference']
+        min_price_difference = self.batconfig['min_price_difference']
         max_hour = len(net_consumption)
         # relevant time range : until next recharge possibility
         for h in range(1, max_hour):
