@@ -71,9 +71,13 @@ class ForecastSolar(object):
             dec = unit['declination']  # declination
             az = unit['azimuth']  # 90 =W -90 = E
             kwp = unit['kWp']
+            api = unit['api'] # ForecastSolar api 
             logger.info(
                 f'[FCSolar] Requesting Information for PV Installation {name}')
-            url = f"https://api.forecast.solar/estimate/watthours/period/{lat}/{lon}/{dec}/{az}/{kwp}"
+            if not api:
+                url = f"https://api.forecast.solar/estimate/watthours/period/{lat}/{lon}/{dec}/{az}/{kwp}"
+            else:
+                url = f"https://api.forecast.solar/" + api + f"/estimate/watthours/period/{lat}/{lon}/{dec}/{az}/{kwp}"
             response = requests.get(url)
             if response.status_code == 200:
                 self.results[name] = json.loads(response.text)

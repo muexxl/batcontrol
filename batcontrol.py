@@ -64,9 +64,11 @@ class Batcontrol(object):
         fronius_address = config['inverter']['address']
         fronius_user = config['inverter']['user']
         fronius_password = config['inverter']['password']
+        fronius_max_charge_rate = config['inverter']['max_charge_rate']
+        fronius_max_grid_power = config['inverter']['max_grid_power']
 
         self.inverter = fronius.FroniusWR(
-            fronius_address, fronius_user, fronius_password)
+            fronius_address, fronius_user, fronius_password, fronius_max_charge_rate, fronius_max_grid_power)
 
         self.pvsettings = config['pvinstallations']
         self.fc_solar = forecastsolar.ForecastSolar(self.pvsettings, timezone)
