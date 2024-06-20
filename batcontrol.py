@@ -11,7 +11,7 @@ import sys
 
 LOGFILE = "batcontrol.log"
 CONFIGFILE = "config/batcontrol_config.yaml"
-VALID_UTILITIES = ['tibber','awattar_at','awattar_de', 'evcc']
+VALID_UTILITIES = ['tibber','awattar_at','awattar_de','evcc']
 VALID_INVERTERS = ['fronius_gen24']
 ERROR_IGNORE_TIME = 600
 TIME_BETWEEN_EVALUATIONS = 120

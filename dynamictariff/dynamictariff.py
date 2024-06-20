@@ -16,7 +16,6 @@ class DynamicTariff(object):
             vat = float(config['vat'])
             markup = float(config['markup'])
             fees = float(config['fees'])
-            
             selected_tariff= Awattar(timezone,'at',fees,markup,vat,min_time_between_API_calls)
         
         elif provider.lower()=='awattar_de':
@@ -27,8 +26,8 @@ class DynamicTariff(object):
             vat = float(config['vat'])
             markup = float(config['markup'])
             fees = float(config['fees'])
-            
             selected_tariff= Awattar(timezone,'de',fees,markup,vat,min_time_between_API_calls)
+
         elif provider.lower()=='tibber':
             if not 'apikey' in config.keys() :
                 raise RuntimeError (f'[Dynamic Tariff] Tibber requires an API token. Please provide "apikey :YOURKEY" in your configuration file')
