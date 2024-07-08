@@ -26,9 +26,10 @@ def strip_dict(original):
 TIMEOFUSE_CONFIG_FILENAME = 'timeofuse_config.json'
 BATTERY_CONFIG_FILENAME = 'battery_config.json'
 
-
-class FroniusWR(object):
+from .baseclass import InverterBaseclass
+class FroniusWR(InverterBaseclass):
     def __init__(self, address, user, password,max_charge_rate,max_grid_power) -> None:
+        super().__init__()
         self.login_attempts=0
         self.address = address
         self.capacity = -1
@@ -65,7 +66,10 @@ class FroniusWR(object):
         capa=self.get_capacity()
         energy=(current_soc-self.min_soc)/100*capa
         return energy
-    
+
+    def get_max_capacity(self):
+        return self.max_soc
+
     def get_usable_capacity(self):
         usable_capa=(self.max_soc-self.min_soc)/100*self.get_capacity()
         return usable_capa

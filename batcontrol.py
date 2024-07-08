@@ -12,7 +12,7 @@ import sys
 LOGFILE = "batcontrol.log"
 CONFIGFILE = "config/batcontrol_config.yaml"
 VALID_UTILITIES = ['tibber','awattar_at','awattar_de','evcc']
-VALID_INVERTERS = ['fronius_gen24']
+VALID_INVERTERS = ['fronius_gen24' , 'testdriver']
 ERROR_IGNORE_TIME = 600
 TIME_BETWEEN_EVALUATIONS = 120
 TIME_BETWEEN_UTILITY_API_CALLS=900 #15 Minutes
@@ -36,7 +36,7 @@ logger.setLevel(loglevel)
 from forecastconsumption import forecastconsumption
 from forecastsolar import forecastsolar
 from dynamictariff import dynamictariff
-from fronius import fronius
+from fronius import inverter 
 from logfilelimiter import logfilelimiter
 
 
@@ -61,14 +61,7 @@ class Batcontrol(object):
         provider = config['utility']['type']
         self.dynamic_tariff = dynamictariff.DynamicTariff(config['utility'],timezone,TIME_BETWEEN_UTILITY_API_CALLS)
         
-        fronius_address = config['inverter']['address']
-        fronius_user = config['inverter']['user']
-        fronius_password = config['inverter']['password']
-        fronius_max_charge_rate = config['inverter']['max_charge_rate']
-        fronius_max_grid_power = config['inverter']['max_grid_power']
-
-        self.inverter = fronius.FroniusWR(
-            fronius_address, fronius_user, fronius_password, fronius_max_charge_rate, fronius_max_grid_power)
+        self.inverter = inverter.Inverter(config['inverter'])
 
         self.pvsettings = config['pvinstallations']
         self.fc_solar = forecastsolar.ForecastSolar(self.pvsettings, timezone)
@@ -120,9 +113,7 @@ class Batcontrol(object):
         else:
             config['utility']['apikey']=None
             
-        
-
-        if config['inverter']['type'] == 'fronius_gen24':
+        if config['inverter']['type'] in VALID_INVERTERS:
             pass
         else:
             raise RuntimeError('Unkown inverter')
@@ -240,12 +231,12 @@ class Batcontrol(object):
         # correction for time that has already passed since the start of the current hour
         net_consumption[0] *= 1 - \
             datetime.datetime.now().astimezone(self.timezone).minute/60
-        self.set_wr_parameters(self.inverter, net_consumption, price_dict)
+        self.set_wr_parameters(net_consumption, price_dict)
         
 
 
         # %%
-    def set_wr_parameters(self, wr: fronius.FroniusWR, net_consumption: np.ndarray, prices: dict):
+    def set_wr_parameters(self, net_consumption: np.ndarray, prices: dict):
         # ensure availability of data
         max_hour = min(len(net_consumption), len(prices))
 
@@ -254,15 +245,14 @@ class Batcontrol(object):
         mode = ""
         value = 0
 
-        if self.is_discharge_allowed(wr, net_consumption, prices):
+        if self.is_discharge_allowed(net_consumption, prices):
             logger.debug(f'[BatCTRL] Mode: Allow Discharging')
-            wr.set_mode_allow_discharge()
+            self.inverter.set_mode_allow_discharge()
 
         else:  # discharge not allowed
             charging_limit = self.batconfig['max_charging_from_grid_limit']
-            required_recharge_energy = self.get_required_required_recharge_energy(
-                wr, net_consumption[:max_hour], prices)
-            is_charging_possible = wr.get_SOC() < (wr.max_soc*charging_limit)
+            required_recharge_energy = self.get_required_required_recharge_energy(net_consumption[:max_hour], prices)
+            is_charging_possible = self.inverter.get_SOC() < (self.inverter.get_max_capacity()*charging_limit)
 
             logger.debug('[BatCTRL] Discharging is NOT allowed')
             logger.debug(f'[BatCTRL] Charging allowed: {is_charging_possible}')
@@ -273,19 +263,19 @@ class Batcontrol(object):
                 remaining_time = (
                     60-datetime.datetime.now().astimezone(self.timezone).minute)/60
                 charge_rate = required_recharge_energy/remaining_time
-                charge_rate = min(charge_rate, wr.max_charge_rate)
-                wr.set_mode_force_charge(round(charge_rate))
+                charge_rate = min(charge_rate, self.inverter.max_charge_rate)
+                self.inverter.set_mode_force_charge(round(charge_rate))
                 logger.debug(
                     f'[BatCTRL] Mode: grid charging. Charge rate : {charge_rate} W')
 
             else:  # keep current charge level. recharge if solar surplus available
-                wr.set_mode_avoid_discharge()
+                self.inverter.set_mode_avoid_discharge()
                 logger.debug(f'[BatCTRL] Mode: Avoid discharge')
 
         return
 
     # %%
-    def get_required_required_recharge_energy(self, wr: fronius.FroniusWR, net_consumption: list, prices: dict):
+    def get_required_required_recharge_energy(self, net_consumption: list, prices: dict):
         current_price = prices[0]
         max_hour = len(net_consumption)
         consumption = np.array(net_consumption)
@@ -330,8 +320,8 @@ class Batcontrol(object):
             # add_remaining energy to shift to recharge amount
             required_energy += energy_to_shift
 
-        recharge_energy =  required_energy-wr.get_stored_energy()
-        free_capacity = wr.get_free_capacity()
+        recharge_energy =  required_energy-self.inverter.get_stored_energy()
+        free_capacity = self.inverter.get_free_capacity()
         
         if recharge_energy > free_capacity:
             recharge_energy=free_capacity
@@ -342,11 +332,11 @@ class Batcontrol(object):
 
 # %%
 
-    def is_discharge_allowed(self, wr: fronius.FroniusWR, net_consumption: np.ndarray, prices: dict):
+    def is_discharge_allowed(self, net_consumption: np.ndarray, prices: dict):
         # always allow discharging when battery is >90% maxsoc
         allow_discharge_limit = self.batconfig['always_allow_discharge_limit']
-        discharge_limit = wr.max_soc*allow_discharge_limit
-        soc = wr.get_SOC()
+        discharge_limit = self.inverter.get_max_capacity() * allow_discharge_limit
+        soc = self.inverter.get_SOC()
         if soc > discharge_limit:
             logger.debug(
                 f'[BatCTRL] Battery level ({soc}) above discharge limit {discharge_limit}')
@@ -405,7 +395,7 @@ class Batcontrol(object):
             # add_remaining required_energy to reserved_storage
             reserved_storage += required_energy
 
-        stored_energy = wr.get_stored_energy()
+        stored_energy = self.inverter.get_stored_energy()
         logger.debug(
             f"[BatCTRL] Reserved Energy: {reserved_storage:0.1f} Wh. Available in Battery: {stored_energy:0.1f}Wh")
         if (stored_energy > reserved_storage):
