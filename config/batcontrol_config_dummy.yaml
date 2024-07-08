@@ -13,11 +13,12 @@ inverter:
   max_charge_rate: 5000 # Watt
   max_grid_power: 25000 # Watt
 utility:
-  type: tibber # [tibber, awattar_at, awattar_de]
+  type: tibber # [tibber, awattar_at, awattar_de, evcc]
   apikey: YOUR-PASSWORD # only required for tibber get one from https://developer.tibber.com/ Zz-XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXx
   vat: 0.20 # only required for awattar
   fees: 0.015 # only required for awattar
   markup: 0.03 # only required for awattar
+  url: http://evcc.local/api/tariff/grid # only required for evcc
 
 pvinstallations:
   - name: Haus #name

@@ -11,7 +11,7 @@ import sys
 
 LOGFILE = "batcontrol.log"
 CONFIGFILE = "config/batcontrol_config.yaml"
-VALID_UTILITIES = ['tibber','awattar_at','awattar_de']
+VALID_UTILITIES = ['tibber','awattar_at','awattar_de','evcc']
 VALID_INVERTERS = ['fronius_gen24']
 ERROR_IGNORE_TIME = 600
 TIME_BETWEEN_EVALUATIONS = 120
@@ -112,7 +112,11 @@ class Batcontrol(object):
                 pass
             else:
                 raise RuntimeError(f'[BatCtrl] Utility Tibber requires an apikey. Please provide the apikey in your configuration file')
-            
+        elif config['utility']['type'] in ['evcc']:
+            if 'url' in config['utility'].keys():
+                pass
+            else:
+                raise RuntimeError(f'[BatCtrl] Utility EVCC requires an URL. Please provide the URL in your configuration file')
         else:
             config['utility']['apikey']=None
             
