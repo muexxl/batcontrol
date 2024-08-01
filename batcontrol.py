@@ -45,6 +45,14 @@ logger.info(f'[Main] Starting Batcontrol ')
 
 class Batcontrol(object):
     def __init__(self, configfile, is_simulation=False):
+        # For API
+        self.last_mode = None  # -1 = charge from grid , 0 = avoid discharge , 10 = discharge allowed 
+        self.last_charge_rate = 0
+        self.last_prices = None
+        self.last_consumption = None
+        self.last_production = None
+        self.last_net_consumption = None
+
         self.load_config(configfile)
         config = self.config
 
@@ -78,6 +86,19 @@ class Batcontrol(object):
 
         self.batconfig = config['battery_control']
         self.time_at_forecast_error=-1
+
+        self.always_allow_discharge_limit = self.batconfig['always_allow_discharge_limit']     
+        self.max_charging_from_grid_limit = self.batconfig['max_charging_from_grid_limit']      
+        self.min_price_difference = self.batconfig['min_price_difference'] 
+
+        self.mqtt_api = None
+        if 'mqtt' in config.keys():
+            if config['mqtt']['enabled'] == True:
+                logger.info(f'[Main] MQTT Connection enabled ')
+                import mqtt_api
+                self.mqtt_api = mqtt_api.MQTT_API(config['mqtt'])
+                self.mqtt_api.wait_ready()
+
 
     def __del__(self):
         try:
@@ -165,6 +186,7 @@ class Batcontrol(object):
         #default to unlimited filesize
         else :
             config['max_logfile_size']=-1
+
         self.config = config
 
     def reset_forecast_error(self):
@@ -189,6 +211,11 @@ class Batcontrol(object):
             self.inverter.set_mode_allow_discharge()
     
     def run(self):
+        # Reset some values
+        self.reset_run_data()
+        # for API
+        self.refresh_static_values()
+        self.set_discharge_limit ( self.get_max_capacity() * self.always_allow_discharge_limit )
 
         #prune log file if file is too large
         if self.config['max_logfile_size'] > 0:
@@ -207,8 +234,7 @@ class Batcontrol(object):
             return
             
         self.reset_forecast_error()
-        
-        
+
         #initialize arrays
         net_consumption = np.zeros(fc_period+1)
         production = np.zeros(fc_period+1)
@@ -231,9 +257,11 @@ class Batcontrol(object):
         # correction for time that has already passed since the start of the current hour
         net_consumption[0] *= 1 - \
             datetime.datetime.now().astimezone(self.timezone).minute/60
-        self.set_wr_parameters(net_consumption, price_dict)
         
+        # Store data for API
+        self.save_run_data(production, consumption, net_consumption, prices)
 
+        self.set_wr_parameters(net_consumption, price_dict)
 
         # %%
     def set_wr_parameters(self, net_consumption: np.ndarray, prices: dict):
@@ -246,13 +274,11 @@ class Batcontrol(object):
         value = 0
 
         if self.is_discharge_allowed(net_consumption, prices):
-            logger.debug(f'[BatCTRL] Mode: Allow Discharging')
-            self.inverter.set_mode_allow_discharge()
-
+            self.allow_discharging()
         else:  # discharge not allowed
-            charging_limit = self.batconfig['max_charging_from_grid_limit']
+            charging_limit = self.max_charging_from_grid_limit
             required_recharge_energy = self.get_required_required_recharge_energy(net_consumption[:max_hour], prices)
-            is_charging_possible = self.inverter.get_SOC() < (self.inverter.get_max_capacity()*charging_limit)
+            is_charging_possible = self.get_SOC() < (self.get_max_capacity() * charging_limit)
 
             logger.debug('[BatCTRL] Discharging is NOT allowed')
             logger.debug(f'[BatCTRL] Charging allowed: {is_charging_possible}')
@@ -264,14 +290,10 @@ class Batcontrol(object):
                     60-datetime.datetime.now().astimezone(self.timezone).minute)/60
                 charge_rate = required_recharge_energy/remaining_time
                 charge_rate = min(charge_rate, self.inverter.max_charge_rate)
-                self.inverter.set_mode_force_charge(round(charge_rate))
-                logger.debug(
-                    f'[BatCTRL] Mode: grid charging. Charge rate : {charge_rate} W')
+                self.force_charge(charge_rate)
 
             else:  # keep current charge level. recharge if solar surplus available
-                self.inverter.set_mode_avoid_discharge()
-                logger.debug(f'[BatCTRL] Mode: Avoid discharge')
-
+                self.avoid_discharging()
         return
 
     # %%
@@ -283,7 +305,7 @@ class Batcontrol(object):
 
         production = -np.array(net_consumption)
         production[production < 0] = 0
-        min_price_difference = self.batconfig['min_price_difference']
+        min_price_difference = self.min_price_difference
 
         # evaluation period until price is first time lower then current price
         for h in range(1, max_hour):
@@ -334,16 +356,15 @@ class Batcontrol(object):
 
     def is_discharge_allowed(self, net_consumption: np.ndarray, prices: dict):
         # always allow discharging when battery is >90% maxsoc
-        allow_discharge_limit = self.batconfig['always_allow_discharge_limit']
-        discharge_limit = self.inverter.get_max_capacity() * allow_discharge_limit
-        soc = self.inverter.get_SOC()
+        discharge_limit = self.get_max_capacity() * self.always_allow_discharge_limit
+        soc = self.get_SOC()
         if soc > discharge_limit:
             logger.debug(
                 f'[BatCTRL] Battery level ({soc}) above discharge limit {discharge_limit}')
             return True
 
         current_price = prices[0]
-        min_price_difference = self.batconfig['min_price_difference']
+        min_price_difference = self.min_price_difference
         max_hour = len(net_consumption)
         # relevant time range : until next recharge possibility
         for h in range(1, max_hour):
@@ -398,12 +419,111 @@ class Batcontrol(object):
         stored_energy = self.inverter.get_stored_energy()
         logger.debug(
             f"[BatCTRL] Reserved Energy: {reserved_storage:0.1f} Wh. Available in Battery: {stored_energy:0.1f}Wh")
+        
+        # for API
+        self.set_reserved_energy(reserved_storage)
+        self.set_stored_energy(stored_energy)
+
         if (stored_energy > reserved_storage):
             # allow discharging
             return True
         else:
             # forbid discharging
             return False
+
+    def _set_charge_rate(self, charge_rate):
+        self.last_charge_rate = charge_rate
+        if self.mqtt_api is not None:
+            self.mqtt_api.publish_charge_rate(charge_rate)
+
+    def _set_mode(self, mode):
+        self.last_mode = mode
+        if self.mqtt_api is not None:
+            self.mqtt_api.publish_mode(mode)
+        # leaving force charge mode, reset charge rate
+        if self.last_charge_rate > 0 and mode != -1:
+            self._set_charge_rate = 0
+
+    def allow_discharging(self):
+        logger.debug(f'[BatCTRL] Mode: Allow Discharging')
+        self.inverter.set_mode_allow_discharge()
+        self._set_mode(10)
+        return
+    
+    def avoid_discharging(self):
+        logger.debug(f'[BatCTRL] Mode: Avoid Discharging')
+        self.inverter.set_mode_avoid_discharge()
+        self._set_mode(0)
+        return
+    
+    def force_charge(self, charge_rate):
+        logger.debug(f'[BatCTRL] Mode: grid charging. Charge rate : {charge_rate} W')
+        self.inverter.set_mode_force_charge(charge_rate)
+        self._set_mode(-1)
+        self._set_charge_rate(charge_rate)
+        return
+    
+    def save_run_data(self, production, consumption, net_consumption, prices):
+        self.last_production = production
+        self.last_consumption = consumption
+        self.last_net_consumption = net_consumption
+        self.last_prices = prices
+        if self.mqtt_api is not None:
+            self.mqtt_api.publish_production(production)
+            self.mqtt_api.publish_consumption(consumption)
+            self.mqtt_api.publish_net_consumption(net_consumption)
+            self.mqtt_api.publish_prices(prices)
+        return
+    
+
+    def reset_run_data(self):
+        self.fetched_soc = False
+        self.fetched_max_capacity = False
+
+    def get_SOC(self):
+        if not self.fetched_soc:
+            self.last_SOC = self.inverter.get_SOC()
+            self.fetched_soc = True
+            if self.mqtt_api is not None:
+                self.mqtt_api.publish_SOC(self.last_SOC)
+        return self.last_SOC
+    
+    def get_max_capacity(self):
+        if not self.fetched_max_capacity:
+            self.last_max_capacity = self.inverter.get_max_capacity()
+            self.fetched_max_capacity = True
+            if self.mqtt_api is not None:
+                self.mqtt_api.publish_max_capacity(self.last_max_capacity)
+        return self.last_max_capacity
+    
+    def get_stored_energy(self):
+        return self.inverter.get_stored_energy()
+    
+    def set_reserved_energy(self, reserved_energy):
+        if self.mqtt_api is not None:
+            self.mqtt_api.publish_reserved_energy(reserved_energy)
+        return
+    
+    def set_stored_energy(self, stored_energy):
+        if self.mqtt_api is not None:
+            self.mqtt_api.publish_stored_energy(stored_energy)
+        return
+    
+    def set_discharge_limit(self, discharge_limit):
+        self.discharge_limit = discharge_limit
+        if self.mqtt_api is not None:
+            self.mqtt_api.publish_discharge_limit(discharge_limit)
+        return
+
+    def refresh_static_values(self):
+        if self.mqtt_api is not None:
+            self.mqtt_api.publish_SOC(self.get_SOC())
+            self.mqtt_api.publish_stored_energy(self.get_stored_energy())
+            #
+            self.mqtt_api.publish_always_allow_discharge_limit(self.always_allow_discharge_limit)
+            self.mqtt_api.publish_max_charging_from_grid_limit(self.max_charging_from_grid_limit)
+            #
+            self.mqtt_api.publish_min_price_difference(self.min_price_difference)
 
 
 if __name__ == '__main__':

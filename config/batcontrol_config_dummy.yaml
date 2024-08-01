@@ -19,6 +19,19 @@ utility:
   fees: 0.015 # only required for awattar
   markup: 0.03 # only required for awattar
   url: http://evcc.local/api/tariff/grid # only required for evcc
+mqtt:
+  enabled: false
+  broker: localhost
+  port: 1883
+  topic: batcontrol
+  username: user
+  password: password
+  tls: false
+  cafile: /etc/ssl/certs/ca-certificates.crt
+  certfile: /etc/ssl/certs/client.crt
+  keyfile: /etc/ssl/certs/client.key
+  tls_version: tlsv1.2
+
 
 pvinstallations:
   - name: Haus #name
