@@ -51,7 +51,10 @@ class MQTT_API(object):
         self.base_topic = config['topic']
 
         self.client = mqtt.Client()
-        self.client.username_pw_set(config['username'], config['password'])
+        self.client.enable_logger(logger)
+        if 'username' in config and 'password' in config:
+            self.client.username_pw_set(config['username'], config['password'])
+        
         self.client.will_set(self.base_topic + '/status', 'offline', retain=True)
         global mqtt_api
         mqtt_api = self
@@ -68,10 +71,16 @@ class MQTT_API(object):
         return 
     
     def wait_ready(self) -> bool:
+        retry = 30
         # Check if we are connected and wait for it
         while self.client.is_connected() == False:
+            retry -= 1
+            if retry == 0:
+                logger.error(f'[MQTT] Could not connect to MQTT Broker')
+                return False
             logger.info(f'[MQTT] Waiting for connection')
             time.sleep(1)
+
         return True
 
     
@@ -85,24 +94,39 @@ class MQTT_API(object):
             self.client.publish(self.base_topic + '/charge_rate', rate)
         return            
     
-    def publish_production(self, production:np.ndarray) -> None:
+    def publish_production(self, production:np.ndarray, timestamp:float) -> None:
         if self.client.is_connected() == True:
-            self.client.publish(self.base_topic + '/FCST/production', json.dumps(production.tolist()))
+            #self.client.publish(self.base_topic + '/FCST/production', json.dumps(production.tolist()))
+
+            self.client.publish(self.base_topic + '/FCST/production', json.dumps(self._create_forecast(production, timestamp)))
         return            
 
-    def publish_consumption(self, consumption:np.ndarray) -> None:
+    def _create_forecast(self, forecast:np.ndarray, timestamp:float) -> dict:
+        # Take timestamp and reduce it to the first second of the hour
+        now = timestamp - (timestamp % 3600)
+        
+        list = []
+        for h in range(0, len(forecast)):
+            # nächste stunde nach now
+            list.append ({ 'time_start' :now + h * 3600 , 'value' :   forecast[h] , 'time_end' : now -1  + ( h+1) *3600  })
+
+        data = { 'data' : list }
+        return data
+    
+
+    def publish_consumption(self, consumption:np.ndarray, timestamp:float) -> None:
         if self.client.is_connected() == True:
-            self.client.publish(self.base_topic + '/FCST/consumption', json.dumps(consumption.tolist()))
+            self.client.publish(self.base_topic + '/FCST/consumption', json.dumps(self._create_forecast(consumption,timestamp)))
         return            
 
-    def publish_prices(self, price:np.ndarray) -> None:  
+    def publish_prices(self, price:np.ndarray ,timestamp:float) -> None:  
         if self.client.is_connected() == True:
-            self.client.publish(self.base_topic + '/FCST/prices', json.dumps(price.tolist()))
+            self.client.publish(self.base_topic + '/FCST/prices', json.dumps(self._create_forecast(price,timestamp)))
         return            
 
-    def publish_net_consumption(self, net_consumption:np.ndarray) -> None:
+    def publish_net_consumption(self, net_consumption:np.ndarray, timestamp:float) -> None:
         if self.client.is_connected() == True:
-            self.client.publish(self.base_topic + '/FCST/net_consumption', json.dumps(net_consumption.tolist()))
+            self.client.publish(self.base_topic + '/FCST/net_consumption', json.dumps(self._create_forecast(net_consumption,timestamp)))
         return
     
     def publish_SOC(self, soc:float) -> None:

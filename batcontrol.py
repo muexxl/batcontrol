@@ -52,6 +52,7 @@ class Batcontrol(object):
         self.last_consumption = None
         self.last_production = None
         self.last_net_consumption = None
+        self.last_run_time = 0 
 
         self.load_config(configfile)
         config = self.config
@@ -216,6 +217,7 @@ class Batcontrol(object):
         # for API
         self.refresh_static_values()
         self.set_discharge_limit ( self.get_max_capacity() * self.always_allow_discharge_limit )
+        self.last_run_time=time.time()
 
         #prune log file if file is too large
         if self.config['max_logfile_size'] > 0:
@@ -254,13 +256,13 @@ class Batcontrol(object):
         # negative = charging or feed in
         # positive = dis-charging or grid consumption
 
+        # Store data for API
+        self.save_run_data(production, consumption, net_consumption, prices)
+
         # correction for time that has already passed since the start of the current hour
         net_consumption[0] *= 1 - \
             datetime.datetime.now().astimezone(self.timezone).minute/60
         
-        # Store data for API
-        self.save_run_data(production, consumption, net_consumption, prices)
-
         self.set_wr_parameters(net_consumption, price_dict)
 
         # %%
@@ -469,13 +471,12 @@ class Batcontrol(object):
         self.last_net_consumption = net_consumption
         self.last_prices = prices
         if self.mqtt_api is not None:
-            self.mqtt_api.publish_production(production)
-            self.mqtt_api.publish_consumption(consumption)
-            self.mqtt_api.publish_net_consumption(net_consumption)
-            self.mqtt_api.publish_prices(prices)
+            self.mqtt_api.publish_production(production, self.last_run_time)
+            self.mqtt_api.publish_consumption(consumption, self.last_run_time)
+            self.mqtt_api.publish_net_consumption(net_consumption, self.last_run_time)
+            self.mqtt_api.publish_prices(prices, self.last_run_time)
         return
     
-
     def reset_run_data(self):
         self.fetched_soc = False
         self.fetched_max_capacity = False
