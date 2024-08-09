@@ -502,18 +502,18 @@ class Batcontrol(object):
     
     def set_reserved_energy(self, reserved_energy):
         if self.mqtt_api is not None:
-            self.mqtt_api.publish_reserved_energy(reserved_energy)
+            self.mqtt_api.publish_reserved_energy_capacity(reserved_energy)
         return
     
     def set_stored_energy(self, stored_energy):
         if self.mqtt_api is not None:
-            self.mqtt_api.publish_stored_energy(stored_energy)
+            self.mqtt_api.publish_stored_energy_capacity(stored_energy)
         return
     
     def set_discharge_limit(self, discharge_limit):
         self.discharge_limit = discharge_limit
         if self.mqtt_api is not None:
-            self.mqtt_api.publish_discharge_limit(discharge_limit)
+            self.mqtt_api.publish_always_allow_discharge_limit_capacity(discharge_limit)
         return
 
     def refresh_static_values(self):

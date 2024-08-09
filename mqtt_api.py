@@ -6,18 +6,21 @@
 #            /mode    : -1 = charge from grid , 0 = avoid discharge , 10 = discharge allowed 
 #
 #            /SOC : float  # State of Charge in %
+#     
+#            /max_capacity : float  # Maximum capacity of battery in Wh
 #
 #            /max_charging_from_grid_limit : float  # Charge limit in %
-#            /always_allow_discharge_limit : float  # Discharge limit in 0.0-1.0 (%)
 #
-#            /discharge_limit : float  # Discharge limit in W
+#            /always_allow_discharge_limit : float  # Always Discharge limit until %
+#            /always_allow_discharge_limit_capacity : float  # Always discharge limit in Wh (max_capacity * always_allow_discharge_limit)
+#
 #            /charge_rate : float  # Charge rate in W
-#            /stored_energy : float  # Energy stored in battery in Wh
-#            /reserved_energy : float  # Energy reserved for discharge in Wh
+#
+#            /stored_energy_capacity : float  # Energy stored in battery in Wh
+#            /reserved_energy_capacity : float  # Energy reserved for discharge in Wh in the next hours
 #
 #            /min_price_difference : float  # Minimum price difference in EUR
 #
-#          /max_capacity : float  # Maximum capacity of battery in Wh
 #
 #    Following statistical arrays as JSON Arrays
 #            /FCST/production        # Forecasted production in W
@@ -25,7 +28,13 @@
 #            /FCST/prices            # Forecasted price in EUR
 #            /FCST/net_consumption   # Forecasted net consumption in W
 #
-
+#            Timestamps in unix time
+#            JSON schema:
+#            {
+#                "data" : [
+#                    { "time_start" : int, "value" : float, "time_end" : int },
+#                  ]
+#            }
 
 import json
 import logging
@@ -131,22 +140,22 @@ class MQTT_API(object):
     
     def publish_SOC(self, soc:float) -> None:
         if self.client.is_connected() == True:
-            self.client.publish(self.base_topic + '/SOC', soc)
+            self.client.publish(self.base_topic + '/SOC', f'{int(soc):03}')
         return
     
-    def publish_stored_energy(self, stored_energy:float) -> None:
+    def publish_stored_energy_capacity(self, stored_energy:float) -> None:
         if self.client.is_connected() == True:
-            self.client.publish(self.base_topic + '/stored_energy', stored_energy)
+            self.client.publish(self.base_topic + '/stored_energy_capacity', f'{stored_energy:.1f}')
         return
     
-    def publish_reserved_energy(self, reserved_energy:float) -> None:
+    def publish_reserved_energy_capacity(self, reserved_energy:float) -> None:
         if self.client.is_connected() == True:
-            self.client.publish(self.base_topic + '/reserved_energy', str(reserved_energy))
+            self.client.publish(self.base_topic + '/reserved_energy_capacity', f'{reserved_energy:.1f}')
         return
     
-    def publish_discharge_limit(self, discharge_limit:float) -> None:
+    def publish_always_allow_discharge_limit_capacity(self, discharge_limit:float) -> None:
         if self.client.is_connected() == True:
-            self.client.publish(self.base_topic + '/discharge_limit', str(discharge_limit))
+            self.client.publish(self.base_topic + '/always_allow_discharge_limit_capacity', f'{discharge_limit:.1f}')
         return
     
     def publish_always_allow_discharge_limit(self, allow_discharge_limit:float) -> None:
@@ -161,10 +170,10 @@ class MQTT_API(object):
     
     def publish_min_price_difference(self, min_price_differences:float) -> None:
         if self.client.is_connected() == True:
-            self.client.publish(self.base_topic + '/min_price_differences', min_price_differences)
+            self.client.publish(self.base_topic + '/min_price_differences', f'{min_price_differences:.3f}')
         return
     
     def publish_max_capacity(self, max_capacity:float) -> None:
         if self.client.is_connected() == True:
-            self.client.publish(self.base_topic + '/max_capacity', max_capacity)
+            self.client.publish(self.base_topic + '/max_capacity', f'{max_capacity:.1f}')
         return
