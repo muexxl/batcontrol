@@ -519,7 +519,7 @@ class Batcontrol(object):
     def refresh_static_values(self):
         if self.mqtt_api is not None:
             self.mqtt_api.publish_SOC(self.get_SOC())
-            self.mqtt_api.publish_stored_energy(self.get_stored_energy())
+            self.mqtt_api.publish_stored_energy_capacity(self.get_stored_energy())
             #
             self.mqtt_api.publish_always_allow_discharge_limit(self.always_allow_discharge_limit)
             self.mqtt_api.publish_max_charging_from_grid_limit(self.max_charging_from_grid_limit)
