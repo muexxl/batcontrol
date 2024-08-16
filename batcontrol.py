@@ -547,15 +547,15 @@ class Batcontrol(object):
             return
         
         logger.info(f'[BatCtrl] API: Setting mode to {mode}')
-        if mode == -1:
-            self.api_overwrite = True
-            self.force_charge()
-        elif mode == 0:
-            self.api_overwrite = True
-            self.avoid_discharging()
-        elif mode == 10:
-            self.api_overwrite = True
-            self.allow_discharging()
+        self.api_overwrite = True
+            
+        if mode != self.last_mode:
+            if mode == -1:
+                self.force_charge()
+            elif mode == 0:
+                self.avoid_discharging()
+            elif mode == 10:
+                self.allow_discharging()
         return
 
     def api_set_charge_rate(self, charge_rate:int):
@@ -564,7 +564,9 @@ class Batcontrol(object):
             return
         logger.info(f'[BatCtrl] API: Setting charge rate to {charge_rate}')
         self.api_overwrite = True
-        self.force_charge(charge_rate)
+        if charge_rate != self.last_charge_rate:
+            self.force_charge(charge_rate)
+            
         return
 
 if __name__ == '__main__':
