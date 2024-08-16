@@ -15,7 +15,7 @@ class Testdriver(InverterBaseclass):
         self.SOC=99.0
         self.mode='allow_discharge'
         
-    def set_mode_force_charge(self):
+    def set_mode_force_charge(self,chargerate=500):
         self.mode='force_charge'
         
     def set_mode_allow_discharge(self):
