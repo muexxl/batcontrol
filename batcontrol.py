@@ -92,6 +92,8 @@ class Batcontrol(object):
         self.max_charging_from_grid_limit = self.batconfig['max_charging_from_grid_limit']      
         self.min_price_difference = self.batconfig['min_price_difference'] 
 
+        self.api_overwrite = False
+
         self.mqtt_api = None
         if 'mqtt' in config.keys():
             if config['mqtt']['enabled'] == True:
@@ -99,6 +101,9 @@ class Batcontrol(object):
                 import mqtt_api
                 self.mqtt_api = mqtt_api.MQTT_API(config['mqtt'])
                 self.mqtt_api.wait_ready()
+                # Register for callbacks
+                self.mqtt_api.register_set_callback('mode', self.api_set_mode, int)
+                self.mqtt_api.register_set_callback('charge_rate', self.api_set_charge_rate, int)
 
 
     def __del__(self):
@@ -259,6 +264,12 @@ class Batcontrol(object):
         # Store data for API
         self.save_run_data(production, consumption, net_consumption, prices)
 
+        # stop here if api_overwrite is set and reset it
+        if self.api_overwrite:
+            logger.debug(f'[BatCTRL] API Overwrite active. Skipping control logic. Next evaluation in {TIME_BETWEEN_EVALUATIONS:.0f} seconds')
+            self.api_overwrite = False
+            return
+
         # correction for time that has already passed since the start of the current hour
         net_consumption[0] *= 1 - \
             datetime.datetime.now().astimezone(self.timezone).minute/60
@@ -291,7 +302,6 @@ class Batcontrol(object):
                 remaining_time = (
                     60-datetime.datetime.now().astimezone(self.timezone).minute)/60
                 charge_rate = required_recharge_energy/remaining_time
-                charge_rate = min(charge_rate, self.inverter.max_charge_rate)
                 self.force_charge(charge_rate)
 
             else:  # keep current charge level. recharge if solar surplus available
@@ -458,7 +468,8 @@ class Batcontrol(object):
         self._set_mode(0)
         return
     
-    def force_charge(self, charge_rate):
+    def force_charge(self, charge_rate=500):
+        charge_rate = min(charge_rate, self.inverter.max_charge_rate)
         logger.debug(f'[BatCTRL] Mode: grid charging. Charge rate : {charge_rate} W')
         self.inverter.set_mode_force_charge(charge_rate)
         self._set_mode(-1)
@@ -525,7 +536,36 @@ class Batcontrol(object):
             self.mqtt_api.publish_max_charging_from_grid_limit(self.max_charging_from_grid_limit)
             #
             self.mqtt_api.publish_min_price_difference(self.min_price_difference)
+            #
+            self.mqtt_api.publish_evaluation_intervall(TIME_BETWEEN_EVALUATIONS)
+            self.mqtt_api.publish_last_evaluation_time(self.last_run_time)
 
+    def api_set_mode(self, mode:int):
+        # Check if mode is valid
+        if mode not in [-1, 0, 10]:
+            logger.warning(f'[BatCtrl] API: Invalid mode {mode}')
+            return
+        
+        logger.info(f'[BatCtrl] API: Setting mode to {mode}')
+        if mode == -1:
+            self.api_overwrite = True
+            self.force_charge()
+        elif mode == 0:
+            self.api_overwrite = True
+            self.avoid_discharging()
+        elif mode == 10:
+            self.api_overwrite = True
+            self.allow_discharging()
+        return
+
+    def api_set_charge_rate(self, charge_rate:int):
+        if charge_rate < 0:
+            logger.warning(f'[BatCtrl] API: Invalid charge rate {charge_rate}')
+            return
+        logger.info(f'[BatCtrl] API: Setting charge rate to {charge_rate}')
+        self.api_overwrite = True
+        self.force_charge(charge_rate)
+        return
 
 if __name__ == '__main__':
     bc = Batcontrol(CONFIGFILE)

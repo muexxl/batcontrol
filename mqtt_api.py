@@ -3,6 +3,10 @@
 #
 #  base_topic : string  # topic to publish to
 #            /status  : online/offline  # is batcontrol running?
+#
+#            /evaluation_intervall : int  # intervall in seconds
+#            /last_evaluation      : int  # timestamp of last evaluation
+#
 #            /mode    : -1 = charge from grid , 0 = avoid discharge , 10 = discharge allowed 
 #
 #            /SOC : float  # State of Charge in %
@@ -53,11 +57,18 @@ def on_connect( client, userdata, flags, rc ):
     # Make public, that we are running.
     client.publish(mqtt_api.base_topic + '/status', 'online', retain=True)
 
+def on_message_msgs(mosq, obj, msg):
+    # This callback will only be called for messages with topics that match
+    # $SYS/broker/messages/#
+    print("MESSAGES: " + msg.topic + " " + str(msg.qos) + " " + str(msg.payload))
 
 class MQTT_API(object):
+    SET_SUFFIX = '/set'
     def __init__(self, config:dict):
         self.config=config
         self.base_topic = config['topic']
+
+        self.callbacks = {}
 
         self.client = mqtt.Client()
         self.client.enable_logger(logger)
@@ -91,7 +102,26 @@ class MQTT_API(object):
             time.sleep(1)
 
         return True
+    
+    def _handle_message(self, client, userdata, message):
+        logger.debug(f'[MQTT] Received message on {message.topic}')
+        if message.topic in self.callbacks:
+            try:
+                self.callbacks[message.topic]['function'](self.callbacks[message.topic]['convert'](message.payload))
+            except Exception as e:
+                logger.error(f'[MQTT] Error in callback {message.topic} : {e}')
+        else:
+            logger.warning(f'[MQTT] No callback registered for {message.topic}')
+        return
 
+    def register_set_callback(self, topic:str,  callback:callable, convert: callable) -> None:
+        topic_string = self.base_topic + "/" + topic + MQTT_API.SET_SUFFIX
+        logger.debug(f'[MQTT] Registering callback for {topic_string}')
+                # set api endpoints, generic subscription
+        self.callbacks[topic_string] = { 'function' : callback , 'convert' : convert }
+        self.client.subscribe(topic_string)
+        self.client.message_callback_add(topic_string , self._handle_message)
+        return
     
     def publish_mode(self, mode:int) -> None:
         if self.client.is_connected() == True:
@@ -176,4 +206,14 @@ class MQTT_API(object):
     def publish_max_capacity(self, max_capacity:float) -> None:
         if self.client.is_connected() == True:
             self.client.publish(self.base_topic + '/max_capacity', f'{max_capacity:.1f}')
+        return
+    
+    def publish_evaluation_intervall(self, intervall:int) -> None:
+        if self.client.is_connected() == True:
+            self.client.publish(self.base_topic + '/evaluation_intervall', f'{intervall:.0f}')
+        return
+    
+    def publish_last_evaluation_time(self, timestamp:float) -> None:
+        if self.client.is_connected() == True:
+            self.client.publish(self.base_topic + '/last_evaluation', f'{timestamp:.0f}')
         return
