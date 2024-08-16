@@ -39,6 +39,17 @@
 #                    { "time_start" : int, "value" : float, "time_end" : int },
 #                  ]
 #            }
+#
+# Implemented Input-API:
+#  
+#   Values are expected as "string"  and will be converted to the correct type
+#
+#   Changing these values will stop evaluation for one interation.
+#   Make sure the update is fast enough to not miss the next evaluation.  
+# 
+#    /mode/set        : int  # set mode   -1 = charge from grid , 0 = avoid discharge , 10 = discharge allowed
+#    /charge_rate/set : int  # set charge rate in W , sets mode to -1
+#
 
 import json
 import logging
