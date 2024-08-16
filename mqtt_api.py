@@ -13,9 +13,11 @@
 #     
 #            /max_capacity : float  # Maximum capacity of battery in Wh
 #
-#            /max_charging_from_grid_limit : float  # Charge limit in %
+#            /max_charging_from_grid_limit : float  # Charge limit in 0.1-1
+#            /max_charging_from_grid_limit_percent : float  # Charge limit in %
 #
-#            /always_allow_discharge_limit : float  # Always Discharge limit until %
+#            /always_allow_discharge_limit : float  # Always Discharge limit until 0.1-1
+#            /always_allow_discharge_limit_percent : float  # Always Discharge limit in %
 #            /always_allow_discharge_limit_capacity : float  # Always discharge limit in Wh (max_capacity * always_allow_discharge_limit)
 #
 #            /charge_rate : float  # Charge rate in W
@@ -49,6 +51,9 @@
 # 
 #    /mode/set        : int  # set mode   -1 = charge from grid , 0 = avoid discharge , 10 = discharge allowed
 #    /charge_rate/set : int  # set charge rate in W , sets mode to -1
+#    /always_allow_discharge_limit/set : float  # set always discharge limit in 0.1-1
+#    /max_charging_from_grid_limit/set : float  # set charge limit in NOTin 0-1 
+#    /min_price_difference/set : float  # set minimum price difference in EUR
 #
 
 import json
@@ -201,12 +206,14 @@ class MQTT_API(object):
     
     def publish_always_allow_discharge_limit(self, allow_discharge_limit:float) -> None:
         if self.client.is_connected() == True:
-            self.client.publish(self.base_topic + '/always_allow_discharge_limit', allow_discharge_limit * 100)
+            self.client.publish(self.base_topic + '/always_allow_discharge_limit',  f'{allow_discharge_limit:.2f}')
+            self.client.publish(self.base_topic + '/always_allow_discharge_limit_percent', f'{allow_discharge_limit * 100:.0f}')
         return
     
     def publish_max_charging_from_grid_limit(self, charge_limit:float) -> None:
         if self.client.is_connected() == True:
-            self.client.publish(self.base_topic + '/max_charging_from_grid_limit', charge_limit * 100)
+            self.client.publish(self.base_topic + '/max_charging_from_grid_limit_percent', f'{charge_limit * 100:.0f}')
+            self.client.publish(self.base_topic + '/max_charging_from_grid_limit', f'{charge_limit:.2f}')
         return
     
     def publish_min_price_difference(self, min_price_differences:float) -> None:

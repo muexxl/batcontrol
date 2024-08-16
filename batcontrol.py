@@ -104,6 +104,11 @@ class Batcontrol(object):
                 # Register for callbacks
                 self.mqtt_api.register_set_callback('mode', self.api_set_mode, int)
                 self.mqtt_api.register_set_callback('charge_rate', self.api_set_charge_rate, int)
+                self.mqtt_api.register_set_callback('always_allow_discharge_limit', self.api_set_always_allow_discharge_limit, float)
+                self.mqtt_api.register_set_callback('max_charging_from_grid_limit', self.api_set_max_charging_from_grid_limit, float)
+                self.mqtt_api.register_set_callback('min_price_difference', self.api_set_min_price_difference, float)
+                logger.info(f'[Main] MQTT Connection ready ')
+
 
 
     def __del__(self):
@@ -566,8 +571,33 @@ class Batcontrol(object):
         self.api_overwrite = True
         if charge_rate != self.last_charge_rate:
             self.force_charge(charge_rate)
-            
+
         return
+
+    def api_set_always_allow_discharge_limit(self, limit:float):
+        if limit < 0 or limit > 1:
+            logger.warning(f'[BatCtrl] API: Invalid always allow discharge limit {limit}')
+            return
+        logger.info(f'[BatCtrl] API: Setting always allow discharge limit to {limit}')
+        self.always_allow_discharge_limit = limit
+        return
+    
+    def api_set_max_charging_from_grid_limit(self, limit:float):
+        if limit < 0 or limit > 1:
+            logger.warning(f'[BatCtrl] API: Invalid max charging from grid limit {limit}')
+            return
+        logger.info(f'[BatCtrl] API: Setting max charging from grid limit to {limit}')
+        self.max_charging_from_grid_limit = limit
+        return
+
+    def api_set_min_price_difference(self, min_price_difference:float):
+        if min_price_difference < 0:
+            logger.warning(f'[BatCtrl] API: Invalid min price difference {min_price_difference}')
+            return
+        logger.info(f'[BatCtrl] API: Setting min price difference to {min_price_difference}')
+        self.min_price_difference = min_price_difference
+        return
+
 
 if __name__ == '__main__':
     bc = Batcontrol(CONFIGFILE)
