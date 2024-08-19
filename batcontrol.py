@@ -263,7 +263,7 @@ class Batcontrol(object):
                 remaining_time = (
                     60-datetime.datetime.now().astimezone(self.timezone).minute)/60
                 charge_rate = required_recharge_energy/remaining_time
-                charge_rate = min(charge_rate, self.inverter.max_charge_rate)
+                charge_rate = min(charge_rate, self.inverter.max_grid_charge_rate)
                 self.inverter.set_mode_force_charge(round(charge_rate))
                 logger.debug(
                     f'[BatCTRL] Mode: grid charging. Charge rate : {charge_rate} W')

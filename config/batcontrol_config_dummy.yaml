@@ -10,8 +10,8 @@ inverter:
   address: 192.168.0.XX # the local IP of your inverter. needs to be reachable from the machine that runs batcontrol
   user: customer #customer or technician lowercase only!!
   password: YOUR-PASSWORD #
-  max_charge_rate: 5000 # Watt
-  max_grid_power: 25000 # Watt
+  max_grid_charge_rate: 5000 # Watt
+  max_pv_charge_rate : 3000 # Watt
 utility:
   type: tibber # [tibber, awattar_at, awattar_de, evcc]
   apikey: YOUR-PASSWORD # only required for tibber get one from https://developer.tibber.com/ Zz-XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXx

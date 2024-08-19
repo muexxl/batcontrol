@@ -28,13 +28,13 @@ BATTERY_CONFIG_FILENAME = 'battery_config.json'
 
 from .baseclass import InverterBaseclass
 class FroniusWR(InverterBaseclass):
-    def __init__(self, address, user, password,max_charge_rate,max_grid_power) -> None:
+    def __init__(self, address, user, password,max_grid_charge_rate,max_pv_charge_rate) -> None:
         super().__init__()
         self.login_attempts=0
         self.address = address
         self.capacity = -1
-        self.max_charge_rate= max_charge_rate #4000 #Watt
-        self.max_grid_power= max_grid_power #25000 #5000 #Watt
+        self.max_grid_charge_rate= max_grid_charge_rate 
+        self.max_pv_charge_rate= max_pv_charge_rate 
         self.nonce = 0
         self.user = user
         self.password = password
@@ -138,7 +138,7 @@ class FroniusWR(InverterBaseclass):
         minsoc=int(minsoc)
         maxsoc=int(maxsoc)
         
-        if not 0<=grid_power<=self.max_charge_rate:
+        if not 0<=grid_power<=self.max_grid_charge_rate:
             raise RuntimeError(f'gridpower out of allowed limits {grid_power}')
         
         if minsoc>maxsoc:
@@ -194,11 +194,23 @@ class FroniusWR(InverterBaseclass):
 
     def set_mode_allow_discharge(self):
         self.set_allow_grid_charging(False)
-        response = self.set_time_of_use([]) #set empty time of use list to remove all rules
+        if self.max_pv_charge_rate>0:
+            timeofuselist= [{'Active': True, 
+                'Power': self.max_pv_charge_rate, 
+                'ScheduleType': 'CHARGE_MAX', 
+                'TimeTable': {'End': '23:59', 'Start': '00:00'},
+                'Weekdays': {'Fri': True, 'Mon': True, 'Sat': True, 'Sun': True, 'Thu': True, 'Tue': True, 'Wed': True}
+            }]
+            response = self.set_time_of_use(timeofuselist)
+        else:
+            response = self.set_time_of_use([]) #set empty time of use list to remove all rules
+            
         return response
     
     def set_mode_force_charge(self,chargerate=500):
         #activate timeofuse rules
+        if chargerate>self.max_grid_charge_rate:
+            chargerate=self.max_grid_charge_rate
         timeofuselist= [{'Active': True, 
             'Power': chargerate, 
             'ScheduleType': 'CHARGE_MIN', 
