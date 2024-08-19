@@ -11,7 +11,6 @@ inverter:
   user: customer #customer or technician lowercase only!!
   password: YOUR-PASSWORD #
   max_charge_rate: 5000 # Watt
-  max_grid_power: 25000 # Watt
 utility:
   type: tibber # [tibber, awattar_at, awattar_de, evcc]
   apikey: YOUR-PASSWORD # only required for tibber get one from https://developer.tibber.com/ Zz-XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXx
