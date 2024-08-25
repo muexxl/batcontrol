@@ -28,7 +28,7 @@ BATTERY_CONFIG_FILENAME = 'battery_config.json'
 
 from .baseclass import InverterBaseclass
 class FroniusWR(InverterBaseclass):
-    def __init__(self, address, user, password,max_grid_charge_rate,max_pv_charge_rate) -> None:
+    def __init__(self, address, user, password,max_grid_charge_rate,max_pv_charge_rate=0) -> None:
         super().__init__()
         self.login_attempts=0
         self.address = address
