@@ -7,9 +7,8 @@ logger.info(f'[Fronius] loading module ')
 #from .fronius import InverterBaseclass
 
 class Testdriver(InverterBaseclass):
-    def __init__(self, max_charge_rate:float, max_grid_power:float):
+    def __init__(self, max_charge_rate:float):
         self.max_charge_rate=max_charge_rate
-        self.max_grid_power=max_grid_power
         self.stored_energy=2000
         self.max_capacity=5000
         self.SOC=99.0
