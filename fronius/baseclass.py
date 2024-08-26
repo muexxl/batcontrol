@@ -21,3 +21,9 @@ class InverterBaseclass(object):
 
     def get_SOC():
         raise RuntimeError("[Inverter Base Class] Function 'get_SOC' not implemented")
+
+    def activate_mqtt():
+        raise RuntimeError("[Inverter Base Class] Function 'activate_mqtt' not implemented")
+    
+    def refresh_api_values():
+        raise RuntimeError("[Inverter Base Class] Function 'refresh_api_values' not implemented")

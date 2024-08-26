@@ -107,6 +107,8 @@ class Batcontrol(object):
                 self.mqtt_api.register_set_callback('always_allow_discharge_limit', self.api_set_always_allow_discharge_limit, float)
                 self.mqtt_api.register_set_callback('max_charging_from_grid_limit', self.api_set_max_charging_from_grid_limit, float)
                 self.mqtt_api.register_set_callback('min_price_difference', self.api_set_min_price_difference, float)
+                # Inverter Callbacks
+                self.inverter.activate_mqtt(self.mqtt_api)
                 logger.info(f'[Main] MQTT Connection ready ')
 
 
@@ -544,6 +546,8 @@ class Batcontrol(object):
             #
             self.mqtt_api.publish_evaluation_intervall(TIME_BETWEEN_EVALUATIONS)
             self.mqtt_api.publish_last_evaluation_time(self.last_run_time)
+            # Trigger Inverter
+            self.inverter.refresh_api_values()
 
     def api_set_mode(self, mode:int):
         # Check if mode is valid

@@ -235,3 +235,9 @@ class MQTT_API(object):
         if self.client.is_connected() == True:
             self.client.publish(self.base_topic + '/last_evaluation', f'{timestamp:.0f}')
         return
+    
+    # For depended APIs like the Fronius Inverter classes, which is not directly batcontrol.
+    def generic_publish(self, topic:str, value:str) -> None:
+        if self.client.is_connected() == True:
+            self.client.publish(self.base_topic + '/' + topic, value)
+        return
