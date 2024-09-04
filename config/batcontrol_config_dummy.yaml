@@ -21,6 +21,7 @@ utility:
   url: http://evcc.local/api/tariff/grid # only required for evcc
 mqtt:
   enabled: false
+  logger: false
   broker: localhost
   port: 1883
   topic: batcontrol

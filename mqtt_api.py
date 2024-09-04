@@ -90,7 +90,9 @@ class MQTT_API(object):
         self.callbacks = {}
 
         self.client = mqtt.Client()
-        self.client.enable_logger(logger)
+        if 'logger' in config and config['logger'] == True:
+            self.client.enable_logger(logger)
+        
         if 'username' in config and 'password' in config:
             self.client.username_pw_set(config['username'], config['password'])
         
