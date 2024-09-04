@@ -381,22 +381,22 @@ class FroniusWR(InverterBaseclass):
         import mqtt_api
         self.mqtt_api = api_mqtt_api
         # /set is appended to the topic
-        self.mqtt_api.register_set_callback('inverter/max_grid_charge_rate', self.api_set_max_grid_charge_rate, int)
-        self.mqtt_api.register_set_callback('inverter/max_pv_charge_rate', self.api_set_max_pv_charge_rate, int)
+        self.mqtt_api.register_set_callback(self._get_mqtt_topic() + 'max_grid_charge_rate', self.api_set_max_grid_charge_rate, int)
+        self.mqtt_api.register_set_callback(self._get_mqtt_topic() + 'max_pv_charge_rate', self.api_set_max_pv_charge_rate, int)
 
     def refresh_api_values(self):
         if self.mqtt_api:
-            self.mqtt_api.generic_publish('inverter/SOC', self.get_SOC())
-            self.mqtt_api.generic_publish('inverter/stored_energy', self.get_stored_energy())
-            self.mqtt_api.generic_publish('inverter/free_capacity', self.get_free_capacity())
-            self.mqtt_api.generic_publish('inverter/max_capacity', self.get_max_capacity())
-            self.mqtt_api.generic_publish('inverter/usable_capacity', self.get_usable_capacity())
-            self.mqtt_api.generic_publish('inverter/max_grid_charge_rate', self.max_grid_charge_rate)
-            self.mqtt_api.generic_publish('inverter/max_pv_charge_rate', self.max_pv_charge_rate)
-            self.mqtt_api.generic_publish('inverter/min_soc', self.min_soc)
-            self.mqtt_api.generic_publish('inverter/max_soc', self.max_soc)
+            self.mqtt_api.generic_publish(self._get_mqtt_topic() + 'SOC', self.get_SOC())
+            self.mqtt_api.generic_publish(self._get_mqtt_topic() + 'stored_energy', self.get_stored_energy())
+            self.mqtt_api.generic_publish(self._get_mqtt_topic() + 'free_capacity', self.get_free_capacity())
+            self.mqtt_api.generic_publish(self._get_mqtt_topic() + 'max_capacity', self.get_max_capacity())
+            self.mqtt_api.generic_publish(self._get_mqtt_topic() + 'usable_capacity', self.get_usable_capacity())
+            self.mqtt_api.generic_publish(self._get_mqtt_topic() + 'max_grid_charge_rate', self.max_grid_charge_rate)
+            self.mqtt_api.generic_publish(self._get_mqtt_topic() + 'max_pv_charge_rate', self.max_pv_charge_rate)
+            self.mqtt_api.generic_publish(self._get_mqtt_topic() + 'min_soc', self.min_soc)
+            self.mqtt_api.generic_publish(self._get_mqtt_topic() + 'max_soc', self.max_soc)
             
-            self.mqtt_api.generic_publish('inverter/capacity', self.get_capacity())
+            self.mqtt_api.generic_publish(self._get_mqtt_topic() + 'capacity', self.get_capacity())
 
     def api_set_max_grid_charge_rate(self, max_grid_charge_rate:int):
         if max_grid_charge_rate<0:

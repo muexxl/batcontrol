@@ -52,6 +52,17 @@ class Batcontrol(object):
         self.last_consumption = None
         self.last_production = None
         self.last_net_consumption = None
+
+        self.last_stored_energy = -1
+        self.last_reserved_energy = -1
+        self.last_max_capacity = -1
+
+        self.discharge_limit = 0
+
+        self.fetched_stored_energy = False
+        self.fetched_reserved_energy = False
+        self.fetched_max_capacity = False
+        
         self.last_run_time = 0 
 
         self.load_config(configfile)
@@ -361,8 +372,8 @@ class Batcontrol(object):
             # add_remaining energy to shift to recharge amount
             required_energy += energy_to_shift
 
-        recharge_energy =  required_energy-self.inverter.get_stored_energy()
-        free_capacity = self.inverter.get_free_capacity()
+        recharge_energy =  required_energy-self.get_stored_energy()
+        free_capacity = self.get_free_capacity()
         
         if recharge_energy > free_capacity:
             recharge_energy=free_capacity
@@ -435,7 +446,7 @@ class Batcontrol(object):
             # add_remaining required_energy to reserved_storage
             reserved_storage += required_energy
 
-        stored_energy = self.inverter.get_stored_energy()
+        stored_energy = self.get_stored_energy()
         logger.debug(
             f"[BatCTRL] Reserved Energy: {reserved_storage:0.1f} Wh. Available in Battery: {stored_energy:0.1f}Wh")
         
@@ -498,13 +509,14 @@ class Batcontrol(object):
     def reset_run_data(self):
         self.fetched_soc = False
         self.fetched_max_capacity = False
+        self.fetched_stored_energy = False
+        self.fetched_reserved_energy = False
 
     def get_SOC(self):
         if not self.fetched_soc:
             self.last_SOC = self.inverter.get_SOC()
+            #self.last_SOC = self.get_stored_energy() / self.get_max_capacity() * 100
             self.fetched_soc = True
-            if self.mqtt_api is not None:
-                self.mqtt_api.publish_SOC(self.last_SOC)
         return self.last_SOC
     
     def get_max_capacity(self):
@@ -512,18 +524,30 @@ class Batcontrol(object):
             self.last_max_capacity = self.inverter.get_max_capacity()
             self.fetched_max_capacity = True
             if self.mqtt_api is not None:
-                self.mqtt_api.publish_max_capacity(self.last_max_capacity)
+                self.mqtt_api.publish_max_energy_capacity(self.last_max_capacity)
         return self.last_max_capacity
     
     def get_stored_energy(self):
-        return self.inverter.get_stored_energy()
-    
+        if not self.fetched_stored_energy:
+            self.last_stored_energy = self.inverter.get_stored_energy()
+            self.fetched_stored_energy = True
+        return self.last_stored_energy
+
+    def get_free_capacity(self):
+        self.last_free_capacity = self.inverter.get_free_capacity()
+        return self.last_free_capacity
+
     def set_reserved_energy(self, reserved_energy):
+        self.last_reserved_energy = reserved_energy
         if self.mqtt_api is not None:
             self.mqtt_api.publish_reserved_energy_capacity(reserved_energy)
         return
     
+    def get_reserved_energy(self):
+        return self.last_reserved_energy
+    
     def set_stored_energy(self, stored_energy):
+        self.last_stored_energy = stored_energy
         if self.mqtt_api is not None:
             self.mqtt_api.publish_stored_energy_capacity(stored_energy)
         return

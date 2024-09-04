@@ -46,12 +46,12 @@ class Testdriver(InverterBaseclass):
         import mqtt_api
         self.mqtt_api = api_mqtt_api
         # /set is appended to the topic
-        self.mqtt_api.register_set_callback('inverter/SOC', self.api_set_SOC, int)
+        self.mqtt_api.register_set_callback(self._get_mqtt_topic() + 'SOC', self.api_set_SOC, int)
 
     def refresh_api_values(self):
         if self.mqtt_api:
-            self.mqtt_api.generic_publish('inverter/SOC', self.get_SOC())
-            self.mqtt_api.generic_publish('inverter/mode', self.mode)
-            self.mqtt_api.generic_publish('inverter/stored_energy', self.get_stored_energy())
-            self.mqtt_api.generic_publish('inverter/free_capacity', self.get_free_capacity())
-            self.mqtt_api.generic_publish('inverter/max_capacity', self.get_max_capacity())
+            self.mqtt_api.generic_publish(self._get_mqtt_topic() + 'SOC', self.get_SOC())
+            self.mqtt_api.generic_publish(self._get_mqtt_topic() + 'mode', self.mode)
+            self.mqtt_api.generic_publish(self._get_mqtt_topic() + 'stored_energy', self.get_stored_energy())
+            self.mqtt_api.generic_publish(self._get_mqtt_topic() + 'free_capacity', self.get_free_capacity())
+            self.mqtt_api.generic_publish(self._get_mqtt_topic() + 'max_capacity', self.get_max_capacity())

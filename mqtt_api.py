@@ -9,6 +9,12 @@
 #
 #            /mode    : -1 = charge from grid , 0 = avoid discharge , 10 = discharge allowed 
 #
+#
+#            /SOC : float  # State of Charge in %
+#     
+#            /max_capacity : float  # Maximum capacity of battery in Wh
+#
+#     
 #            /SOC : float  # State of Charge in %
 #     
 #            /max_capacity : float  # Maximum capacity of battery in Wh
@@ -22,10 +28,15 @@
 #
 #            /charge_rate : float  # Charge rate in W
 #
-#            /stored_energy_capacity : float  # Energy stored in battery in Wh
-#            /reserved_energy_capacity : float  # Energy reserved for discharge in Wh in the next hours
+#            # Battery values in absoulte values, which might be across multiple batteries.
+#            /max_energy_capacity      : float  # Maximum capacity of battery in Wh
+#            /stored_energy_capacity   : float  # Energy stored in battery in Wh            
+#          
+#            /reserved_energy_capacity : float  # Estimated energy reserved for discharge in Wh in the next hours
 #
-#            /min_price_difference : float  # Minimum price difference in EUR
+#            /SOC                      : float  # State of charge in % calculated from stored_energy_capacity / max_energy_capacity
+#
+#            /min_price_difference     : float  # Minimum price difference in EUR
 #
 #
 #    Following statistical arrays as JSON Arrays
@@ -221,9 +232,9 @@ class MQTT_API(object):
             self.client.publish(self.base_topic + '/min_price_differences', f'{min_price_differences:.3f}')
         return
     
-    def publish_max_capacity(self, max_capacity:float) -> None:
+    def publish_max_energy_capacity(self, max_capacity:float) -> None:
         if self.client.is_connected() == True:
-            self.client.publish(self.base_topic + '/max_capacity', f'{max_capacity:.1f}')
+            self.client.publish(self.base_topic + '/max_energy_capacity', f'{max_capacity:.1f}')
         return
     
     def publish_evaluation_intervall(self, intervall:int) -> None:

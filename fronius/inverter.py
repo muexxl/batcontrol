@@ -16,3 +16,7 @@ class Inverter(object):
             return Testdriver(config['max_grid_charge_rate'])
         else:
             raise RuntimeError(f'[Inverter] Unkown inverter type {config["type"]}')
+        
+
+    def _get_mqtt_topic(self):
+        return 'inverters/0/'
