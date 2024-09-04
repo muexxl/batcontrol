@@ -9,14 +9,6 @@
 #
 #            /mode    : -1 = charge from grid , 0 = avoid discharge , 10 = discharge allowed 
 #
-#
-#            /SOC : float  # State of Charge in %
-#     
-#            /max_capacity : float  # Maximum capacity of battery in Wh
-#
-#     
-#            /SOC : float  # State of Charge in %
-#     
 #            /max_capacity : float  # Maximum capacity of battery in Wh
 #
 #            /max_charging_from_grid_limit : float  # Charge limit in 0.1-1

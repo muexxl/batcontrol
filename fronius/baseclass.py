@@ -28,5 +28,7 @@ class InverterBaseclass(object):
     def refresh_api_values():
         raise RuntimeError("[Inverter Base Class] Function 'refresh_api_values' not implemented")
     
+    # Used to implement the mqtt basic topic. 
+    # Currently there is only one inverter, so the number is hardcoded
     def _get_mqtt_topic(self):
         return 'inverters/0/'

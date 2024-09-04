@@ -377,6 +377,16 @@ class FroniusWR(InverterBaseclass):
         self.logout()
 
 
+   ## Start API functions
+   # MQTT publishes all internal values.
+   #
+   # Topic is: base_topic + '/inverters/0/'
+   #  
+   # Following parameters can be set via MQTT:
+   # max_grid_charge_rate (int) - Maximum power in W that can be used to load the battery from the grid
+   # max_pv_charge_rate (int)   - Maximum power in W that can be used to load the battery from the PV
+   
+
     def activate_mqtt(self, api_mqtt_api):  # no type here to prevent the need of loading mqtt_api
         import mqtt_api
         self.mqtt_api = api_mqtt_api

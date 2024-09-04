@@ -6,6 +6,13 @@ logger.info(f'[Testdriver] loading module ')
 
 #from .fronius import InverterBaseclass
 
+# Testdriver to simulate a inverter for local testing.
+#
+# Following values can be set via MQTT:
+# - SOC (int): State of charge in percent
+#            : <mqtt_topic>/inverters/0/SOC/set
+
+
 class Testdriver(InverterBaseclass):
     def __init__(self, max_charge_rate:float):
         self.max_charge_rate=max_charge_rate
