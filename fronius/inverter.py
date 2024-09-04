@@ -17,6 +17,3 @@ class Inverter(object):
         else:
             raise RuntimeError(f'[Inverter] Unkown inverter type {config["type"]}')
         
-
-    def _get_mqtt_topic(self):
-        return 'inverters/0/'
