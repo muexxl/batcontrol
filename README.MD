@@ -1,5 +1,7 @@
 **Optimize your Electricity cost by re-charging your PV Battery when Electricity is cheap and there is not enough Solarpower available.**
 
+To include batcontrol in home assistant please use the repository: https://github.com/muexxl/ha_addons/
+
 # Preconditions: 
 
 1. You have a PV Installation with a BYD Battery and a Fronius inverter  
