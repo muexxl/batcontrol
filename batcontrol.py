@@ -36,7 +36,7 @@ logger.setLevel(loglevel)
 from forecastconsumption import forecastconsumption
 from forecastsolar import forecastsolar
 from dynamictariff import dynamictariff
-from fronius import inverter 
+from inverter import inverter 
 from logfilelimiter import logfilelimiter
 
 

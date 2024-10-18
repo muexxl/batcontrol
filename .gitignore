@@ -6,3 +6,5 @@
 *venv*
 log
 test.py
+config/batcontrol_config.yaml.bck
+run_infinite.sh
