@@ -31,7 +31,7 @@ class ForecastSolar(object):
         if self.results == {}:
             logger.warning(f'[FCSolar] No results from FC Solar API available')
             raise RuntimeWarning('[FCSolar] No results from FC Solar API available')
-            
+
 
         prediction={}
         now = datetime.datetime.now().astimezone(self.timezone)
@@ -56,10 +56,10 @@ class ForecastSolar(object):
         max_hour=max(prediction.keys())
         for h in range(max_hour+1):
             if h not in prediction.keys():
-                prediction[h]=0        
+                prediction[h]=0
         #sort output
         output=dict(sorted(prediction.items()))
-        
+
         return output
 
     def get_raw_forecast(self):
@@ -71,16 +71,19 @@ class ForecastSolar(object):
             dec = unit['declination']  # declination
             az = unit['azimuth']  # 90 =W -90 = E
             kwp = unit['kWp']
+
+            apikey_urlmod=''
             if 'apikey' in unit.keys():
-                apikey = unit['api'] # ForecastSolar api 
-                url = f"https://api.forecast.solar/{apikey}/estimate/watthours/period/{lat}/{lon}/{dec}/{az}/{kwp}"
-            else:
-                url = f"https://api.forecast.solar/estimate/watthours/period/{lat}/{lon}/{dec}/{az}/{kwp}"
-                
+                apikey_urlmod = unit['apikey'] +"/"# ForecastSolar api
+            #legacy naming in config file
+            elif 'api' in unit.keys():
+                apikey_urlmod = unit['api'] +"/" # ForecastSolar api
+
+            url = f"https://api.forecast.solar/{apikey_urlmod}estimate/watthours/period/{lat}/{lon}/{dec}/{az}/{kwp}"
             logger.info(
                 f'[FCSolar] Requesting Information for PV Installation {name}')
-            
-            
+
+
             response = requests.get(url)
             if response.status_code == 200:
                 self.results[name] = json.loads(response.text)
