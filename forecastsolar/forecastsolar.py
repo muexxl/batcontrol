@@ -73,10 +73,10 @@ class ForecastSolar(object):
             kwp = unit['kWp']
 
             apikey_urlmod=''
-            if 'apikey' in unit.keys():
+            if 'apikey' in unit.keys() and unit['apikey'] is not None:
                 apikey_urlmod = unit['apikey'] +"/"# ForecastSolar api
             #legacy naming in config file
-            elif 'api' in unit.keys():
+            elif 'api' in unit.keys() and unit['api'] is not None:
                 apikey_urlmod = unit['api'] +"/" # ForecastSolar api
 
             url = f"https://api.forecast.solar/{apikey_urlmod}estimate/watthours/period/{lat}/{lon}/{dec}/{az}/{kwp}"
