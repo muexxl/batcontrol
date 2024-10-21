@@ -14,8 +14,8 @@ logger.info(f'[Testdriver] loading module ')
 
 
 class Testdriver(InverterBaseclass):
-    def __init__(self, max_charge_rate:float):
-        self.max_charge_rate=max_charge_rate
+    def __init__(self, max_grid_charge:float):
+        self.max_grid_charge_rate=max_grid_charge
         self.max_capacity=5000
         self.SOC=99.0
         self.mode='allow_discharge'
