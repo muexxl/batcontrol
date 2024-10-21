@@ -487,7 +487,7 @@ class Batcontrol(object):
         return
     
     def force_charge(self, charge_rate=500):
-        charge_rate = min(charge_rate, self.inverter.max_charge_rate)
+        charge_rate = min(charge_rate, self.inverter.max_grid_charge_rate)
         logger.debug(f'[BatCTRL] Mode: grid charging. Charge rate : {charge_rate} W')
         self.inverter.set_mode_force_charge(charge_rate)
         self._set_mode(-1)
