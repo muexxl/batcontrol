@@ -387,10 +387,10 @@ class Batcontrol(object):
     def is_discharge_allowed(self, net_consumption: np.ndarray, prices: dict):
         # always allow discharging when battery is >90% maxsoc
         discharge_limit = self.get_max_capacity() * self.always_allow_discharge_limit
-        soc = self.get_SOC()
-        if soc > discharge_limit:
+        stored_energy = self.get_stored_energy()
+        if stored_energy > discharge_limit:
             logger.debug(
-                f'[BatCTRL] Battery level ({soc}) above discharge limit {discharge_limit}')
+                f'[BatCTRL] Battery with {stored_energy} above discharge limit {discharge_limit}')
             return True
 
         current_price = prices[0]
@@ -446,7 +446,6 @@ class Batcontrol(object):
             # add_remaining required_energy to reserved_storage
             reserved_storage += required_energy
 
-        stored_energy = self.get_stored_energy()
         logger.debug(
             f"[BatCTRL] Reserved Energy: {reserved_storage:0.1f} Wh. Available in Battery: {stored_energy:0.1f}Wh")
         
