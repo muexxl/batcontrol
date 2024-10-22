@@ -49,7 +49,8 @@ logger.info(f'[Main] Starting Batcontrol ')
 class Batcontrol(object):
     def __init__(self, configfile, is_simulation=False):
         # For API
-        self.last_mode = None
+        self.api_overwrite = False
+        self.last_mode = None  # -1 = charge from grid , 0 = avoid discharge , 10 = discharge allowed 
         self.last_charge_rate = 0
         self.last_prices = None
         self.last_consumption = None
@@ -120,8 +121,6 @@ class Batcontrol(object):
         self.always_allow_discharge_limit = self.batconfig['always_allow_discharge_limit']
         self.max_charging_from_grid_limit = self.batconfig['max_charging_from_grid_limit']
         self.min_price_difference = self.batconfig['min_price_difference']
-
-        self.api_overwrite = False
 
         self.mqtt_api = None
         if 'mqtt' in config.keys():
