@@ -166,7 +166,7 @@ class Batcontrol(object):
                 logger.info(f'[Main] EVCC Connection enabled')
                 import evcc_api
                 self.evcc_api = evcc_api.EVCC_API(config['evcc'])
-                self.ebcc_api.register_block_function(self.set_discharge_blocked)
+                self.evcc_api.register_block_function(self.set_discharge_blocked)
                 self.evcc_api.wait_ready()
                 logger.info(f'[Main] EVCC Connection ready')
 
@@ -476,9 +476,10 @@ class Batcontrol(object):
         # always allow discharging when battery is >90% maxsoc
         discharge_limit = self.get_max_capacity() * self.always_allow_discharge_limit
         stored_energy = self.get_stored_energy()
+     
         if stored_energy > discharge_limit:
             logger.debug(
-                f'[BatCTRL] Battery with {stored_energy} above discharge limit {discharge_limit}')
+                f'[BatCTRL] Battery with ({stored_energy}) above discharge limit {discharge_limit}')
             return True
         
         if self.discharge_blocked:
@@ -661,6 +662,7 @@ class Batcontrol(object):
     def set_discharge_blocked(self, discharge_blocked):
         if discharge_blocked == self.discharge_blocked:
             return
+        logger.info(f'[BatCTRL] Discharge block: {discharge_blocked}')
         if self.mqtt_api is not None:
             self.mqtt_api.publish_discharge_blocked(discharge_blocked)
         self.discharge_blocked = discharge_blocked
@@ -693,8 +695,8 @@ class Batcontrol(object):
         if mode not in [MODE_FORCE_CHARGING, MODE_AVOID_DISCHARGING, MODE_ALLOW_DISCHARGING]:
             logger.warning(f'[BatCtrl] API: Invalid mode {mode}')
             return
-
-        logger.info(f'[BatCtrl] API: Setting mode to {mode}')
+        
+        logger.info(f'[BatCTRL] API: Setting mode to {mode}')
         self.api_overwrite = True
 
         if mode != self.last_mode:
@@ -708,9 +710,9 @@ class Batcontrol(object):
 
     def api_set_charge_rate(self, charge_rate: int):
         if charge_rate < 0:
-            logger.warning(f'[BatCtrl] API: Invalid charge rate {charge_rate}')
+            logger.warning(f'[BatCTRL] API: Invalid charge rate {charge_rate}')
             return
-        logger.info(f'[BatCtrl] API: Setting charge rate to {charge_rate}')
+        logger.info(f'[BatCTRL] API: Setting charge rate to {charge_rate}')
         self.api_overwrite = True
         if charge_rate != self.last_charge_rate:
             self.force_charge(charge_rate)

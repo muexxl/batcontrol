@@ -2,7 +2,6 @@
 This module provides an API to publish data from batcontrol to MQTT
 for further processing and visualization.
 
-<<<<<<< HEAD
 The following topics are published:
 - /status: online/offline status of batcontrol
 - /evaluation_intervall: interval in seconds
@@ -20,69 +19,7 @@ The following topics are published:
 - /reserved_energy_capacity: estimated energy reserved for discharge in Wh
 - /SOC: state of charge in %
 - /min_price_difference: minimum price difference in EUR
-=======
-# API to publish data from batcontrol to MQTT for further processing+visualization
-#
-#  base_topic : string  # topic to publish to
-#            /status  : online/offline  # is batcontrol running?
-#
-#            /evaluation_intervall : int  # intervall in seconds
-#            /last_evaluation      : int  # timestamp of last evaluation
-#
-#            /mode    : -1 = charge from grid , 0 = avoid discharge , 10 = discharge allowed 
-#
-#            /max_capacity : float  # Maximum capacity of battery in Wh
-#
-#            /max_charging_from_grid_limit : float  # Charge limit in 0.1-1
-#            /max_charging_from_grid_limit_percent : float  # Charge limit in %
-#
-#            /always_allow_discharge_limit : float  # Always Discharge limit until 0.1-1
-#            /always_allow_discharge_limit_percent : float  # Always Discharge limit in %
-#            /always_allow_discharge_limit_capacity : float  # Always discharge limit in Wh (max_capacity * always_allow_discharge_limit)
-#
-#            /charge_rate : float  # Charge rate in W
-#
-#            # Battery values in absoulte values, which might be across multiple batteries.
-#            /max_energy_capacity      : float  # Maximum capacity of battery in Wh
-#            /stored_energy_capacity   : float  # Energy stored in battery in Wh            
-#          
-#            /reserved_energy_capacity : float  # Estimated energy reserved for discharge in Wh in the next hours
-#
-#            /SOC                      : float  # State of charge in % calculated from stored_energy_capacity / max_energy_capacity
-#
-#            /min_price_difference     : float  # Minimum price difference in EUR
-#
-#            /discharge_blocked        : bool  # Discharge is blocked by other sources
-#
-#
-#    Following statistical arrays as JSON Arrays
-#            /FCST/production        # Forecasted production in W
-#            /FCST/consumption       # Forecasted consumption in W
-#            /FCST/prices            # Forecasted price in EUR
-#            /FCST/net_consumption   # Forecasted net consumption in W
-#
-#            Timestamps in unix time
-#            JSON schema:
-#            {
-#                "data" : [
-#                    { "time_start" : int, "value" : float, "time_end" : int },
-#                  ]
-#            }
-#
-# Implemented Input-API:
-#  
-#   Values are expected as "string"  and will be converted to the correct type
-#
-#   Changing these values will stop evaluation for one interation.
-#   Make sure the update is fast enough to not miss the next evaluation.  
-# 
-#    /mode/set        : int  # set mode   -1 = charge from grid , 0 = avoid discharge , 10 = discharge allowed
-#    /charge_rate/set : int  # set charge rate in W , sets mode to -1
-#    /always_allow_discharge_limit/set : float  # set always discharge limit in 0.1-1
-#    /max_charging_from_grid_limit/set : float  # set charge limit in NOTin 0-1 
-#    /min_price_difference/set : float  # set minimum price difference in EUR
-#
->>>>>>> e033539 (Add discharge blocker)
+- /discharge_blocked        : bool  # Discharge is blocked by other sources
 
 The following statistical arrays are published as JSON arrays:
 - /FCST/production: forecasted production in W
