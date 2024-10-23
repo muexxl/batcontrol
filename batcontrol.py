@@ -17,6 +17,10 @@ ERROR_IGNORE_TIME = 600
 TIME_BETWEEN_EVALUATIONS = 120
 TIME_BETWEEN_UTILITY_API_CALLS=900 #15 Minutes
 
+MODE_ALLOW_DISCHARGING = 10
+MODE_AVOID_DISCHARGING = 0
+MODE_FORCE_CHARGING = -1
+
 loglevel = logging.DEBUG
 logger = logging.getLogger(__name__)
 formatter = logging.Formatter("%(asctime)s %(levelname)s %(message)s",
@@ -470,26 +474,26 @@ class Batcontrol(object):
         if self.mqtt_api is not None:
             self.mqtt_api.publish_mode(mode)
         # leaving force charge mode, reset charge rate
-        if self.last_charge_rate > 0 and mode != -1:
+        if self.last_charge_rate > 0 and mode != MODE_FORCE_CHARGING:
             self._set_charge_rate = 0
 
     def allow_discharging(self):
         logger.debug(f'[BatCTRL] Mode: Allow Discharging')
         self.inverter.set_mode_allow_discharge()
-        self._set_mode(10)
+        self._set_mode(MODE_ALLOW_DISCHARGING)
         return
     
     def avoid_discharging(self):
         logger.debug(f'[BatCTRL] Mode: Avoid Discharging')
         self.inverter.set_mode_avoid_discharge()
-        self._set_mode(0)
+        self._set_mode(MODE_AVOID_DISCHARGING)
         return
     
     def force_charge(self, charge_rate=500):
         charge_rate = min(charge_rate, self.inverter.max_grid_charge_rate)
         logger.debug(f'[BatCTRL] Mode: grid charging. Charge rate : {charge_rate} W')
         self.inverter.set_mode_force_charge(charge_rate)
-        self._set_mode(-1)
+        self._set_mode(MODE_FORCE_CHARGING)
         self._set_charge_rate(charge_rate)
         return
     
@@ -574,7 +578,7 @@ class Batcontrol(object):
 
     def api_set_mode(self, mode:int):
         # Check if mode is valid
-        if mode not in [-1, 0, 10]:
+        if mode not in [MODE_FORCE_CHARGING, MODE_AVOID_DISCHARGING, MODE_ALLOW_DISCHARGING]:
             logger.warning(f'[BatCtrl] API: Invalid mode {mode}')
             return
         
@@ -582,11 +586,11 @@ class Batcontrol(object):
         self.api_overwrite = True
             
         if mode != self.last_mode:
-            if mode == -1:
+            if mode == MODE_FORCE_CHARGING:
                 self.force_charge()
-            elif mode == 0:
+            elif mode == MODE_AVOID_DISCHARGING:
                 self.avoid_discharging()
-            elif mode == 10:
+            elif mode == MODE_ALLOW_DISCHARGING:
                 self.allow_discharging()
         return
 
