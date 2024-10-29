@@ -78,6 +78,16 @@ class Batcontrol(object):
         
         timezone = pytz.timezone(config['timezone'])
         self.timezone = timezone
+        
+        try:
+            tz=os.environ['TZ']
+            logger.info(f"[Batcontrol] host system time zone is {tz}")
+        except:
+            logger.info(f"[Batcontrol] host system time zone was not set. Setting to {config['timezone']}")
+            os.environ['TZ']=config['timezone']
+        time.tzset()
+            
+            
 
         self.is_simulation = is_simulation
         
