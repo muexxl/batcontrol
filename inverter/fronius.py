@@ -75,7 +75,7 @@ class FroniusWR(InverterBaseclass):
         return energy
 
     def get_max_capacity(self):
-        return self.max_soc
+        return self.max_soc/100*self.get_capacity()
 
     def get_usable_capacity(self):
         usable_capa = (self.max_soc-self.min_soc)/100*self.get_capacity()
@@ -436,7 +436,6 @@ class FroniusWR(InverterBaseclass):
                 self._get_mqtt_topic() + 'min_soc', self.min_soc)
             self.mqtt_api.generic_publish(
                 self._get_mqtt_topic() + 'max_soc', self.max_soc)
-
             self.mqtt_api.generic_publish(
                 self._get_mqtt_topic() + 'capacity', self.get_capacity())
 
