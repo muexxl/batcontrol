@@ -29,7 +29,6 @@ def strip_dict(original):
 
 TIMEOFUSE_CONFIG_FILENAME = 'timeofuse_config.json'
 BATTERY_CONFIG_FILENAME = 'battery_config.json'
-# POWERUNIT_CONFIG_FILENAME = 'powerunit_config.json'
 
 
 class FroniusWR(InverterBaseclass):
@@ -52,17 +51,11 @@ class FroniusWR(InverterBaseclass):
             raise RuntimeError(
                 f'[Inverter] failed to load Power Unit config from Inverter at {self.address}')
         self.backup_power_mode = self.previous_backup_power_config['backuppower']['DEVICE_MODE_BACKUPMODE_TYPE_U16']
-        # logger.info(
-        #     f'[Inverter] Backup Power: {self.backup_power_mode} ')
         if self.backup_power_mode == 0:
             self.min_soc = self.previous_battery_config['BAT_M0_SOC_MIN'] # in percent
         else:
             self.min_soc = max(self.previous_battery_config['BAT_M0_SOC_MIN'], self.previous_battery_config['HYB_BACKUP_RESERVED'])  # in percent
         self.max_soc = self.previous_battery_config['BAT_M0_SOC_MAX']
-        # logger.info(
-        #     f'[Inverter] Battery MIN_SOC: {self.min_soc} ')
-        # logger.info(
-        #     f'[Inverter] Battery MAX_SOC: {self.max_soc} ')
 
         self.get_time_of_use()  # save timesofuse
 
@@ -114,8 +107,6 @@ class FroniusWR(InverterBaseclass):
             logger.error(f'[Inverter] Failed to get power unit configuration. Returning empty dict')
             return {}
         result = json.loads(response.text)
-        # with open(POWERUNIT_CONFIG_FILENAME, 'w') as f:
-        #     f.write(response.text)
         return result
 
     def restore_battery_config(self):
