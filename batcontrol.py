@@ -485,7 +485,7 @@ class Batcontrol(object):
             self.mqtt_api.publish_mode(mode)
         # leaving force charge mode, reset charge rate
         if self.last_charge_rate > 0 and mode != MODE_FORCE_CHARGING:
-            self._set_charge_rate = 0
+            self._set_charge_rate(0)
 
     def allow_discharging(self):
         logger.debug(f'[BatCTRL] Mode: Allow Discharging')
