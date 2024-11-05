@@ -43,23 +43,45 @@ class FroniusWR(InverterBaseclass):
         self.user = user
         self.password = password
         self.previous_battery_config = self.get_battery_config()
+        self.previous_backup_power_config = None
+        # default values
+        self.max_soc = 100
+        self.min_soc = 0
+
         if not self.previous_battery_config:
             raise RuntimeError(
                 f'[Inverter] failed to load Battery config from Inverter at {self.address}')
         try:
             self.previous_backup_power_config = self.get_powerunit_config()
         except RuntimeError:
-            self.previous_backup_power_config = self.get_powerunit_config('1.2')
+            logger.error(
+                '[Inverter] failed to load Power Unit config from Inverter (latest).'
+            )
+
         if not self.previous_backup_power_config:
-            raise RuntimeError(
-                f'[Inverter] failed to load Power Unit config from Inverter at {self.address}')
-        self.backup_power_mode = self.previous_backup_power_config['backuppower']['DEVICE_MODE_BACKUPMODE_TYPE_U16']
+            try:
+                self.previous_backup_power_config = self.get_powerunit_config('1.2')
+            except RuntimeError:
+                logger.error(
+                    '[Inverter] failed to load Power Unit config from Inverter (1.2).'
+                )
+
+        if self.previous_backup_power_config:
+            self.backup_power_mode = self.previous_backup_power_config['backuppower']['DEVICE_MODE_BACKUPMODE_TYPE_U16']
+        else:
+            logger.error("[Inverter] Setting backup power mode to 0 as a fallback.")
+            self.backup_power_mode = 0
+            self.previous_backup_power_config = None
+
         if self.backup_power_mode == 0:
             self.min_soc = self.previous_battery_config['BAT_M0_SOC_MIN'] # in percent
         else:
-            self.min_soc = max(self.previous_battery_config['BAT_M0_SOC_MIN'], self.previous_battery_config['HYB_BACKUP_RESERVED'])  # in percent
+             # in percent
+            self.min_soc = max(
+                self.previous_battery_config['BAT_M0_SOC_MIN'],
+                self.previous_battery_config['HYB_BACKUP_RESERVED']
+            )
         self.max_soc = self.previous_battery_config['BAT_M0_SOC_MAX']
-
         self.get_time_of_use()  # save timesofuse
 
     def get_SOC(self):
