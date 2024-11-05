@@ -1,10 +1,10 @@
-from .baseclass import InverterBaseclass
-import requests
-import json
-import hashlib
-import logging
 import time
 import os
+import logging
+import json
+import hashlib
+import requests
+from .baseclass import InverterBaseclass
 
 logger = logging.getLogger('__main__')
 logger.info(f'[Inverter] loading module ')

@@ -1,13 +1,19 @@
 #! /usr/bin/env python
 # %%
-import pytz
+import sys
 import datetime
 import time
 import os
-import yaml
-import numpy as np
 import logging
-import sys
+import yaml
+import pytz
+import numpy as np
+
+from forecastconsumption import forecastconsumption
+from forecastsolar import forecastsolar
+from dynamictariff import dynamictariff
+from inverter import inverter
+from logfilelimiter import logfilelimiter
 
 LOGFILE = "batcontrol.log"
 CONFIGFILE = "config/batcontrol_config.yaml"
@@ -37,20 +43,13 @@ logger.addHandler(streamhandler)
 
 logger.setLevel(loglevel)
 
-from forecastconsumption import forecastconsumption
-from forecastsolar import forecastsolar
-from dynamictariff import dynamictariff
-from inverter import inverter
-from logfilelimiter import logfilelimiter
-
-
 logger.info(f'[Main] Starting Batcontrol ')
 
 
 class Batcontrol(object):
     def __init__(self, configfile, is_simulation=False):
         # For API
-        self.last_mode = None  # -1 = charge from grid , 0 = avoid discharge , 10 = discharge allowed
+        self.last_mode = None
         self.last_charge_rate = 0
         self.last_prices = None
         self.last_consumption = None

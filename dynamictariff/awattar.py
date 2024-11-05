@@ -1,7 +1,7 @@
-from .baseclass import DynamicTariffBaseclass
-import requests
 import datetime
 import math
+import requests
+from .baseclass import DynamicTariffBaseclass
 
 class Awattar(DynamicTariffBaseclass):
     def __init__(self, timezone ,country:str, price_fees:float, price_markup:float, vat:float,  min_time_between_API_calls=0):
