@@ -373,7 +373,7 @@ class Batcontrol(object):
 
             # correct energy to shift with potential production
             # start with nearest hour
-            for hour in range(high_price_hour):
+            for hour in range(1,high_price_hour):
                 if production[hour] == 0:
                     continue
                 if production[hour] >= energy_to_shift:
