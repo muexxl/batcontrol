@@ -81,9 +81,12 @@ class Batcontrol(object):
         try:
             tz=os.environ['TZ']
             logger.info(f"[Batcontrol] host system time zone is {tz}")
-        except:
-            logger.info(f"[Batcontrol] host system time zone was not set. Setting to {config['timezone']}")
-            os.environ['TZ']=config['timezone']
+        except KeyError:
+            logger.info(
+                "[Batcontrol] host system time zone was not set. Setting to %s",
+                config['timezone']
+            )
+            os.environ['TZ'] = config['timezone']
         time.tzset()
 
 
@@ -92,7 +95,11 @@ class Batcontrol(object):
 
         apikey = config['utility']['apikey']
         provider = config['utility']['type']
-        self.dynamic_tariff = dynamictariff.DynamicTariff(config['utility'],timezone,TIME_BETWEEN_UTILITY_API_CALLS)
+        self.dynamic_tariff = dynamictariff.DynamicTariff(
+            config['utility'],
+            timezone,
+            TIME_BETWEEN_UTILITY_API_CALLS
+        )
 
         self.inverter = inverter.Inverter(config['inverter'])
 
@@ -126,11 +133,31 @@ class Batcontrol(object):
                 self.mqtt_api = mqtt_api.MQTT_API(config['mqtt'])
                 self.mqtt_api.wait_ready()
                 # Register for callbacks
-                self.mqtt_api.register_set_callback('mode', self.api_set_mode, int)
-                self.mqtt_api.register_set_callback('charge_rate', self.api_set_charge_rate, int)
-                self.mqtt_api.register_set_callback('always_allow_discharge_limit', self.api_set_always_allow_discharge_limit, float)
-                self.mqtt_api.register_set_callback('max_charging_from_grid_limit', self.api_set_max_charging_from_grid_limit, float)
-                self.mqtt_api.register_set_callback('min_price_difference', self.api_set_min_price_difference, float)
+                self.mqtt_api.register_set_callback(
+                    'mode',
+                    self.api_set_mode,
+                    int
+                )
+                self.mqtt_api.register_set_callback(
+                    'charge_rate',
+                    self.api_set_charge_rate,
+                    int
+                )
+                self.mqtt_api.register_set_callback(
+                    'always_allow_discharge_limit',
+                    self.api_set_always_allow_discharge_limit,
+                    float
+                )
+                self.mqtt_api.register_set_callback(
+                    'max_charging_from_grid_limit',
+                    self.api_set_max_charging_from_grid_limit,
+                    float
+                )
+                self.mqtt_api.register_set_callback(
+                    'min_price_difference',
+                    self.api_set_min_price_difference,
+                    float
+                )
                 # Inverter Callbacks
                 self.inverter.activate_mqtt(self.mqtt_api)
                 logger.info(f'[Main] MQTT Connection ready ')
@@ -162,12 +189,18 @@ class Batcontrol(object):
             if 'apikey' in config['utility'].keys():
                 pass
             else:
-                raise RuntimeError(f'[BatCtrl] Utility Tibber requires an apikey. Please provide the apikey in your configuration file')
+                raise RuntimeError(
+                    '[BatCtrl] Utility Tibber requires an apikey. '
+                    'Please provide the apikey in your configuration file'
+                )
         elif config['utility']['type'] in ['evcc']:
             if 'url' in config['utility'].keys():
                 pass
             else:
-                raise RuntimeError(f'[BatCtrl] Utility EVCC requires an URL. Please provide the URL in your configuration file')
+                raise RuntimeError(
+                    '[BatCtrl] Utility EVCC requires an URL. '
+                    'Please provide the URL in your configuration file'
+                )
         else:
             config['utility']['apikey']=None
 
@@ -186,17 +219,24 @@ class Batcontrol(object):
                 config['consumption_forecast']['load_profile']
         except:
             logger.info(
-                f"[Config] No load profile provided. Proceeding with default profile from default_load_profile.csv")
+                "[Config] No load profile provided. "
+                "Proceeding with default profile from default_load_profile.csv"
+            )
             config['consumption_forecast']['load_profile'] = 'default_load_profile.csv'
 
         if not os.path.isfile(config['consumption_forecast']['load_profile']):
             raise RuntimeError(
-                f"[Config] Specified Load Profile file '{config['consumption_forecast']['load_profile']}' not found")
+                "[Config] Specified Load Profile file " +
+                f"'{config['consumption_forecast']['load_profile']}' not found"
+            )
 
         try:
             tzstring = config['timezone']
         except KeyError:
-            raise RuntimeError(f"Config Entry in general: timezone {config['timezone']} not valid. Try e.g. 'Europe/Berlin'")
+            raise RuntimeError(
+                f"Config Entry in general: timezone {config['timezone']} " +
+                 "not valid. Try e.g. 'Europe/Berlin'"
+            )
         try:
             loglevel=config['loglevel']
         except KeyError:
@@ -212,14 +252,19 @@ class Batcontrol(object):
             logger.setLevel(logging.INFO)
         else :
             logger.setLevel(logging.INFO)
-            logger.info(f'[BATCtrl] Provided loglevel "{loglevel}" not valid. Defaulting to loglevel "info"')
+            logger.info(
+                '[BATCtrl] Provided loglevel "%s" not valid. Defaulting to loglevel "info"',
+                loglevel
+            )
 
         if 'max_logfile_size' in config.keys():
             if type(config['max_logfile_size']) == int:
                 pass
             else:
                 raise RuntimeError(
-                f"Config Entry in general: max_logfile_size {config['max_logfile_size']} not valid. Only integer values allowed")
+                    f"Config Entry in general: max_logfile_size {config['max_logfile_size']}" +
+                    " not valid. Only integer values allowed"
+                )
         #default to unlimited filesize
         else :
             config['max_logfile_size']=-1
@@ -241,10 +286,14 @@ class Batcontrol(object):
 
         if time_passed < ERROR_IGNORE_TIME :
             #keep current mode
-            logger.info(f"[BatCtrl] An API Error occured {time_passed:.0f}s ago. Keeping inverter mode unchanged.")
+            logger.info("[BatCtrl] An API Error occured %0.fs ago. "
+                        "Keeping inverter mode unchanged.", time_passed)
         else:
             #set default mode
-            logger.warning(f"[BatCtrl] An API Error occured {time_passed:.0f}s ago. Setting inverter to default mode (Allow Discharging)")
+            logger.warning(
+                  "[BatCtrl] An API Error occured %0.fs ago. "
+                  "Setting inverter to default mode (Allow Discharging)",
+                           time_passed)
             self.inverter.set_mode_allow_discharge()
 
     def run(self):
@@ -267,7 +316,10 @@ class Batcontrol(object):
             fc_period = min(max(price_dict.keys()), max(production_forecast.keys()))
             consumption_forecast = self.fc_consumption.get_forecast(fc_period+1)
         except Exception as e:
-            logger.warning(f'[BatCtrl] Following Exception occurred when trying to get forecasts: \n\t{e}')
+            logger.warning(
+                '[BatCtrl] Following Exception occurred when trying to get forecasts: \n\t%s',
+                exc_info=e
+            )
             self.handle_forecast_error()
             return
 
@@ -297,7 +349,11 @@ class Batcontrol(object):
 
         # stop here if api_overwrite is set and reset it
         if self.api_overwrite:
-            logger.debug(f'[BatCTRL] API Overwrite active. Skipping control logic. Next evaluation in {TIME_BETWEEN_EVALUATIONS:.0f} seconds')
+            logger.debug(
+                '[BatCTRL] API Overwrite active. Skipping control logic. '
+                'Next evaluation in %.0f seconds',
+                TIME_BETWEEN_EVALUATIONS
+            )
             self.api_overwrite = False
             return
 
@@ -321,7 +377,10 @@ class Batcontrol(object):
             self.allow_discharging()
         else:  # discharge not allowed
             charging_limit = self.max_charging_from_grid_limit
-            required_recharge_energy = self.get_required_required_recharge_energy(net_consumption[:max_hour], prices)
+            required_recharge_energy = self.get_required_required_recharge_energy(
+                                                net_consumption[:max_hour],
+                                                prices
+                                            )
             is_charging_possible = self.get_SOC() < (self.get_max_capacity() * charging_limit)
 
             logger.debug('[BatCTRL] Discharging is NOT allowed')
@@ -432,7 +491,8 @@ class Batcontrol(object):
         higher_price_hours = []
         for h in range(max_hour):
             future_price = prices[h]
-            if future_price > current_price:  # !!! different formula compared to detect relevant hours
+            # !!! different formula compared to detect relevant hours
+            if future_price > current_price:
                 higher_price_hours.append(h)
 
         higher_price_hours.sort()
@@ -460,7 +520,10 @@ class Batcontrol(object):
             reserved_storage += required_energy
 
         logger.debug(
-            f"[BatCTRL] Reserved Energy: {reserved_storage:0.1f} Wh. Available in Battery: {stored_energy:0.1f}Wh")
+            "[BatCTRL] Reserved Energy: %0.1f Wh. Available in Battery: %0.1f Wh",
+            reserved_storage,
+            stored_energy
+        )
 
         # for API
         self.set_reserved_energy(reserved_storage)
