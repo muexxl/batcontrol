@@ -61,6 +61,7 @@ class FroniusWR(InverterBaseclass):
         if not self.previous_backup_power_config:
             try:
                 self.previous_backup_power_config = self.get_powerunit_config('1.2')
+                logger.info('[Inverter] loaded Power Unit config from Inverter (1.2).')
             except RuntimeError:
                 logger.error(
                     '[Inverter] failed to load Power Unit config from Inverter (1.2).'
