@@ -365,16 +365,15 @@ class Batcontrol(object):
             if future_price > current_price+min_price_difference:
                 high_price_hours.append(h)
 
-        # start with latest hour
+        # start with nearest hour
         high_price_hours.sort()
-        high_price_hours.reverse()
         required_energy = 0
         for high_price_hour in high_price_hours:
             energy_to_shift = consumption[high_price_hour]
 
             # correct energy to shift with potential production
-            # start with latest hour
-            for hour in list(range(high_price_hour))[::-1]:
+            # start with nearest hour
+            for hour in range(high_price_hour):
                 if production[hour] == 0:
                     continue
                 if production[hour] >= energy_to_shift:
@@ -382,7 +381,7 @@ class Batcontrol(object):
                     energy_to_shift = 0
                 else:
                     energy_to_shift -= production[hour]
-                    production[hour]
+                    production[hour] = 0
             # add_remaining energy to shift to recharge amount
             required_energy += energy_to_shift
 
