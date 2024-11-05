@@ -46,7 +46,7 @@ class FroniusWR(InverterBaseclass):
         self.previous_backup_power_config = None
         # default values
         self.max_soc = 100
-        self.min_soc = 0
+        self.min_soc = 5
 
         if not self.previous_battery_config:
             raise RuntimeError(
@@ -138,7 +138,7 @@ class FroniusWR(InverterBaseclass):
         if path_version == 'latest':
             path = '/config/powerunit'
         else:
-            path = 'config/setup/powerunit'
+            path = '/config/setup/powerunit'
 
         response = self.send_request(path, auth=True)
         if not response:
