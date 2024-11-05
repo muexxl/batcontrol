@@ -163,12 +163,12 @@ class Batcontrol(object):
         self.evcc_api = None
         if 'evcc' in config.keys():
             if config['evcc']['enabled'] == True:
-                logger.info(f'[Main] EVCC Connection enabled')
+                logger.info('[Main] EVCC Connection enabled')
                 import evcc_api
-                self.evcc_api = evcc_api.EVCC_API(config['evcc'])
+                self.evcc_api = evcc_api.EvccApi(config['evcc'])
                 self.evcc_api.register_block_function(self.set_discharge_blocked)
                 self.evcc_api.wait_ready()
-                logger.info(f'[Main] EVCC Connection ready')
+                logger.info('[Main] EVCC Connection ready')
 
     def __del__(self):
         try:
