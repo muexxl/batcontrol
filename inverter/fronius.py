@@ -46,7 +46,10 @@ class FroniusWR(InverterBaseclass):
         if not self.previous_battery_config:
             raise RuntimeError(
                 f'[Inverter] failed to load Battery config from Inverter at {self.address}')
-        self.previous_backup_power_config = self.get_powerunit_config()
+        try:
+            self.previous_backup_power_config = self.get_powerunit_config()
+        except RuntimeError:
+            self.previous_backup_power_config = self.get_powerunit_config('1.2')
         if not self.previous_backup_power_config:
             raise RuntimeError(
                 f'[Inverter] failed to load Power Unit config from Inverter at {self.address}')
@@ -100,11 +103,24 @@ class FroniusWR(InverterBaseclass):
             f.write(response.text)
         return result
 
-    def get_powerunit_config(self):
-        path = '/config/powerunit'
+    def get_powerunit_config(self, path_version='latest'):
+        """ Get additional PowerUnit configuration for backup power.
+
+        Parameters: 
+            path_version (optional):
+                'latest' (default) - get via '/config/powerunit'
+                '1.2'              - get via '/config/setup/powerunit'           
+
+        Returns: dict with backup power configuration
+        """
+        if path_version == 'latest':
+            path = '/config/powerunit'
+        else:
+            path = 'config/setup/powerunit'
+
         response = self.send_request(path, auth=True)
         if not response:
-            logger.error(f'[Inverter] Failed to get power unit configuration. Returning empty dict')
+            logger.error('[Inverter] Failed to get power unit configuration. Returning empty dict')
             return {}
         result = json.loads(response.text)
         return result
