@@ -343,6 +343,7 @@ class Batcontrol(object):
     # %%
     def get_required_required_recharge_energy(self, net_consumption: list, prices: dict):
         current_price = prices[0]
+        logger.debug(f'[reChargeCalc] current price {current_price}')
         max_hour = len(net_consumption)
         consumption = np.array(net_consumption)
         consumption[consumption < 0] = 0
@@ -356,6 +357,7 @@ class Batcontrol(object):
             future_price = prices[h]
             if future_price <= current_price:
                 max_hour = h
+                logger.debug(f'[ReChargeCalc] Hours considered for recharge: {max_hour}')
                 break
 
         # get high price hours
@@ -367,23 +369,51 @@ class Batcontrol(object):
 
         # start with nearest hour
         high_price_hours.sort()
+        logger.debug(f'[ReChargeCalc] Hours with higher price: {high_price_hours}')
         required_energy = 0
         for high_price_hour in high_price_hours:
             energy_to_shift = consumption[high_price_hour]
+            logger.debug(f'[ReChargeCalc] in {high_price_hour} expected consumption is {energy_to_shift}')
 
             # correct energy to shift with potential production
             # start with nearest hour
             for hour in range(1,high_price_hour):
                 if production[hour] == 0:
+                    logger.debug(
+                        f'[ReChargeCalc] in {hour} available production to shift is {production[hour]}, moving on')
                     continue
                 if production[hour] >= energy_to_shift:
+                    logger.debug(
+                        f'[ReChargeCalc] in {hour} available production to shift is {production[hour]}')
+                    logger.debug(
+                        f'[ReChargeCalc] in {hour} energy to shift is {energy_to_shift}')
+                    logger.debug(
+                        f'[ReChargeCalc] in {hour} available production >= energy to shift')
                     production[hour] -= energy_to_shift
                     energy_to_shift = 0
+                    logger.debug(
+                        f'[ReChargeCalc] in {hour} after shifting, energy to shift is {energy_to_shift}')
+                    logger.debug(
+                        f'[ReChargeCalc] in {hour} after shifting, available production to shift is {production[hour]}')
                 else:
+                    logger.debug(
+                        f'[ReChargeCalc] in {hour} available production to shift is {production[hour]}')
+                    logger.debug(
+                        f'[ReChargeCalc] in {hour} energy to shift is {energy_to_shift}')
+                    logger.debug(
+                        f'[ReChargeCalc] in {hour} available production < energy to shift')
                     energy_to_shift -= production[hour]
                     production[hour] = 0
+                    logger.debug(
+                        f'[ReChargeCalc] in {hour} after shifting, energy to shift is {energy_to_shift}')
+                    logger.debug(
+                        f'[ReChargeCalc] in {hour} after shifting, available production to shift is {production[hour]}')
             # add_remaining energy to shift to recharge amount
             required_energy += energy_to_shift
+
+            logger.debug(f'[ReChargeCalc] in {high_price_hour} expected consumption net of earlier production is {energy_to_shift}')
+            logger.debug(
+                f'[ReChargeCalc] Total expected consumption net of earlier production from {high_price_hour} is {required_energy}')
 
         recharge_energy =  required_energy-self.get_stored_energy()
         free_capacity = self.get_free_capacity()
