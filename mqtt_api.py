@@ -59,11 +59,11 @@
 #    /min_price_difference/set : float  # set minimum price difference in EUR
 #
 
+import time
 import json
 import logging
 import paho.mqtt.client as mqtt
 import numpy as np
-import time
 
 logger = logging.getLogger('__main__')
 logger.info(f'[MQTT] loading module ')

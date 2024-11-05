@@ -1,7 +1,7 @@
-from .baseclass import DynamicTariffBaseclass
-import requests
 import datetime
 import math
+import requests
+from .baseclass import DynamicTariffBaseclass
 
 class Tibber(DynamicTariffBaseclass):
     def __init__(self, timezone , token, min_time_between_API_calls=0):
