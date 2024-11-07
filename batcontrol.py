@@ -289,7 +289,7 @@ class Batcontrol(object):
         logger.debug('[BatCTRL] Production FCST: %s', ', '.join(f'{v:.2f}' for v in production))
         logger.debug('[BatCTRL] Consumption FCST: %s', ', '.join(f'{v:.2f}' for v in consumption))
         logger.debug('[BatCTRL] Net Consumption FCST: %s', ', '.join(f'{v:.2f}' for v in net_consumption))
-        logger.debug('[BatCTRL] Prices: : %s', ', '.join(f'{v:.2f}' for v in prices))
+        logger.debug('[BatCTRL] Prices: %s', ', '.join(f'{v:.2f}' for v in prices))
         # negative = charging or feed in
         # positive = dis-charging or grid consumption
 
