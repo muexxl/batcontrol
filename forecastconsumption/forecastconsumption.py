@@ -71,8 +71,9 @@ class ForecastConsumption(object):
                 energy = df['energy'].median()
             prediction[h]=energy*self.scaling_factor
         
-        logger.debug(f'[FC Cons] predicting consumption {prediction}')
+        logger.debug('[FC Cons] predicting consumption: %s', np.array(list(prediction.values())).round(1))
         return prediction
+
     
     def get_annual_value(self):
         self.dataframe['energy'].sum()*8760/2016/1000

@@ -286,10 +286,10 @@ class Batcontrol(object):
             prices[h] = price_dict[h]
         
         net_consumption = consumption-production
-        logger.debug(f'[BatCTRL] Production FCST {production}')
-        logger.debug(f'[BatCTRL] Consumption FCST {consumption}')
-        logger.debug(f'[BatCTRL] Net Consumption FCST {net_consumption}')
-        logger.debug(f'[BatCTRL] prices {prices}')
+        logger.debug('[BatCTRL] Production FCST: %s', np.ndarray.round(production,1))
+        logger.debug('[BatCTRL] Consumption FCST: %s', np.ndarray.round(consumption,1))
+        logger.debug('[BatCTRL] Net Consumption FCST: %s', np.ndarray.round(net_consumption,1))
+        logger.debug('[BatCTRL] Prices: %s', np.ndarray.round(prices,3))
         # negative = charging or feed in
         # positive = dis-charging or grid consumption
 
