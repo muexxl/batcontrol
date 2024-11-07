@@ -70,8 +70,8 @@ class ForecastConsumption(object):
             if math.isnan(energy):
                 energy = df['energy'].median()
             prediction[h]=energy*self.scaling_factor
-
-        logger.debug(f'[FC Cons] predicting consumption {prediction}')
+        
+        logger.debug('[FC Cons] predicting consumption: %s', ', '.join(f'{v:.2f}' for v in prediction.values()))
         return prediction
 
     def get_annual_value(self):
