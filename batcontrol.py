@@ -337,10 +337,10 @@ class Batcontrol(object):
             prices[h] = price_dict[h]
 
         net_consumption = consumption-production
-        logger.debug(f'[BatCTRL] Production FCST {production}')
-        logger.debug(f'[BatCTRL] Consumption FCST {consumption}')
-        logger.debug(f'[BatCTRL] Net Consumption FCST {net_consumption}')
-        logger.debug(f'[BatCTRL] prices {prices}')
+        logger.debug('[BatCTRL] Production FCST: %s', np.ndarray.round(production,1))
+        logger.debug('[BatCTRL] Consumption FCST: %s', np.ndarray.round(consumption,1))
+        logger.debug('[BatCTRL] Net Consumption FCST: %s', np.ndarray.round(net_consumption,1))
+        logger.debug('[BatCTRL] Prices: %s', np.ndarray.round(prices,3))
         # negative = charging or feed in
         # positive = dis-charging or grid consumption
 
@@ -536,7 +536,7 @@ class Batcontrol(object):
             # forbid discharging
             return False
 
-    def _set_charge_rate(self, charge_rate):
+    def _set_charge_rate(self, charge_rate:int):
         self.last_charge_rate = charge_rate
         if self.mqtt_api is not None:
             self.mqtt_api.publish_charge_rate(charge_rate)
@@ -562,7 +562,7 @@ class Batcontrol(object):
         return
 
     def force_charge(self, charge_rate=500):
-        charge_rate = min(charge_rate, self.inverter.max_grid_charge_rate)
+        charge_rate = int(min(charge_rate, self.inverter.max_grid_charge_rate))
         logger.debug(f'[BatCTRL] Mode: grid charging. Charge rate : {charge_rate} W')
         self.inverter.set_mode_force_charge(charge_rate)
         self._set_mode(MODE_FORCE_CHARGING)

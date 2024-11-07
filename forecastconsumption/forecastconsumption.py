@@ -44,7 +44,6 @@ class ForecastConsumption(object):
         scaling_factor = annual_consumption/annual_consumption_load_profile
         return scaling_factor
 
-
     def load_data_file(self, datafile):
         df = pd.read_csv(datafile)
         df['timestamp'] = df['timestamp'].map(
@@ -70,8 +69,7 @@ class ForecastConsumption(object):
             if math.isnan(energy):
                 energy = df['energy'].median()
             prediction[h]=energy*self.scaling_factor
-
-        logger.debug(f'[FC Cons] predicting consumption {prediction}')
+        logger.debug('[FC Cons] predicting consumption: %s', np.array(list(prediction.values())).round(1))
         return prediction
 
     def get_annual_value(self):
