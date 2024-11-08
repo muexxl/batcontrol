@@ -32,6 +32,13 @@ COPY inverter ./inverter
 COPY forecastconsumption ./forecastconsumption
 COPY forecastsolar ./forecastsolar
 COPY logfilelimiter ./logfilelimiter
+COPY heatpump ./heatpump
+
+# ! module ThermiaOnlineAPI checked out into Git submodule thermia_online_api, 
+# so we need to copy it to path ThermiaOnlineAPI 
+# to make it available as Python module on python path
+# in the Docker image
+COPY thermia_online_api/ThermiaOnlineAPI ./ThermiaOnlineAPI
 COPY entrypoint.sh ./
 RUN chmod +x entrypoint.sh
 

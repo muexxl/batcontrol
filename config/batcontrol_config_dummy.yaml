@@ -37,6 +37,32 @@ mqtt:
   keyfile: /etc/ssl/certs/client.key
   tls_version: tlsv1.2
 
+heatpump:
+  type: Thermia # [Thermia, none]
+  user: "your_username"  # Username for accessing the heat pump system
+  password: "your_password"  # Password for accessing the heat pump system
+  # EVU block settings
+  min_price_for_evu_block: 0.6  # Minimum price threshold to block EVU (Energy Supply Company) usage
+  max_evu_block_hours: 14  # Maximum number of hours to block EVU usage per day
+  max_evu_block_duration: 6  # Maximum duration for a single EVU block event in hours
+  # Hot water block settings
+  min_price_for_hot_water_block: 0.4  # Minimum price threshold to block hot water usage
+  max_hot_water_block_hours: 10  # Maximum number of hours to block hot water usage per day
+  max_hot_water_block_duration: 4  # Maximum duration for a single hot water block event in hours
+  #reduced heat settings
+  min_price_for_reduced_heat: 0.3  # Minimum price threshold to reduce heating
+  max_reduced_heat_hours: 14  # Maximum number of hours to reduce heating per day
+  max_reduced_heat_duration: 6  # Maximum duration for a single reduced heating event in hours
+  reduced_heat_temperature: 20  # Target temperature when heating is reduced
+  #increased heat settings
+  max_price_for_increased_heat: 0.2  # Maximum price threshold to increase heating
+  min_energy_surplus_for_increased_heat: 1000  # Minimum energy surplus required to increase heating
+  max_increased_heat_hours: 14  # Maximum number of hours to increase heating per day
+  max_increased_heat_duration: 6  # Maximum duration for a single increased heating event in hours
+  increased_heat_temperature: 22  # Target temperature when heating is increased
+  max_increased_heat_outdoor_temperature: 15  # Maximum outdoor temperature to allow increased heating
+ 
+
 
 pvinstallations:
   - name: Haus #name

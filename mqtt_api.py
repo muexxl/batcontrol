@@ -344,3 +344,41 @@ class MqttApi:
         """
         if self.client.is_connected():
             self.client.publish(self.base_topic + '/' + topic, value)
+
+
+    def delete_all_topics(self, prefix: str) -> None:
+        """
+        Deletes all MQTT topics with the given prefix.
+        This method constructs a full topic prefix by combining the base topic and the provided prefix.
+        It then subscribes to all topics matching this prefix and publishes a message with a `None` payload
+        and `retain=True` to delete each topic.
+        Args:
+            prefix (str): The prefix of the topics to delete.
+        Returns:
+            None
+        """
+        if prefix.endswith('/'):
+            prefix = prefix[:-1]
+
+        f_q_prefix=self.base_topic + '/' + prefix
+        logger.debug('[MQTT] Deleting all topics with prefix %s', f_q_prefix)
+        if self.client.is_connected():
+            def on_message_delete(client, userdata, message): # pylint: disable=unused-argument # callback
+                logger.info('[MQTT] Deleting topic %s', message.topic)
+                self.client.publish(message.topic, None, retain=True)
+
+            topic_wildcard = f_q_prefix + '/#'
+            self.client.message_callback_add(topic_wildcard, on_message_delete)
+            self.client.subscribe(topic_wildcard)
+            logger.debug('[MQTT] Waiting for messages matching topic (%s)', topic_wildcard)
+
+            # Wait for all messages to be processed
+            # from current observation, 3 seconds seem enough  
+            time.sleep(3)
+
+            self.client.unsubscribe(topic_wildcard)
+            self.client.message_callback_remove(topic_wildcard)
+            logger.debug('[MQTT] All topics with prefix %s deleted', topic_wildcard)
+        return
+    
+    

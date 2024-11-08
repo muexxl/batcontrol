@@ -1,0 +1,3 @@
+[submodule "thermia_online_api"]
+	path = thermia_online_api
+	url = https://github.com/hashtagKnorke/thermia-online-api.git

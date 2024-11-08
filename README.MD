@@ -23,10 +23,11 @@ To integrate batcontrol with Home Assistant, use the following repository: [ha_a
 
 
 ## Installation:
+(i) This contains some temporary hacky adjustments for Thermia online API integration (see [Thermia API library](https://github.com/hashtagKnorke/batcontrol/blob/be5f4eb2df73936234807a4ff355b7d1a9da882e/HOWITWORKS.md#L38) for details)
 
 ## Install:
 ```sh
-git clone https://github.com/muexxl/batcontrol.git
+git clone https://github.com/muexxl/batcontrol.git --recurse-submodules
 cd batcontrol
 virtualenv venv
 source venv/bin/activate
