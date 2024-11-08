@@ -49,7 +49,7 @@ docker run -d \
   --name batcontrol \
   -v /path/to/config:/app/config \
   -v /path/to/logs:/app/logs \
-  mastr950/batcontrol:latest
+  muexx/batcontrol:latest
 ```
 
 # Docker-compose example
@@ -61,7 +61,7 @@ version: '3.8'
 
 services:
   batcontrol:
-    image: mastr950/batcontrol:latest
+    image: muexx/batcontrol:latest
     volumes:
       - ./config:/app/config
       - ./logs:/app/logs
