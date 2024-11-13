@@ -14,6 +14,8 @@ class InverterBaseclass(object):
         current_soc = self.get_SOC()
         capa = self.get_capacity()
         energy = (current_soc-self.min_soc)/100*capa
+        if energy < 0:
+            return 0
         return energy
 
     def get_free_capacity():
