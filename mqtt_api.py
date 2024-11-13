@@ -35,7 +35,6 @@ Implemented Input-API:
 
 The module uses the paho-mqtt library for MQTT communication and numpy for handling arrays.
 """
-
 import time
 import json
 import logging
@@ -312,6 +311,7 @@ class MqttApi:
         if self.client.is_connected():
             self.client.publish(self.base_topic + '/last_evaluation', f'{timestamp:.0f}')
 
+    # For depended APIs like the Fronius Inverter classes, which is not directly batcontrol.
     def generic_publish(self, topic:str, value:str) -> None:
         """ Publish a generic value to a topic
             For depended APIs like the Fronius Inverter classes, which is not directly batcontrol.
