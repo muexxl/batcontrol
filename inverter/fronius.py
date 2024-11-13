@@ -43,20 +43,46 @@ class FroniusWR(InverterBaseclass):
         self.user = user
         self.password = password
         self.previous_battery_config = self.get_battery_config()
+        self.previous_backup_power_config = None
+        # default values
+        self.max_soc = 100
+        self.min_soc = 5
+
         if not self.previous_battery_config:
             raise RuntimeError(
                 f'[Inverter] failed to load Battery config from Inverter at {self.address}')
-        self.previous_backup_power_config = self.get_powerunit_config()
+        try:
+            self.previous_backup_power_config = self.get_powerunit_config()
+        except RuntimeError:
+            logger.error(
+                '[Inverter] failed to load Power Unit config from Inverter (latest).'
+            )
+
         if not self.previous_backup_power_config:
-            raise RuntimeError(
-                f'[Inverter] failed to load Power Unit config from Inverter at {self.address}')
-        self.backup_power_mode = self.previous_backup_power_config['backuppower']['DEVICE_MODE_BACKUPMODE_TYPE_U16']
+            try:
+                self.previous_backup_power_config = self.get_powerunit_config('1.2')
+                logger.info('[Inverter] loaded Power Unit config from Inverter (1.2).')
+            except RuntimeError:
+                logger.error(
+                    '[Inverter] failed to load Power Unit config from Inverter (1.2).'
+                )
+
+        if self.previous_backup_power_config:
+            self.backup_power_mode = self.previous_backup_power_config['backuppower']['DEVICE_MODE_BACKUPMODE_TYPE_U16']
+        else:
+            logger.error("[Inverter] Setting backup power mode to 0 as a fallback.")
+            self.backup_power_mode = 0
+            self.previous_backup_power_config = None
+
         if self.backup_power_mode == 0:
             self.min_soc = self.previous_battery_config['BAT_M0_SOC_MIN'] # in percent
         else:
-            self.min_soc = max(self.previous_battery_config['BAT_M0_SOC_MIN'], self.previous_battery_config['HYB_BACKUP_RESERVED'])  # in percent
+             # in percent
+            self.min_soc = max(
+                self.previous_battery_config['BAT_M0_SOC_MIN'],
+                self.previous_battery_config['HYB_BACKUP_RESERVED']
+            )
         self.max_soc = self.previous_battery_config['BAT_M0_SOC_MAX']
-
         self.get_time_of_use()  # save timesofuse
 
     def get_SOC(self):
@@ -100,11 +126,24 @@ class FroniusWR(InverterBaseclass):
             f.write(response.text)
         return result
 
-    def get_powerunit_config(self):
-        path = '/config/powerunit'
+    def get_powerunit_config(self, path_version='latest'):
+        """ Get additional PowerUnit configuration for backup power.
+
+        Parameters: 
+            path_version (optional):
+                'latest' (default) - get via '/config/powerunit'
+                '1.2'              - get via '/config/setup/powerunit'           
+
+        Returns: dict with backup power configuration
+        """
+        if path_version == 'latest':
+            path = '/config/powerunit'
+        else:
+            path = '/config/setup/powerunit'
+
         response = self.send_request(path, auth=True)
         if not response:
-            logger.error(f'[Inverter] Failed to get power unit configuration. Returning empty dict')
+            logger.error('[Inverter] Failed to get power unit configuration. Returning empty dict')
             return {}
         result = json.loads(response.text)
         return result
