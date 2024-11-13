@@ -130,7 +130,7 @@ class Batcontrol(object):
             if config['mqtt']['enabled'] == True:
                 logger.info(f'[Main] MQTT Connection enabled ')
                 import mqtt_api
-                self.mqtt_api = mqtt_api.MQTT_API(config['mqtt'])
+                self.mqtt_api = mqtt_api.MqttApi(config['mqtt'])
                 self.mqtt_api.wait_ready()
                 # Register for callbacks
                 self.mqtt_api.register_set_callback(
