@@ -32,12 +32,6 @@ class Testdriver(InverterBaseclass):
     def set_mode_avoid_discharge(self):
         self.mode='avoid_discharge'
 
-    def get_stored_energy(self):
-        current_soc = self.get_SOC()
-        capa = self.get_capacity()
-        energy = (current_soc - self.min_soc) / 100 * capa
-        return energy
-
     def get_free_capacity(self):
         current_soc = self.get_SOC()
         capa = self.get_capacity()
