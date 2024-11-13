@@ -76,12 +76,6 @@ class FroniusWR(InverterBaseclass):
         free_capa = (self.max_soc-current_soc)/100*capa
         return free_capa
 
-    def get_stored_energy(self):
-        current_soc = self.get_SOC()
-        capa = self.get_capacity()
-        energy = (current_soc-self.min_soc)/100*capa
-        return energy
-
     def get_max_capacity(self):
         return self.max_soc/100*self.get_capacity()
 
