@@ -163,13 +163,14 @@ class MqttApi:
         now = timestamp - (timestamp % 3600)
 
         data_list = []
-        for h in enumerate(forecast):
+        for h, value in enumerate(forecast):
             # next hour after now
-            data_list.append (
-                { 'time_start' :now + h * 3600,
-                  'value' :   forecast[h],
-                  'time_end' : now -1  + ( h+1) *3600
-                }
+            data_list.append(
+            {
+                'time_start': now + h * 3600,
+                'value': value,
+                'time_end': now - h + (h + 1) * 3600
+            }
             )
 
         data = { 'data' : data_list }
