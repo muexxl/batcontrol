@@ -311,12 +311,14 @@ class MqttApi:
         """
         if self.client.is_connected():
             self.client.publish(self.base_topic + '/last_evaluation', f'{timestamp:.0f}')
-    
+
     def publish_discharge_blocked(self, discharge_blocked:bool) -> None:
-        if self.client.is_connected() == True:
+        """ Publish the discharge blocked status to MQTT
+            /discharge_blocked
+        """
+        if self.client.is_connected():
             self.client.publish(self.base_topic + '/discharge_blocked', str(discharge_blocked))
-        return
-    
+
     # For depended APIs like the Fronius Inverter classes, which is not directly batcontrol.
     def generic_publish(self, topic:str, value:str) -> None:
         """ Publish a generic value to a topic

@@ -460,7 +460,7 @@ class Batcontrol(object):
             recharge_energy = required_energy-self.get_stored_energy()
         else:
             recharge_energy = 0
-            
+
         free_capacity = self.get_free_capacity()
 
         if recharge_energy > free_capacity:
@@ -476,12 +476,12 @@ class Batcontrol(object):
         # always allow discharging when battery is >90% maxsoc
         discharge_limit = self.get_max_capacity() * self.always_allow_discharge_limit
         stored_energy = self.get_stored_energy()
-     
+
         if stored_energy > discharge_limit:
             logger.debug(
                 f'[BatCTRL] Battery with ({stored_energy}) above discharge limit {discharge_limit}')
             return True
-        
+
         if self.discharge_blocked:
             logger.debug(
                 f'[BatCTRL] Discharge blocked due to external lock')
@@ -658,7 +658,7 @@ class Batcontrol(object):
             self.mqtt_api.publish_always_allow_discharge_limit_capacity(
                 discharge_limit)
         return
-    
+
     def set_discharge_blocked(self, discharge_blocked):
         if discharge_blocked == self.discharge_blocked:
             return
@@ -693,10 +693,10 @@ class Batcontrol(object):
     def api_set_mode(self, mode: int):
         # Check if mode is valid
         if mode not in [MODE_FORCE_CHARGING, MODE_AVOID_DISCHARGING, MODE_ALLOW_DISCHARGING]:
-            logger.warning(f'[BatCtrl] API: Invalid mode {mode}')
+            logger.warning('[BatCtrl] API: Invalid mode %s', mode)
             return
-        
-        logger.info(f'[BatCTRL] API: Setting mode to {mode}')
+
+        logger.info('[BatCTRL] API: Setting mode to %s', mode)
         self.api_overwrite = True
 
         if mode != self.last_mode:
