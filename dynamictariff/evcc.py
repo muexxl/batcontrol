@@ -1,19 +1,48 @@
+"""
+This module defines the Evcc class, which is used to interact with the EVCC API to fetch
+dynamic tariff data.
+
+Classes:
+    Evcc: A class to interact with the EVCC API and process dynamic tariff data.
+
+Methods:
+    __init__(self, timezone, url, min_time_between_API_calls=60):
+        Initializes the Evcc instance with the given timezone, API URL,
+        and minimum time between API calls.
+
+    get_raw_data_from_provider(self):
+        Fetches raw data from the EVCC API and returns it as a JSON object.
+
+    get_prices_from_raw_data(self):
+        Processes the raw data from the EVCC API and returns a dictionary of prices
+        indexed by the relative hour.
+
+    test():
+        A test function to run the Evcc class with a provided URL and print the fetched prices.
+
+Usage:
+    To use this module, run it as a script with the API URL as an argument:
+    python evcc.py <url>
+"""
 import datetime
 import math
 import requests
 from .baseclass import DynamicTariffBaseclass
 
 class Evcc(DynamicTariffBaseclass):
-
+    """ Implement EVCC API to get dynamic electricity prices
+        Inherits from DynamicTariffBaseclass
+    """
     def __init__(self, timezone , url , min_time_between_API_calls=60):
         super().__init__(timezone,min_time_between_API_calls)
         self.url=url
 
     def get_raw_data_from_provider(self):
-        response=requests.get(self.url)
+        response=requests.get(self.url, timeout=30)
 
         if response.status_code != 200:
-           raise RuntimeError(f'[EVCC] API returned {response}')
+            raise RuntimeError(f'[EVCC] API returned {response}')
+
         # {"result":
         #     { "rates": [
         #            {
@@ -29,7 +58,6 @@ class Evcc(DynamicTariffBaseclass):
         #        ]
         #     }
         # }
-
 
         raw_data=response.json()
         return raw_data
@@ -51,9 +79,30 @@ class Evcc(DynamicTariffBaseclass):
         return prices
 
 def test():
-    import sys
-    import json
-    import pytz
+    """
+    This script tests the functionality of the Evcc class by fetching and printing
+    electric vehicle charging prices from a specified URL.
+
+    Usage:
+        python evcc.py <url>
+
+    Arguments:
+        url (str): The URL to fetch the EV charging prices from.
+
+    The script performs the following steps:
+    1. Initializes an instance of the Evcc class with the specified URL and the
+       'Europe/Berlin' timezone.
+    2. Fetches the EV charging prices using the get_prices method of the Evcc class.
+    3. Prints the fetched prices in a formatted JSON structure.
+
+    Dependencies:
+        - sys
+        - json
+        - pytz
+    """
+    import sys  # pylint: disable=import-outside-toplevel
+    import json # pylint: disable=import-outside-toplevel
+    import pytz # pylint: disable=import-outside-toplevel
     if len(sys.argv) != 2:
         print("Usage: python evcc.py <url>")
         sys.exit(1)
