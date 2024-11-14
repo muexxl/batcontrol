@@ -69,6 +69,7 @@ class ForecastConsumption(object):
             if math.isnan(energy):
                 energy = df['energy'].median()
             prediction[h]=energy*self.scaling_factor
+
         logger.debug('[FC Cons] predicting consumption: %s', np.array(list(prediction.values())).round(1))
         return prediction
 
