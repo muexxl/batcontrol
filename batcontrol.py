@@ -50,7 +50,7 @@ class Batcontrol(object):
     def __init__(self, configfile, is_simulation=False):
         # For API
         self.api_overwrite = False
-        self.last_mode = None  # -1 = charge from grid , 0 = avoid discharge , 10 = discharge allowed 
+        self.last_mode = None  # -1 = charge from grid , 0 = avoid discharge , 10 = discharge allowed
         self.last_charge_rate = 0
         self.last_prices = None
         self.last_consumption = None
@@ -482,11 +482,6 @@ class Batcontrol(object):
                 f'[BatCTRL] Battery with ({stored_energy}) above discharge limit {discharge_limit}')
             return True
 
-        if self.discharge_blocked:
-            logger.debug(
-                f'[BatCTRL] Discharge blocked due to external lock')
-            return False
-
         current_price = prices[0]
         min_price_difference = self.min_price_difference
         max_hour = len(net_consumption)
@@ -550,6 +545,11 @@ class Batcontrol(object):
         # for API
         self.set_reserved_energy(reserved_storage)
         self.set_stored_energy(stored_energy)
+
+        if self.discharge_blocked:
+            logger.debug(
+                f'[BatCTRL] Discharge blocked due to external lock')
+            return False
 
         if (stored_energy > reserved_storage):
             # allow discharging
