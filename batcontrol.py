@@ -387,9 +387,11 @@ class Batcontrol(object):
                 self.get_max_capacity() * charging_limit)
 
             logger.debug('[BatCTRL] Discharging is NOT allowed')
-            logger.debug(f'[BatCTRL] Charging allowed: {is_charging_possible}')
+            logger.debug('[BatCTRL] Charging allowed: %s', is_charging_possible)
             logger.debug(
-                f'[BatCTRL] Get additional energy via grid: {required_recharge_energy:0.1f} Wh')
+                '[BatCTRL] Get additional energy via grid: %0.1f Wh',
+                required_recharge_energy
+                )
             # charge if battery capacity available and more stored energy is required
             if is_charging_possible and required_recharge_energy > 0:
                 remaining_time = (
