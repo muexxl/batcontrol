@@ -91,9 +91,6 @@ class ForecastConsumption:
                 )
         return prediction
 
-    def get_annual_value(self):
-        self.dataframe['energy'].sum()*8760/2016/1000
-
     def create_loadprofile(self, datafile, path_to_profile='load_profile.csv'):
         df=self.load_data_file(datafile)
         a=[]
