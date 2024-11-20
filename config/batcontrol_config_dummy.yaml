@@ -1,6 +1,8 @@
 timezone: Europe/Berlin #your time zone. not optional.
 loglevel: debug
+log_to_file: true
 max_logfile_size: 100 #kB
+logfile_path: logs/batcontrol.log
 battery_control:
   min_price_difference: 0.05 # minimum price difference in Euro to justify charging your battery
   always_allow_discharge_limit: 0.90 # 0.00 to 1.00 above this SOC limit using energy from the battery is always allowed

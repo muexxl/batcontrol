@@ -15,7 +15,8 @@ from dynamictariff import dynamictariff
 from inverter import inverter
 from logfilelimiter import logfilelimiter
 
-LOGFILE = "batcontrol.log"
+LOGFILE_ENABLED_DEFAULT = True
+LOGFILE = "logs/batcontrol.log"
 CONFIGFILE = "config/batcontrol_config.yaml"
 VALID_UTILITIES = ['tibber', 'awattar_at', 'awattar_de', 'evcc']
 VALID_INVERTERS = ['fronius_gen24', 'testdriver']
@@ -31,10 +32,6 @@ loglevel = logging.DEBUG
 logger = logging.getLogger(__name__)
 formatter = logging.Formatter("%(asctime)s %(levelname)s %(message)s",
                               "%Y-%m-%d %H:%M:%S")
-
-filehandler = logging.FileHandler(LOGFILE)
-filehandler.setFormatter(formatter)
-logger.addHandler(filehandler)
 
 streamhandler = logging.StreamHandler(sys.stdout)
 streamhandler.setFormatter(formatter)
@@ -68,12 +65,12 @@ class Batcontrol(object):
 
         self.last_run_time = 0
 
+        self.logfile = LOGFILE
+        self.logfile_enabled = True
+        self.logfilelimiter = None
+
         self.load_config(configfile)
         config = self.config
-
-        if config['max_logfile_size'] > 0:
-            self.logfilelimiter = logfilelimiter.LogFileLimiter(
-                LOGFILE, config['max_logfile_size'])
 
         timezone = pytz.timezone(config['timezone'])
         self.timezone = timezone
@@ -253,6 +250,23 @@ class Batcontrol(object):
                 loglevel
             )
 
+        log_is_enabled = LOGFILE_ENABLED_DEFAULT
+        if 'logfile_enabled' in config.keys():
+            log_is_enabled = config['logfile_enabled']
+
+        if log_is_enabled:
+            self.setup_logfile(config)
+        else:
+            self.logfile_enabled = False
+            logger.info(
+                "[Main] Logfile disabled in config. Proceeding without logfile"
+            )
+
+        self.config = config
+
+    def setup_logfile(self, config):
+        """ Setup the logfile and correpsonding handlers """
+
         if 'max_logfile_size' in config.keys():
             if type(config['max_logfile_size']) == int:
                 pass
@@ -265,7 +279,31 @@ class Batcontrol(object):
         else:
             config['max_logfile_size'] = -1
 
-        self.config = config
+        if config['max_logfile_size'] > 0:
+            self.logfilelimiter = logfilelimiter.LogFileLimiter(
+                self.logfile, config['max_logfile_size'])
+
+        if 'logfile_path' in config.keys():
+            self.logfile = config['logfile_path']
+        else:
+            logger.info(
+                "[Main] No logfile path provided. Proceeding with default logfile path: %s",
+                LOGFILE
+            )
+
+        # is the path valid and writable?
+        if not os.path.isdir(os.path.dirname(self.logfile)):
+            raise RuntimeError(
+                f"Logfile path {os.path.dirname(self.logfile)} not found"
+            )
+        if not os.access(os.path.dirname(self.logfile), os.W_OK):
+            raise RuntimeError(
+                f"Logfile path {os.path.dirname(self.logfile)} not writable"
+            )
+
+        filehandler = logging.FileHandler(self.logfile)
+        filehandler.setFormatter(formatter)
+        logger.addHandler(filehandler)
 
     def reset_forecast_error(self):
         self.time_at_forecast_error = -1
@@ -302,7 +340,7 @@ class Batcontrol(object):
         self.last_run_time = time.time()
 
         # prune log file if file is too large
-        if self.config['max_logfile_size'] > 0:
+        if self.logfilelimiter is not None and self.logfile_enabled:
             self.logfilelimiter.run()
 
         # get forecasts
