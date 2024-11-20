@@ -728,6 +728,11 @@ if __name__ == '__main__':
     try:
         while (1):
             bc.run()
-            time.sleep(TIME_BETWEEN_EVALUATIONS)
+            now = datetime.datetime.now().astimezone(bc.timezone)
+            next_minute = (now + datetime.timedelta(seconds=TIME_BETWEEN_EVALUATIONS)).replace(second=0, microsecond=0)
+            sleeptime = (next_minute - now).total_seconds()
+            logger.info("[Main] Next evaluation at %s. Sleeping for %.0f seconds",
+                         next_minute.strftime("%H:%M:%S"), sleeptime)
+            time.sleep(sleeptime)
     finally:
         del bc
