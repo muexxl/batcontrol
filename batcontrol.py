@@ -316,7 +316,7 @@ class Batcontrol(object):
         except Exception as e:
             logger.warning(
                 '[BatCtrl] Following Exception occurred when trying to get forecasts: %s', e,
-                exec_info=True
+                exc_info=True
                 )
             self.handle_forecast_error()
             return
