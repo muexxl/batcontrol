@@ -1,6 +1,6 @@
 timezone: Europe/Berlin #your time zone. not optional.
 loglevel: debug
-log_to_file: true
+logfile_enabled: true
 max_logfile_size: 100 #kB
 logfile_path: logs/batcontrol.log
 battery_control:
