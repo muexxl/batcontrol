@@ -708,7 +708,18 @@ class Batcontrol(object):
         if self.mqtt_api is not None:
             self.mqtt_api.publish_discharge_blocked(discharge_blocked)
         self.discharge_blocked = discharge_blocked
-        return
+
+        discharge_limit = self.get_max_capacity() * self.always_allow_discharge_limit
+        stored_energy = self.get_stored_energy()
+
+        if stored_energy > discharge_limit:
+            logger.debug(
+                '[BatCTRL] Battery with %s above discharge limit %s',
+                stored_energy,
+                discharge_limit
+                )
+        else:
+            self.avoid_discharging()
 
     def refresh_static_values(self):
         if self.mqtt_api is not None:
