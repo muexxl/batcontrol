@@ -166,8 +166,10 @@ class Batcontrol(object):
                 self.evcc_api.wait_ready()
                 logger.info('[Main] EVCC Connection ready')
 
-    def __del__(self):
+    def shutdown(self):
+        logger.info('[Main] Shutting down Batcontrol')
         try:
+            self.inverter.shutdown()
             del self.inverter
         except:
             pass
@@ -802,4 +804,5 @@ if __name__ == '__main__':
                          next_minute.strftime("%H:%M:%S"), sleeptime)
             time.sleep(sleeptime)
     finally:
+        bc.shutdown()
         del bc

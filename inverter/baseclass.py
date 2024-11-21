@@ -37,3 +37,6 @@ class InverterBaseclass(object):
     # Currently there is only one inverter, so the number is hardcoded
     def _get_mqtt_topic(self):
         return 'inverters/0/'
+
+    def shutdown():
+        pass
