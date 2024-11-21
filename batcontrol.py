@@ -315,9 +315,9 @@ class Batcontrol(object):
                 fc_period+1)
         except Exception as e:
             logger.warning(
-                '[BatCtrl] Following Exception occurred when trying to get forecasts: \n\t%s',
-                exc_info=e
-            )
+                '[BatCtrl] Following Exception occurred when trying to get forecasts: %s', e,
+                exec_info=True
+                )
             self.handle_forecast_error()
             return
 
