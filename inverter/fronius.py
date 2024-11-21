@@ -27,8 +27,8 @@ def strip_dict(original):
     return stripped_copy
 
 
-TIMEOFUSE_CONFIG_FILENAME = 'timeofuse_config.json'
-BATTERY_CONFIG_FILENAME = 'battery_config.json'
+TIMEOFUSE_CONFIG_FILENAME = 'config/timeofuse_config.json'
+BATTERY_CONFIG_FILENAME = 'config/battery_config.json'
 
 
 class FroniusWR(InverterBaseclass):

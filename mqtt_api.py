@@ -7,7 +7,6 @@ The following topics are published:
 - /evaluation_intervall: interval in seconds
 - /last_evaluation: timestamp of last evaluation
 - /mode: operational mode (-1 = charge from grid, 0 = avoid discharge, 10 = discharge allowed)
-- /max_capacity: maximum capacity of battery in Wh
 - /max_charging_from_grid_limit: charge limit in 0.1-1
 - /max_charging_from_grid_limit_percent: charge limit in %
 - /always_allow_discharge_limit: always discharge limit in 0.1-1

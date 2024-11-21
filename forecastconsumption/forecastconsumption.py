@@ -1,15 +1,16 @@
 #%%
-import pandas as pd
-import numpy as np
 import datetime
 import math
 import logging
 import pytz
+import pandas as pd
+import numpy as np
+
 
 logger = logging.getLogger("__main__")
-logger.info(f'[FCConsumption] loading module ')
+logger.info('[FCConsumption] loading module')
 
-class ForecastConsumption(object):
+class ForecastConsumption:
     """Forecasts Consumption based on load profiles
 
         Loadprofile:
@@ -30,17 +31,31 @@ class ForecastConsumption(object):
         self.load_loadprofile()
         if annual_consumption >0:
             self.scaling_factor = self.calculate_scaling_factor(annual_consumption)
-            logger.info(f"[FC Cons] the hourly values from the load profile are scaled with a factor of {self.scaling_factor:0.2f} to match the annual consumption of {annual_consumption} kWh")
+            logger.info(
+                    "[FC Cons] the hourly values from the load profile are scaled with a "
+                    "factor of %.2f to match the annual consumption of %d kWh",
+                    self.scaling_factor,
+                    annual_consumption
+                    )
         else:
             self.scaling_factor=1
             annual_consumption_load_profile= self.dataframe['energy'].sum()*8760/2016/1000
-            logger.info(f"[FC Cons] The annual consumption of the applied load profile is {annual_consumption_load_profile:0.1f} kWh ")
-            logger.info(f"[FC Cons] You can specify your estimated annual consumption in the config file under consumption_forecast:  annual_consumption ")
+            logger.info(
+                "[FC Cons] The annual consumption of the applied load profile is %.2f kWh ",
+                 annual_consumption_load_profile
+                )
+            logger.info(
+                "[FC Cons] You can specify your estimated annual consumption in the config file "
+                "under consumption_forecast:  annual_consumption "
+                )
         self.timezone=timezone
 
     def calculate_scaling_factor(self, annual_consumption):
         annual_consumption_load_profile= self.dataframe['energy'].sum()*8760/2016/1000
-        logger.info(f"[FC Cons] The annual consumption of the applied load profile is {annual_consumption_load_profile} kWh ")
+        logger.info(
+            "[FC Cons] The annual consumption of the applied load profile is %s kWh ",
+            annual_consumption_load_profile
+            )
         scaling_factor = annual_consumption/annual_consumption_load_profile
         return scaling_factor
 
@@ -65,16 +80,16 @@ class ForecastConsumption(object):
             delta_t = datetime.timedelta(hours=h)
             t1 = t0+delta_t
             energy = df.loc[df['hour'] == t1.hour].loc[df['month'] ==
-                                               t1.month].loc[df['weekday'] == t1.weekday()]['energy'].median()
+                                    t1.month].loc[df['weekday'] == t1.weekday()]['energy'].median()
             if math.isnan(energy):
                 energy = df['energy'].median()
             prediction[h]=energy*self.scaling_factor
 
-        logger.debug('[FC Cons] predicting consumption: %s', np.array(list(prediction.values())).round(1))
+        logger.debug(
+                  '[FC Cons] predicting consumption: %s',
+                   np.array(list(prediction.values())).round(1)
+                )
         return prediction
-
-    def get_annual_value(self):
-        self.dataframe['energy'].sum()*8760/2016/1000
 
     def create_loadprofile(self, datafile, path_to_profile='load_profile.csv'):
         df=self.load_data_file(datafile)
@@ -83,10 +98,13 @@ class ForecastConsumption(object):
         for month in range(1,13):
             for day in range(7):
                 for hour in range(24):
-                    energy = df.loc[df['hour'] == hour].loc[df['month'] == month].loc[df['weekday'] == day]['energy'].mean()
+                    energy = df.loc[df['hour'] == hour].loc[df['month'] == month].loc[df['weekday'] == day]['energy'].mean()  # pylint: disable=c0301
                     a.append([month,day,hour,energy])
         df_load_profile=pd.DataFrame(a)
-        df_load_profile.to_csv(path_to_profile,header=['month','weekday','hour','energy'], index=None)
+        df_load_profile.to_csv(
+                  path_to_profile,header=['month','weekday','hour','energy'],
+                  index=None
+                )
 
     def load_loadprofile(self):
         self.dataframe=pd.read_csv(self.path_to_load_profile)
