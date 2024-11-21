@@ -468,7 +468,7 @@ class FroniusWR(InverterBaseclass):
         auth_header = f'Digest username="{user}", realm="{realm}", nonce="{nonce}", uri="{path}", algorithm="MD5", qop=auth, nc={ncvalue}, cnonce="{cnonce}", response="{respdig}"'
         return auth_header
 
-    def __del__(self):
+    def shutdown(self):
         logger.info('[Inverter] Reverting batcontrol created config changes')
         self.restore_battery_config()
         self.restore_time_of_use_config()

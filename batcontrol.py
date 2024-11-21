@@ -160,9 +160,10 @@ class Batcontrol(object):
                 self.inverter.activate_mqtt(self.mqtt_api)
                 logger.info(f'[Main] MQTT Connection ready ')
 
-    def __del__(self):
+    def shutdown(self):
         logger.info('[Main] Shutting down Batcontrol')
         try:
+            self.inverter.shutdown()
             del self.inverter
         except:
             pass
@@ -731,4 +732,5 @@ if __name__ == '__main__':
             bc.run()
             time.sleep(TIME_BETWEEN_EVALUATIONS)
     finally:
+        bc.shutdown()
         del bc
