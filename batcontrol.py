@@ -43,11 +43,11 @@ logger.addHandler(streamhandler)
 
 logger.setLevel(loglevel)
 
-logger.info(f'[Main] Starting Batcontrol ')
+logger.info('[Main] Starting Batcontrol')
 
 
 class Batcontrol(object):
-    def __init__(self, configfile, is_simulation=False):
+    def __init__(self, configfile):
         # For API
         self.last_mode = None
         self.last_charge_rate = 0
@@ -56,6 +56,8 @@ class Batcontrol(object):
         self.last_production = None
         self.last_net_consumption = None
 
+        self.last_SOC = -1              # pylint: disable=invalid-name
+        self.last_free_capacity = -1
         self.last_stored_energy = -1
         self.last_reserved_energy = -1
         self.last_max_capacity = -1
@@ -65,6 +67,7 @@ class Batcontrol(object):
         self.fetched_stored_energy = False
         self.fetched_reserved_energy = False
         self.fetched_max_capacity = False
+        self.fetched_soc = False
 
         self.last_run_time = 0
 
@@ -80,7 +83,7 @@ class Batcontrol(object):
 
         try:
             tz = os.environ['TZ']
-            logger.info(f"[Batcontrol] host system time zone is {tz}")
+            logger.info("[Batcontrol] host system time zone is %s", tz)
         except KeyError:
             logger.info(
                 "[Batcontrol] host system time zone was not set. Setting to %s",
@@ -89,10 +92,6 @@ class Batcontrol(object):
             os.environ['TZ'] = config['timezone']
         time.tzset()
 
-        self.is_simulation = is_simulation
-
-        apikey = config['utility']['apikey']
-        provider = config['utility']['type']
         self.dynamic_tariff = dynamictariff.DynamicTariff(
             config['utility'],
             timezone,
@@ -125,8 +124,8 @@ class Batcontrol(object):
 
         self.mqtt_api = None
         if 'mqtt' in config.keys():
-            if config['mqtt']['enabled'] == True:
-                logger.info(f'[Main] MQTT Connection enabled ')
+            if config['mqtt']['enabled']:
+                logger.info('[Main] MQTT Connection enabled')
                 import mqtt_api
                 self.mqtt_api = mqtt_api.MqttApi(config['mqtt'])
                 self.mqtt_api.wait_ready()
@@ -158,7 +157,7 @@ class Batcontrol(object):
                 )
                 # Inverter Callbacks
                 self.inverter.activate_mqtt(self.mqtt_api)
-                logger.info(f'[Main] MQTT Connection ready ')
+                logger.info('[Main] MQTT Connection ready')
 
     def __del__(self):
         try:
@@ -370,11 +369,6 @@ class Batcontrol(object):
         # ensure availability of data
         max_hour = min(len(net_consumption), len(prices))
 
-        # current price as reference
-        current_price = prices[0]
-        mode = ""
-        value = 0
-
         if self.is_discharge_allowed(net_consumption, prices):
             self.allow_discharging()
         else:  # discharge not allowed
@@ -452,7 +446,7 @@ class Batcontrol(object):
             recharge_energy = required_energy-self.get_stored_energy()
         else:
             recharge_energy = 0
-            
+
         free_capacity = self.get_free_capacity()
 
         if recharge_energy > free_capacity:
@@ -470,7 +464,10 @@ class Batcontrol(object):
         stored_energy = self.get_stored_energy()
         if stored_energy > discharge_limit:
             logger.debug(
-                f'[BatCTRL] Battery with {stored_energy} above discharge limit {discharge_limit}')
+                '[BatCTRL] Battery with %s above discharge limit %s',
+                stored_energy,
+                discharge_limit
+                )
             return True
 
         current_price = prices[0]
@@ -487,7 +484,10 @@ class Batcontrol(object):
         t1 = t0+dt
         last_hour = t1.astimezone(self.timezone).strftime("%H:59")
         logger.debug(
-            f'[BatCTRL] Evaluating next {max_hour} hours until {last_hour}')
+              '[BatCTRL] Evaluating next %d hours until %s',
+              max_hour,
+              last_hour
+            )
         # distribute remaining energy
         consumption = np.array(net_consumption)
         consumption[consumption < 0] = 0
@@ -558,13 +558,13 @@ class Batcontrol(object):
             self._set_charge_rate(0)
 
     def allow_discharging(self):
-        logger.debug(f'[BatCTRL] Mode: Allow Discharging')
+        logger.debug('[BatCTRL] Mode: Allow Discharging')
         self.inverter.set_mode_allow_discharge()
         self._set_mode(MODE_ALLOW_DISCHARGING)
         return
 
     def avoid_discharging(self):
-        logger.debug(f'[BatCTRL] Mode: Avoid Discharging')
+        logger.debug('[BatCTRL] Mode: Avoid Discharging')
         self.inverter.set_mode_avoid_discharge()
         self._set_mode(MODE_AVOID_DISCHARGING)
         return
@@ -572,7 +572,7 @@ class Batcontrol(object):
     def force_charge(self, charge_rate=500):
         charge_rate = int(min(charge_rate, self.inverter.max_grid_charge_rate))
         logger.debug(
-            f'[BatCTRL] Mode: grid charging. Charge rate : {charge_rate} W')
+            '[BatCTRL] Mode: grid charging. Charge rate : %d W', charge_rate)
         self.inverter.set_mode_force_charge(charge_rate)
         self._set_mode(MODE_FORCE_CHARGING)
         self._set_charge_rate(charge_rate)
@@ -668,10 +668,10 @@ class Batcontrol(object):
     def api_set_mode(self, mode: int):
         # Check if mode is valid
         if mode not in [MODE_FORCE_CHARGING, MODE_AVOID_DISCHARGING, MODE_ALLOW_DISCHARGING]:
-            logger.warning(f'[BatCtrl] API: Invalid mode {mode}')
+            logger.warning('[BatCtrl] API: Invalid mode %s', mode)
             return
 
-        logger.info(f'[BatCtrl] API: Setting mode to {mode}')
+        logger.info('[BatCtrl] API: Setting mode to %s', mode)
         self.api_overwrite = True
 
         if mode != self.last_mode:
@@ -685,9 +685,9 @@ class Batcontrol(object):
 
     def api_set_charge_rate(self, charge_rate: int):
         if charge_rate < 0:
-            logger.warning(f'[BatCtrl] API: Invalid charge rate {charge_rate}')
+            logger.warning('[BatCtrl] API: Invalid charge rate %d W', charge_rate)
             return
-        logger.info(f'[BatCtrl] API: Setting charge rate to {charge_rate}')
+        logger.info('[BatCtrl] API: Setting charge rate to %d W',  {charge_rate})
         self.api_overwrite = True
         if charge_rate != self.last_charge_rate:
             self.force_charge(charge_rate)
@@ -697,30 +697,30 @@ class Batcontrol(object):
     def api_set_always_allow_discharge_limit(self, limit: float):
         if limit < 0 or limit > 1:
             logger.warning(
-                f'[BatCtrl] API: Invalid always allow discharge limit {limit}')
+                '[BatCtrl] API: Invalid always allow discharge limit %.2f', limit )
             return
         logger.info(
-            f'[BatCtrl] API: Setting always allow discharge limit to {limit}')
+            '[BatCtrl] API: Setting always allow discharge limit to %.2f' , limit )
         self.always_allow_discharge_limit = limit
         return
 
     def api_set_max_charging_from_grid_limit(self, limit: float):
         if limit < 0 or limit > 1:
             logger.warning(
-                f'[BatCtrl] API: Invalid max charging from grid limit {limit}')
+                 '[BatCtrl] API: Invalid max charging from grid limit %.2f' , limit )
             return
         logger.info(
-            f'[BatCtrl] API: Setting max charging from grid limit to {limit}')
+               '[BatCtrl] API: Setting max charging from grid limit to %.2f' ,limit )
         self.max_charging_from_grid_limit = limit
         return
 
     def api_set_min_price_difference(self, min_price_difference: float):
         if min_price_difference < 0:
             logger.warning(
-                f'[BatCtrl] API: Invalid min price difference {min_price_difference}')
+                 '[BatCtrl] API: Invalid min price difference %.3f', min_price_difference)
             return
         logger.info(
-            f'[BatCtrl] API: Setting min price difference to {min_price_difference}')
+              '[BatCtrl] API: Setting min price difference to %.3f', min_price_difference)
         self.min_price_difference = min_price_difference
         return
 
