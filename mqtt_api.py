@@ -18,6 +18,7 @@ The following topics are published:
 - /reserved_energy_capacity: estimated energy reserved for discharge in Wh
 - /SOC: state of charge in %
 - /min_price_difference: minimum price difference in EUR
+- /discharge_blocked        : bool  # Discharge is blocked by other sources
 
 The following statistical arrays are published as JSON arrays:
 - /FCST/production: forecasted production in W
@@ -309,6 +310,13 @@ class MqttApi:
         """
         if self.client.is_connected():
             self.client.publish(self.base_topic + '/last_evaluation', f'{timestamp:.0f}')
+
+    def publish_discharge_blocked(self, discharge_blocked:bool) -> None:
+        """ Publish the discharge blocked status to MQTT
+            /discharge_blocked
+        """
+        if self.client.is_connected():
+            self.client.publish(self.base_topic + '/discharge_blocked', str(discharge_blocked))
 
     # For depended APIs like the Fronius Inverter classes, which is not directly batcontrol.
     def generic_publish(self, topic:str, value:str) -> None:

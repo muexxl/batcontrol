@@ -49,7 +49,8 @@ logger.info('[Main] Starting Batcontrol')
 class Batcontrol(object):
     def __init__(self, configfile):
         # For API
-        self.last_mode = None
+        self.api_overwrite = False
+        self.last_mode = None  # -1 = charge from grid , 0 = avoid discharge , 10 = discharge allowed
         self.last_charge_rate = 0
         self.last_prices = None
         self.last_consumption = None
@@ -62,6 +63,7 @@ class Batcontrol(object):
         self.last_reserved_energy = -1
         self.last_max_capacity = -1
 
+        self.discharge_blocked = False
         self.discharge_limit = 0
 
         self.fetched_stored_energy = False
@@ -120,10 +122,9 @@ class Batcontrol(object):
         self.max_charging_from_grid_limit = self.batconfig['max_charging_from_grid_limit']
         self.min_price_difference = self.batconfig['min_price_difference']
 
-        self.api_overwrite = False
-
         self.mqtt_api = None
         if 'mqtt' in config.keys():
+
             if config['mqtt']['enabled']:
                 logger.info('[Main] MQTT Connection enabled')
                 import mqtt_api
@@ -157,7 +158,16 @@ class Batcontrol(object):
                 )
                 # Inverter Callbacks
                 self.inverter.activate_mqtt(self.mqtt_api)
-                logger.info('[Main] MQTT Connection ready')
+
+        self.evcc_api = None
+        if 'evcc' in config.keys():
+            if config['evcc']['enabled'] == True:
+                logger.info('[Main] EVCC Connection enabled')
+                import evcc_api
+                self.evcc_api = evcc_api.EvccApi(config['evcc'])
+                self.evcc_api.register_block_function(self.set_discharge_blocked)
+                self.evcc_api.wait_ready()
+                logger.info('[Main] EVCC Connection ready')
 
     def __del__(self):
         try:
@@ -462,6 +472,7 @@ class Batcontrol(object):
         # always allow discharging when battery is >90% maxsoc
         discharge_limit = self.get_max_capacity() * self.always_allow_discharge_limit
         stored_energy = self.get_stored_energy()
+
         if stored_energy > discharge_limit:
             logger.debug(
                 '[BatCTRL] Battery with %s above discharge limit %s',
@@ -536,6 +547,11 @@ class Batcontrol(object):
         # for API
         self.set_reserved_energy(reserved_storage)
         self.set_stored_energy(stored_energy)
+
+        if self.discharge_blocked:
+            logger.debug(
+                f'[BatCTRL] Discharge blocked due to external lock')
+            return False
 
         if (stored_energy > reserved_storage):
             # allow discharging
@@ -645,6 +661,15 @@ class Batcontrol(object):
                 discharge_limit)
         return
 
+    def set_discharge_blocked(self, discharge_blocked):
+        if discharge_blocked == self.discharge_blocked:
+            return
+        logger.info(f'[BatCTRL] Discharge block: {discharge_blocked}')
+        if self.mqtt_api is not None:
+            self.mqtt_api.publish_discharge_blocked(discharge_blocked)
+        self.discharge_blocked = discharge_blocked
+        return
+
     def refresh_static_values(self):
         if self.mqtt_api is not None:
             self.mqtt_api.publish_SOC(self.get_SOC())
@@ -662,6 +687,8 @@ class Batcontrol(object):
             self.mqtt_api.publish_evaluation_intervall(
                 TIME_BETWEEN_EVALUATIONS)
             self.mqtt_api.publish_last_evaluation_time(self.last_run_time)
+            #
+            self.mqtt_api.publish_discharge_blocked(self.discharge_blocked)
             # Trigger Inverter
             self.inverter.refresh_api_values()
 
@@ -687,7 +714,7 @@ class Batcontrol(object):
         if charge_rate < 0:
             logger.warning('[BatCtrl] API: Invalid charge rate %d W', charge_rate)
             return
-        logger.info('[BatCtrl] API: Setting charge rate to %d W',  {charge_rate})
+        logger.info('[BatCtrl] API: Setting charge rate to %d W',  charge_rate)
         self.api_overwrite = True
         if charge_rate != self.last_charge_rate:
             self.force_charge(charge_rate)
