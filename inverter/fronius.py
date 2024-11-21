@@ -27,8 +27,8 @@ def strip_dict(original):
     return stripped_copy
 
 
-TIMEOFUSE_CONFIG_FILENAME = 'timeofuse_config.json'
-BATTERY_CONFIG_FILENAME = 'battery_config.json'
+TIMEOFUSE_CONFIG_FILENAME = 'config/timeofuse_config.json'
+BATTERY_CONFIG_FILENAME = 'config/battery_config.json'
 
 
 class FroniusWR(InverterBaseclass):
@@ -43,20 +43,46 @@ class FroniusWR(InverterBaseclass):
         self.user = user
         self.password = password
         self.previous_battery_config = self.get_battery_config()
+        self.previous_backup_power_config = None
+        # default values
+        self.max_soc = 100
+        self.min_soc = 5
+
         if not self.previous_battery_config:
             raise RuntimeError(
                 f'[Inverter] failed to load Battery config from Inverter at {self.address}')
-        self.previous_backup_power_config = self.get_powerunit_config()
+        try:
+            self.previous_backup_power_config = self.get_powerunit_config()
+        except RuntimeError:
+            logger.error(
+                '[Inverter] failed to load Power Unit config from Inverter (latest).'
+            )
+
         if not self.previous_backup_power_config:
-            raise RuntimeError(
-                f'[Inverter] failed to load Power Unit config from Inverter at {self.address}')
-        self.backup_power_mode = self.previous_backup_power_config['backuppower']['DEVICE_MODE_BACKUPMODE_TYPE_U16']
+            try:
+                self.previous_backup_power_config = self.get_powerunit_config('1.2')
+                logger.info('[Inverter] loaded Power Unit config from Inverter (1.2).')
+            except RuntimeError:
+                logger.error(
+                    '[Inverter] failed to load Power Unit config from Inverter (1.2).'
+                )
+
+        if self.previous_backup_power_config:
+            self.backup_power_mode = self.previous_backup_power_config['backuppower']['DEVICE_MODE_BACKUPMODE_TYPE_U16']
+        else:
+            logger.error("[Inverter] Setting backup power mode to 0 as a fallback.")
+            self.backup_power_mode = 0
+            self.previous_backup_power_config = None
+
         if self.backup_power_mode == 0:
             self.min_soc = self.previous_battery_config['BAT_M0_SOC_MIN'] # in percent
         else:
-            self.min_soc = max(self.previous_battery_config['BAT_M0_SOC_MIN'], self.previous_battery_config['HYB_BACKUP_RESERVED'])  # in percent
+             # in percent
+            self.min_soc = max(
+                self.previous_battery_config['BAT_M0_SOC_MIN'],
+                self.previous_battery_config['HYB_BACKUP_RESERVED']
+            )
         self.max_soc = self.previous_battery_config['BAT_M0_SOC_MAX']
-
         self.get_time_of_use()  # save timesofuse
 
     def get_SOC(self):
@@ -76,12 +102,6 @@ class FroniusWR(InverterBaseclass):
         free_capa = (self.max_soc-current_soc)/100*capa
         return free_capa
 
-    def get_stored_energy(self):
-        current_soc = self.get_SOC()
-        capa = self.get_capacity()
-        energy = (current_soc-self.min_soc)/100*capa
-        return energy
-
     def get_max_capacity(self):
         return self.max_soc/100*self.get_capacity()
 
@@ -90,21 +110,42 @@ class FroniusWR(InverterBaseclass):
         return usable_capa
 
     def get_battery_config(self):
+        """ Get battery configuration from inverter and keep a backup."""
         path = '/config/batteries'
         response = self.send_request(path, auth=True)
         if not response:
-            logger.error(f'[Inverter] Failed to get battery configuration. Returning empty dict')
+            logger.error('[Inverter] Failed to get battery configuration. Returning empty dict')
             return {}
+
         result = json.loads(response.text)
-        with open(BATTERY_CONFIG_FILENAME, 'w') as f:
-            f.write(response.text)
+        # only write file if it does not exist
+        if not os.path.exists(BATTERY_CONFIG_FILENAME):
+            with open(BATTERY_CONFIG_FILENAME, 'w') as f:
+                f.write(response.text)
+        else:
+            logger.warning('[Inverter] Battery config file already exists. Not writing to %s', BATTERY_CONFIG_FILENAME)
+
+
         return result
 
-    def get_powerunit_config(self):
-        path = '/config/powerunit'
+    def get_powerunit_config(self, path_version='latest'):
+        """ Get additional PowerUnit configuration for backup power.
+
+        Parameters: 
+            path_version (optional):
+                'latest' (default) - get via '/config/powerunit'
+                '1.2'              - get via '/config/setup/powerunit'           
+
+        Returns: dict with backup power configuration
+        """
+        if path_version == 'latest':
+            path = '/config/powerunit'
+        else:
+            path = '/config/setup/powerunit'
+
         response = self.send_request(path, auth=True)
         if not response:
-            logger.error(f'[Inverter] Failed to get power unit configuration. Returning empty dict')
+            logger.error('[Inverter] Failed to get power unit configuration. Returning empty dict')
             return {}
         result = json.loads(response.text)
         return result
@@ -140,6 +181,12 @@ class FroniusWR(InverterBaseclass):
         for expected_write_success in expected_write_successes:
             if not expected_write_success in response_dict['writeSuccess']:
                 raise RuntimeError(f'failed to set {expected_write_success}')
+        # Remove after successful restore
+        try:
+            os.remove(BATTERY_CONFIG_FILENAME)
+        except OSError:
+            logger.error(
+                '[Inverter] could not remove battery config file %s', BATTERY_CONFIG_FILENAME)
         return response
 
     def set_allow_grid_charging(self, value: bool):
@@ -204,14 +251,20 @@ class FroniusWR(InverterBaseclass):
         return response
 
     def get_time_of_use(self):
+        """ Get time of use configuration from inverter and keep a backup."""
         response = self.send_request('/config/timeofuse', auth=True)
         if not response:
             return None
 
         result = json.loads(response.text)['timeofuse']
+        # only write file if it does not exist
         if not os.path.exists(TIMEOFUSE_CONFIG_FILENAME):
             with open(TIMEOFUSE_CONFIG_FILENAME, 'w') as f:
                 f.write(json.dumps(result))
+        else:
+            logger.warning(
+                '[Inverter] Time of use config file already exists. Not writing to %s', TIMEOFUSE_CONFIG_FILENAME)
+
         return result
 
     def set_mode_avoid_discharge(self):
@@ -284,6 +337,12 @@ class FroniusWR(InverterBaseclass):
             stripped_time_of_use_config.append(new_item)
 
         self.set_time_of_use(stripped_time_of_use_config)
+        # After restoring the time of use config, delete the backup
+        try:
+            os.remove(TIMEOFUSE_CONFIG_FILENAME)
+        except OSError:
+            logger.error(
+                '[Inverter] could not remove timeofuse config file %s', TIMEOFUSE_CONFIG_FILENAME)
 
     def set_time_of_use(self, timeofuselist):
         config = {
@@ -409,7 +468,8 @@ class FroniusWR(InverterBaseclass):
         auth_header = f'Digest username="{user}", realm="{realm}", nonce="{nonce}", uri="{path}", algorithm="MD5", qop=auth, nc={ncvalue}, cnonce="{cnonce}", response="{respdig}"'
         return auth_header
 
-    def __del__(self):
+    def shutdown(self):
+        logger.info('[Inverter] Reverting batcontrol created config changes')
         self.restore_battery_config()
         self.restore_time_of_use_config()
         self.logout()

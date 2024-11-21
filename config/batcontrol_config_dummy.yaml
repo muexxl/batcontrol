@@ -1,6 +1,8 @@
 timezone: Europe/Berlin #your time zone. not optional.
 loglevel: debug
+logfile_enabled: true
 max_logfile_size: 100 #kB
+logfile_path: logs/batcontrol.log
 battery_control:
   min_price_difference: 0.05 # minimum price difference in Euro to justify charging your battery
   always_allow_discharge_limit: 0.90 # 0.00 to 1.00 above this SOC limit using energy from the battery is always allowed
@@ -52,3 +54,20 @@ pvinstallations:
 consumption_forecast: 
   annual_consumption: 4500 # total consumption in kWh p.a. the load profile 
   load_profile: load_profile.csv #name of the load profile file within the config folder
+
+# evcc connection
+#   listen to evcc mqtt messages to lock the battery if the car is charging
+evcc:
+  enabled: false
+  broker: localhost
+  port: 1883
+  status_topic: evcc/status
+  # one loadpoints that should be monitored
+  loadpoint_topic: evcc/loadpoints/1/charging
+  username: user
+  password: password
+  tls: false
+  cafile: /etc/ssl/certs/ca-certificates.crt
+  certfile: /etc/ssl/certs/client.crt
+  keyfile: /etc/ssl/certs/client.key
+  tls_version: tlsv1.2

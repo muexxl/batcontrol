@@ -1,22 +1,24 @@
 **Optimize your Electricity cost by re-charging your PV Battery when Electricity is cheap and there is not enough Solarpower available.**
+To integrate batcontrol with Home Assistant, use the following repository: [ha_addons](https://github.com/muexxl/ha_addons/)
 
-To include batcontrol in home assistant please use the repository: https://github.com/muexxl/ha_addons/
+## Prerequisites:
 
-# Preconditions: 
+1. A PV installation with a BYD Battery and a Fronius inverter.
+2. A Tibber or aWattar contract with hourly electricity pricing. (Get a €50 bonus on sign-up using this [link](https://invite.tibber.com/x8ci52nj).)
 
-1. You have a PV Installation with a BYD Battery and a Fronius inverter  
-1. You have a Tibber or aWattar contract with hourly electricity pricing. (Use this link if you want 50€ Bonus on sign up https://invite.tibber.com/x8ci52nj.)  
+## Preparations:
 
 # Local installation
 ## Preparations:
+1. Verify the credentials of your inverter for customer or technician access.
+2. Obtain your Tibber API key from [Tibber Developer](https://developer.tibber.com/).
+3. Create your `batcontrol_config.yaml` in the config folder.
+4. Customize your load profile or use the default one.
 
-1. verify the credentials of your inverter for customer or technician
-1. get your tibber API key from https://developer.tibber.com/
-1. create your batcontrol_config.yaml in the config folder
-1. customize your load profile or use the default load profile
+## Installation:
 
 ## Install:
-```
+```sh
 git clone https://github.com/muexxl/batcontrol.git  
 cd batcontrol  
 virtualenv venv  
@@ -25,14 +27,15 @@ pip install -r requirements.txt
 ```
 
 ## run
-```
+```sh
 cd /PATH/TO/batcontrol
 source venv/bin/activate
 python batcontrol.py
 ```
+
 # Docker usage
 
-# Preparations
+## Preparations
 
 ```
 mkdir -p ./config -p ./logs
@@ -42,7 +45,7 @@ mkdir -p ./config -p ./logs
 
 - Use the default load_profile (automatically) or create your own.-
 
-# Plain Docker
+### Plain Docker
 
 ```
 docker run -d \
@@ -52,7 +55,7 @@ docker run -d \
   muexx/batcontrol:latest
 ```
 
-# Docker-compose example
+### Docker-compose example
 
 Create docker-compose.yml with the following content:
 
@@ -69,3 +72,15 @@ services:
 ```
 
 Then start the container using `docker-compose up -d`.
+
+# FAQs
+
+## How are the different config parameters related to each other?
+
+The parameters follow this order:
+
+`MIN_SOC -> Backup-Power-Reserved -> max_charging_from_grid_limit -> always_allow_discharge_limit -> MAX_SOC`
+
+The `always_allow_discharge_limit` parameter overrides any logic and allows the battery to operate freely according to the inverter's logic.
+
+The `max_charging_from_grid_limit` parameter charges from the minimum up to the `always_allow_discharge_limit`.

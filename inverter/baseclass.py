@@ -10,8 +10,13 @@ class InverterBaseclass(object):
     def set_mode_avoid_discharge():
         raise RuntimeError("[Inverter Base Class] Function 'set_mode_avoid_discharge' not implemented")
 
-    def get_stored_energy():
-        raise RuntimeError("[Inverter Base Class] Function 'get_stored_energy' not implemented")
+    def get_stored_energy(self):
+        current_soc = self.get_SOC()
+        capa = self.get_capacity()
+        energy = (current_soc-self.min_soc)/100*capa
+        if energy < 0:
+            return 0
+        return energy
 
     def get_free_capacity():
         raise RuntimeError("[Inverter Base Class] Function 'get_free_capacity' not implemented")
@@ -32,3 +37,6 @@ class InverterBaseclass(object):
     # Currently there is only one inverter, so the number is hardcoded
     def _get_mqtt_topic(self):
         return 'inverters/0/'
+
+    def shutdown():
+        pass
