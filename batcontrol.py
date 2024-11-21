@@ -161,6 +161,7 @@ class Batcontrol(object):
                 logger.info(f'[Main] MQTT Connection ready ')
 
     def __del__(self):
+        logger.info('[Main] Shutting down Batcontrol')
         try:
             del self.inverter
         except:

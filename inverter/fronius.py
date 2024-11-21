@@ -469,6 +469,7 @@ class FroniusWR(InverterBaseclass):
         return auth_header
 
     def __del__(self):
+        logger.info('[Inverter] Reverting batcontrol created config changes')
         self.restore_battery_config()
         self.restore_time_of_use_config()
         self.logout()
