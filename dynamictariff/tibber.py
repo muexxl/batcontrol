@@ -15,7 +15,7 @@ class Tibber(DynamicTariffBaseclass):
         self.access_token=token
         self.url="https://api.tibber.com/v1-beta/gql"
 
-    def get_raw_data_from_provider(self):
+    def __get_raw_data_from_provider(self) -> dict:   # pylint: disable=unused-private-member
         """ Get raw data from Tibber API """
         if not self.access_token:
             raise RuntimeError
@@ -31,8 +31,9 @@ class Tibber(DynamicTariffBaseclass):
         return raw_data
 
 
-    def get_prices_from_raw_data(self,homeid=0):
+    def __get_prices_from_raw_data(self) -> dict[int, float]:    # pylint: disable=unused-private-member
         """ Extract prices from raw to internal datastracture based on hours """
+        homeid=0
         rawdata=self.raw_data['data']
         now=datetime.datetime.now().astimezone(self.timezone)
         prices={}

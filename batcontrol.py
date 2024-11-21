@@ -11,7 +11,7 @@ import numpy as np
 
 from forecastconsumption import forecastconsumption
 from forecastsolar import forecastsolar
-from dynamictariff import dynamictariff
+from dynamictariff import dynamictariff as tariff_factory
 from inverter import inverter
 from logfilelimiter import logfilelimiter
 
@@ -101,7 +101,7 @@ class Batcontrol(object):
             os.environ['TZ'] = config['timezone']
         time.tzset()
 
-        self.dynamic_tariff = dynamictariff.DynamicTariff(
+        self.dynamic_tariff = tariff_factory.DynamicTariff.create_tarif_provider(
             config['utility'],
             timezone,
             TIME_BETWEEN_UTILITY_API_CALLS,

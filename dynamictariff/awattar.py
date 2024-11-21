@@ -50,7 +50,7 @@ class Awattar(DynamicTariffBaseclass):
         self.price_fees=price_fees
         self.price_markup=price_markup
 
-    def get_raw_data_from_provider(self):
+    def __get_raw_data_from_provider(self):   # pylint: disable=unused-private-member
         response=requests.get(self.url, timeout=30)
         if response.status_code != 200:
             raise RuntimeError(f'[Awattar_AT] API returned {response}')
@@ -59,7 +59,7 @@ class Awattar(DynamicTariffBaseclass):
         return raw_data
 
 
-    def get_prices_from_raw_data(self):
+    def __get_prices_from_raw_data(self):     # pylint: disable=unused-private-member
         data=self.raw_data['data']
         now=datetime.datetime.now().astimezone(self.timezone)
         prices={}
