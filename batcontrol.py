@@ -339,7 +339,7 @@ class Batcontrol(object):
                 "[BatCtrl] An API Error occured %0.fs ago. "
                 "Setting inverter to default mode (Allow Discharging)",
                 time_passed)
-            self.inverter.set_mode_allow_discharge()
+            self.allow_discharging()
 
     def run(self):
         # Reset some values
