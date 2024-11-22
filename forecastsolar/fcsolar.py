@@ -1,3 +1,9 @@
+""" Module to get forecast from Forecast Solar API
+
+See https://forecast.solar/ for more information
+
+"""
+
 import datetime
 import random
 import time
@@ -8,7 +14,7 @@ import requests
 from .forecastsolar_interface import ForecastSolarInterface
 
 logger = logging.getLogger('__main__')
-logger.info(f'[FCSolar] loading module ')
+logger.info('[FCSolar] loading module')
 
 class FCSolar(ForecastSolarInterface):
     """ Provider to get data from https://forecast.solar/ """
@@ -21,7 +27,8 @@ class FCSolar(ForecastSolarInterface):
         self.timezone=timezone
         self.delay_evaluation_by_seconds=delay_evaluation_by_seconds
 
-    def get_forecast(self):
+    def get_forecast(self) -> dict:
+        """ Get hourly forecast from provider """
         got_error = False
         t0 = time.time()
         dt = t0-self.last_update
@@ -46,8 +53,8 @@ class FCSolar(ForecastSolarInterface):
             prediction[hour] = 0
 
         # return empty prediction if results have not been obtained
-        if self.results == {}:
-            logger.warning(f'[FCSolar] No results from FC Solar API available')
+        if not self.results:
+            logger.warning('[FCSolar] No results from FC Solar API available')
             raise RuntimeWarning('[FCSolar] No results from FC Solar API available')
 
 
@@ -59,7 +66,7 @@ class FCSolar(ForecastSolarInterface):
         response_time_string = result['message']['info']['time']
         response_time = datetime.datetime.fromisoformat(response_time_string)
         response_timezone = response_time.tzinfo
-        for name, result in self.results.items():
+        for _, result in self.results.items():
             for isotime, value in result['result'].items():
                 timestamp = datetime.datetime.fromisoformat(
                     isotime).astimezone(response_timezone)
@@ -101,17 +108,19 @@ class FCSolar(ForecastSolarInterface):
             elif 'api' in unit.keys() and unit['api'] is not None:
                 apikey_urlmod = unit['api'] +"/" # ForecastSolar api
 
-            url = f"https://api.forecast.solar/{apikey_urlmod}estimate/watthours/period/{lat}/{lon}/{dec}/{az}/{kwp}"
+            url = (f"https://api.forecast.solar/{apikey_urlmod}estimate/"
+                   f"watthours/period/{lat}/{lon}/{dec}/{az}/{kwp}")
             logger.info(
-                f'[FCSolar] Requesting Information for PV Installation {name}')
+                '[FCSolar] Requesting Information for PV Installation %s', name)
 
 
-            response = requests.get(url)
+            response = requests.get(url, timeout=60)
             if response.status_code == 200:
                 self.results[name] = json.loads(response.text)
             else:
                 logger.warning(
-                    f'[ForecastSolar] forecast solar API returned {response.status_code} - {response.text}')
+                    '[ForecastSolar] forecast solar API returned %s - %s',
+                      response.status_code, response.text)
 
 
 if __name__ == '__main__':
