@@ -38,7 +38,7 @@ class Evcc(DynamicTariffBaseclass):
         self.delay_evaluation_by_seconds=0
         self.url=url
 
-    def __get_raw_data_from_provider(self) -> dict:  # pylint: disable=unused-private-member
+    def get_raw_data_from_provider(self) -> dict:  # pylint: disable=unused-private-member
         response=requests.get(self.url, timeout=30)
 
         if response.status_code != 200:
@@ -64,11 +64,10 @@ class Evcc(DynamicTariffBaseclass):
         return raw_data
 
 
-    def __get_prices_from_raw_data(self) -> dict[int, float]:   # pylint: disable=unused-private-member
+    def get_prices_from_raw_data(self) -> dict[int, float]:   # pylint: disable=unused-private-member
         data=self.raw_data['result']['rates']
         now=datetime.datetime.now().astimezone(self.timezone)
         prices={}
-
 
         for item in data:
             # "start":"2024-06-20T08:00:00+02:00" to timestamp

@@ -28,19 +28,18 @@ class DynamicTariffBaseclass(TariffInterface):
                         '[Tariff] Waiting for %d seconds before requesting new data',
                         sleeptime)
                 time.sleep(sleeptime)
-
             self.raw_data=self.get_raw_data_from_provider()
             self.last_update=now
-        prices=self.__get_prices_from_raw_data()
+        prices=self.get_prices_from_raw_data()
         return prices
 
-    def __get_raw_data_from_provider(self) -> dict:
+    def get_raw_data_from_provider(self) -> dict:
         """ Prototype for get_raw_data_from_provider """
         raise RuntimeError("[Dyn Tariff Base Class] Function "
                            "'get_raw_data_from_provider' not implemented"
                            )
 
-    def __get_prices_from_raw_data(self) -> dict[int, float]:
+    def get_prices_from_raw_data(self) -> dict[int, float]:
         """ Prototype for get_prices_from_raw_data """
         raise RuntimeError("[Dyn Tariff Base Class] Function "
                            "'get_prices_from_raw_data' not implemented"
