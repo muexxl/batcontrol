@@ -5,11 +5,13 @@ import math
 import json
 import logging
 import requests
+from .forecastsolar_interface import ForecastSolarInterface
 
 logger = logging.getLogger('__main__')
 logger.info(f'[FCSolar] loading module ')
 
-class ForecastSolar(object):
+class FCSolar(ForecastSolarInterface):
+    """ Provider to get data from https://forecast.solar/ """
     def __init__(self, pvinstallations, timezone,
                  delay_evaluation_by_seconds) -> None:
         self.pvinstallations = pvinstallations
@@ -82,7 +84,7 @@ class ForecastSolar(object):
 
         return output
 
-    def get_raw_forecast(self):
+    def __get_raw_forecast(self):
         unit: dict
         for unit in self.pvinstallations:
             name = unit['name']

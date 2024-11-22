@@ -10,10 +10,12 @@ import pytz
 import numpy as np
 
 from forecastconsumption import forecastconsumption
-from forecastsolar import forecastsolar
 from dynamictariff import dynamictariff as tariff_factory
 from inverter import inverter
 from logfilelimiter import logfilelimiter
+
+from forecastsolar import solar as solar_factory
+
 
 LOGFILE_ENABLED_DEFAULT = True
 LOGFILE = "logs/batcontrol.log"
@@ -111,7 +113,10 @@ class Batcontrol(object):
         self.inverter = inverter.Inverter(config['inverter'])
 
         self.pvsettings = config['pvinstallations']
-        self.fc_solar = forecastsolar.ForecastSolar(self.pvsettings, timezone, DELAY_EVALUATION_BY_SECONDS)
+        self.fc_solar = solar_factory.ForecastSolar.create_solar_provider(self.pvsettings, 
+                                                                          timezone, 
+                                                                          DELAY_EVALUATION_BY_SECONDS
+                                                                         )
 
         self.load_profile = config['consumption_forecast']['load_profile']
         try:
