@@ -290,10 +290,6 @@ class Batcontrol(object):
         else:
             config['max_logfile_size'] = -1
 
-        if config['max_logfile_size'] > 0:
-            self.logfilelimiter = logfilelimiter.LogFileLimiter(
-                self.logfile, config['max_logfile_size'])
-
         if 'logfile_path' in config.keys():
             self.logfile = config['logfile_path']
         else:
@@ -301,6 +297,10 @@ class Batcontrol(object):
                 "[Main] No logfile path provided. Proceeding with default logfile path: %s",
                 LOGFILE
             )
+
+        if config['max_logfile_size'] > 0:
+            self.logfilelimiter = logfilelimiter.LogFileLimiter(
+                self.logfile, config['max_logfile_size'])
 
         # is the path valid and writable?
         if not os.path.isdir(os.path.dirname(self.logfile)):
