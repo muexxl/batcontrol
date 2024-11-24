@@ -660,7 +660,6 @@ class Batcontrol(object):
             logger.debug("[Rule] No reserved energy required, because no "
                          "'high price' hours in evaluation window.")
 
-
         # for API
         self.set_reserved_energy(reserved_storage)
         self.set_stored_energy(stored_energy)
@@ -795,6 +794,12 @@ class Batcontrol(object):
         self.last_stored_usable_energy = stored_usable_energy
         if self.mqtt_api is not None:
             self.mqtt_api.publish_stored_usable_energy_capacity(stored_usable_energy)
+
+    def set_stored_usable_energy(self, stored_usable_energy):
+        self.last_stored_usable_energy = stored_usable_energy
+        if self.mqtt_api is not None:
+            self.mqtt_api.publish_stored_usable_energy_capacity(stored_usable_energy)
+        return
 
     def set_discharge_limit(self, discharge_limit):
         self.discharge_limit = discharge_limit
