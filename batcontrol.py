@@ -507,20 +507,26 @@ class Batcontrol(object):
 
         return recharge_energy
 
-# %%
-
-    def is_discharge_allowed(self, net_consumption: np.ndarray, prices: dict):
-        # always allow discharging when battery is >90% maxsoc
-        discharge_limit = self.get_max_capacity() * self.always_allow_discharge_limit
+    def __is_above_always_allow_discharge_limit(self):
+        """ Evaluate if the battery is allowed to discharge always
+            return: bool
+        """
         stored_energy = self.get_stored_energy()
-        stored_usable_energy = self.get_stored_usable_energy()
-
-        if self.get_stored_energy() > discharge_limit:
+        discharge_limit = self.get_max_capacity() * self.always_allow_discharge_limit
+        if stored_energy > discharge_limit:
             logger.debug(
                 '[BatCTRL] Battery with %s above discharge limit %s',
                 stored_energy,
                 discharge_limit
                 )
+            return True
+        return False
+# %%
+    def is_discharge_allowed(self, net_consumption: np.ndarray, prices: dict):
+        stored_energy = self.get_stored_energy()
+        stored_usable_energy = self.get_stored_usable_energy()
+
+        if self.__is_above_always_allow_discharge_limit():
             return True
 
         current_price = prices[0]
@@ -722,23 +728,20 @@ class Batcontrol(object):
         return
 
     def set_discharge_blocked(self, discharge_blocked):
+        """ Avoid discharging if an external block is received,
+            but take care of the always_allow_discharge_limit.
+
+            If block is removed, the next calculation cycle will
+            decide what to do.
+        """
         if discharge_blocked == self.discharge_blocked:
             return
-        logger.info(f'[BatCTRL] Discharge block: {discharge_blocked}')
+        logger.info('[BatCTRL] Discharge block: %s', {discharge_blocked})
         if self.mqtt_api is not None:
             self.mqtt_api.publish_discharge_blocked(discharge_blocked)
         self.discharge_blocked = discharge_blocked
 
-        discharge_limit = self.get_max_capacity() * self.always_allow_discharge_limit
-        stored_energy = self.get_stored_energy()
-
-        if stored_energy > discharge_limit:
-            logger.debug(
-                '[BatCTRL] Battery with %s above discharge limit %s',
-                stored_energy,
-                discharge_limit
-                )
-        else:
+        if not self.__is_above_always_allow_discharge_limit():
             self.avoid_discharging()
 
     def refresh_static_values(self):
