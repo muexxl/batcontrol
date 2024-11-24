@@ -429,8 +429,7 @@ class Batcontrol(object):
                 net_consumption[:max_hour],
                 prices
             )
-            is_charging_possible = self.get_SOC() < (
-                self.get_max_capacity() * charging_limit)
+            is_charging_possible = self.get_SOC() < ( 100 * charging_limit)
 
             logger.debug('[BatCTRL] Discharging is NOT allowed')
             logger.debug('[BatCTRL] Charging allowed: %s', is_charging_possible)
