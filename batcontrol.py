@@ -59,6 +59,7 @@ class Batcontrol(object):
         self.last_stored_energy = -1
         self.last_reserved_energy = -1
         self.last_max_capacity = -1
+        self.last_stored_usable_energy = -1
 
         self.discharge_blocked = False
         self.discharge_limit = 0
@@ -67,6 +68,7 @@ class Batcontrol(object):
         self.fetched_reserved_energy = False
         self.fetched_max_capacity = False
         self.fetched_soc = False
+        self.fetched_stored_usable_energy = False
 
         self.last_run_time = 0
 
@@ -493,7 +495,7 @@ class Batcontrol(object):
             required_energy += energy_to_shift
 
         if required_energy > 0:
-            recharge_energy = required_energy-self.get_stored_energy()
+            recharge_energy = required_energy-self.get_stored_usable_energy()
         else:
             recharge_energy = 0
 
@@ -512,8 +514,9 @@ class Batcontrol(object):
         # always allow discharging when battery is >90% maxsoc
         discharge_limit = self.get_max_capacity() * self.always_allow_discharge_limit
         stored_energy = self.get_stored_energy()
+        stored_usable_energy = self.get_stored_usable_energy()
 
-        if stored_energy > discharge_limit:
+        if self.get_stored_energy() > discharge_limit:
             logger.debug(
                 '[BatCTRL] Battery with %s above discharge limit %s',
                 stored_energy,
@@ -579,21 +582,22 @@ class Batcontrol(object):
             reserved_storage += required_energy
 
         logger.debug(
-            "[BatCTRL] Reserved Energy: %0.1f Wh. Available in Battery: %0.1f Wh",
+            "[BatCTRL] Reserved Energy: %0.1f Wh. Usable in Battery: %0.1f Wh",
             reserved_storage,
-            stored_energy
+            stored_usable_energy
         )
 
         # for API
         self.set_reserved_energy(reserved_storage)
         self.set_stored_energy(stored_energy)
+        self.set_stored_usable_energy(stored_usable_energy)
 
         if self.discharge_blocked:
             logger.debug(
                 f'[BatCTRL] Discharge blocked due to external lock')
             return False
 
-        if (stored_energy > reserved_storage):
+        if (stored_usable_energy > reserved_storage):
             # allow discharging
             return True
         else:
@@ -652,6 +656,7 @@ class Batcontrol(object):
         self.fetched_max_capacity = False
         self.fetched_stored_energy = False
         self.fetched_reserved_energy = False
+        self.fetched_stored_usable_energy = False
 
     def get_SOC(self):
         if not self.fetched_soc:
@@ -670,9 +675,19 @@ class Batcontrol(object):
         return self.last_max_capacity
 
     def get_stored_energy(self):
+        """ Returns the stored eneregy in the battery in kWh without
+            considering the minimum SOC"""
         if not self.fetched_stored_energy:
             self.last_stored_energy = self.inverter.get_stored_energy()
             self.fetched_stored_energy = True
+        return self.last_stored_energy
+
+    def get_stored_usable_energy(self):
+        """ Returns the stored eneregy in the battery in kWh with considering
+            the MIN_SOC of inverters. """
+        if not self.fetched_stored_usable_energy:
+            self.last_stored_energy = self.inverter.get_stored_usable_energy()
+            self.fetched_stored_usable_energy = True
         return self.last_stored_energy
 
     def get_free_capacity(self):
@@ -692,6 +707,12 @@ class Batcontrol(object):
         self.last_stored_energy = stored_energy
         if self.mqtt_api is not None:
             self.mqtt_api.publish_stored_energy_capacity(stored_energy)
+        return
+
+    def set_stored_usable_energy(self, stored_usable_energy):
+        self.last_stored_usable_energy = stored_usable_energy
+        if self.mqtt_api is not None:
+            self.mqtt_api.publish_stored_usable_energy_capacity(stored_usable_energy)
         return
 
     def set_discharge_limit(self, discharge_limit):

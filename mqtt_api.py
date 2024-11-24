@@ -15,6 +15,7 @@ The following topics are published:
 - /charge_rate: charge rate in W
 - /max_energy_capacity: maximum capacity of battery in Wh
 - /stored_energy_capacity: energy stored in battery in Wh
+- /stored_usable_energy_capacity: energy stored in battery in Wh and usable (min SOC considered)
 - /reserved_energy_capacity: estimated energy reserved for discharge in Wh
 - /SOC: state of charge in %
 - /min_price_difference: minimum price difference in EUR
@@ -225,6 +226,13 @@ class MqttApi:
         """
         if self.client.is_connected():
             self.client.publish(self.base_topic + '/stored_energy_capacity', f'{stored_energy:.1f}')
+
+    def publish_stored_usable_energy_capacity(self, stored_energy:float) -> None:
+        """ Publish the stored usable energy capacity in Wh to MQTT
+            /stored_usable_energy_capacity
+        """
+        if self.client.is_connected():
+            self.client.publish(self.base_topic + '/stored_usable_energy_capacity', f'{stored_energy:.1f}')
 
     def publish_reserved_energy_capacity(self, reserved_energy:float) -> None:
         """ Publish the reserved energy capacity in Wh to MQTT
