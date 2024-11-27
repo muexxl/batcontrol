@@ -103,6 +103,7 @@ class FroniusWR(InverterBaseclass):
         return free_capa
 
     def get_max_capacity(self):
+        """ Returns Capacity reduced by MAX_SOC """
         return self.max_soc/100*self.get_capacity()
 
     def get_usable_capacity(self):
@@ -131,10 +132,10 @@ class FroniusWR(InverterBaseclass):
     def get_powerunit_config(self, path_version='latest'):
         """ Get additional PowerUnit configuration for backup power.
 
-        Parameters: 
+        Parameters:
             path_version (optional):
                 'latest' (default) - get via '/config/powerunit'
-                '1.2'              - get via '/config/setup/powerunit'           
+                '1.2'              - get via '/config/setup/powerunit'
 
         Returns: dict with backup power configuration
         """
