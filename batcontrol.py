@@ -507,7 +507,7 @@ class Batcontrol(object):
 
         return recharge_energy
 
-    def __is_above_always_allow_discharge_limit(self):
+    def __is_above_always_allow_discharge_limit(self) -> bool:
         """ Evaluate if the battery is allowed to discharge always
             return: bool
         """
