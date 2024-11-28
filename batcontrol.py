@@ -23,6 +23,11 @@ VALID_INVERTERS = ['fronius_gen24', 'testdriver']
 ERROR_IGNORE_TIME = 600
 TIME_BETWEEN_EVALUATIONS = 120
 TIME_BETWEEN_UTILITY_API_CALLS = 900  # 15 Minutes
+# Minimum charge rate to controlling loops between charging and
+#   self discharge.
+# 500W is Fronius' internal value for forced recharge.
+MIN_CHARGE_RATE = 500
+
 
 MODE_ALLOW_DISCHARGING = 10
 MODE_AVOID_DISCHARGING = 0
@@ -444,6 +449,14 @@ class Batcontrol(object):
                 remaining_time = (
                     60-datetime.datetime.now().astimezone(self.timezone).minute)/60
                 charge_rate = required_recharge_energy/remaining_time
+
+                if charge_rate < MIN_CHARGE_RATE:
+                    logger.debug("[BatCTRL] Charge rate increased to %d W from %d W",
+                                    MIN_CHARGE_RATE ,
+                                    charge_rate
+                                )
+                    charge_rate = MIN_CHARGE_RATE
+
                 self.force_charge(charge_rate)
 
             else:  # keep current charge level. recharge if solar surplus available
