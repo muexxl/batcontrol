@@ -23,13 +23,13 @@ class ForecastSolar(object):
         if dt > self.seconds_between_updates:
             try:
                 self.get_raw_forecast()
+                self.last_update = t0
             except Exception as e:
                 # Catch error here.
                 # Check cached values below
                 logger.error('[FCSolar] Error getting forecast: %s', e)
                 logger.warning('[FCSolar] Using cached values')
                 got_error = True
-            self.last_update = t0
         prediction = {}
         for hour in range(48+1):
             prediction[hour] = 0
