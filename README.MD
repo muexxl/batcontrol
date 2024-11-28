@@ -8,6 +8,8 @@ To integrate batcontrol with Home Assistant, use the following repository: [ha_a
 
 ## Preparations:
 
+# Local installation
+## Preparations:
 1. Verify the credentials of your inverter for customer or technician access.
 2. Obtain your Tibber API key from [Tibber Developer](https://developer.tibber.com/).
 3. Create your `batcontrol_config.yaml` in the config folder.
@@ -15,6 +17,7 @@ To integrate batcontrol with Home Assistant, use the following repository: [ha_a
 
 ## Installation:
 
+## Install:
 ```sh
 git clone https://github.com/muexxl/batcontrol.git  
 cd batcontrol  
@@ -23,13 +26,52 @@ source venv/bin/activate
 pip install -r requirements.txt  
 ```
 
-## Running the Application:
-
+## run
 ```sh
-cd /PATH/TO/batcontrol  
-source venv/bin/activate        
-python batcontrol.py  
+cd /PATH/TO/batcontrol
+source venv/bin/activate
+python batcontrol.py
 ```
+
+# Docker usage
+
+## Preparations
+
+```
+mkdir -p ./config -p ./logs
+```
+
+- Download the the latest [batcontrol_config.yaml](https://raw.githubusercontent.com/muexxl/batcontrol/refs/heads/main/config/batcontrol_config_dummy.yaml) sample, adjust and place it to config/batcontrol_config.yaml.
+
+- Use the default load_profile (automatically) or create your own.-
+
+### Plain Docker
+
+```
+docker run -d \
+  --name batcontrol \
+  -v /path/to/config:/app/config \
+  -v /path/to/logs:/app/logs \
+  muexx/batcontrol:latest
+```
+
+### Docker-compose example
+
+Create docker-compose.yml with the following content:
+
+```
+version: '3.8'
+
+services:
+  batcontrol:
+    image: muexx/batcontrol:latest
+    volumes:
+      - ./config:/app/config
+      - ./logs:/app/logs
+    restart: unless-stopped
+```
+
+Then start the container using `docker-compose up -d`.
 
 # FAQs
 
