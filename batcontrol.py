@@ -25,7 +25,8 @@ TIME_BETWEEN_EVALUATIONS = 120
 TIME_BETWEEN_UTILITY_API_CALLS = 900  # 15 Minutes
 # Minimum charge rate to controlling loops between charging and
 #   self discharge.
-MIN_CHARGE_RATE = 100
+# 500W is Fronius' internal value for forced recharge.
+MIN_CHARGE_RATE = 500
 
 
 MODE_ALLOW_DISCHARGING = 10
