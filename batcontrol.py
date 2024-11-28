@@ -699,9 +699,9 @@ class Batcontrol(object):
         """ Returns the stored eneregy in the battery in kWh with considering
             the MIN_SOC of inverters. """
         if not self.fetched_stored_usable_energy:
-            self.last_stored_energy = self.inverter.get_stored_usable_energy()
+            self.last_stored_usable_energy = self.inverter.get_stored_usable_energy()
             self.fetched_stored_usable_energy = True
-        return self.last_stored_energy
+        return self.last_stored_usable_energy
 
     def get_free_capacity(self):
         self.last_free_capacity = self.inverter.get_free_capacity()
