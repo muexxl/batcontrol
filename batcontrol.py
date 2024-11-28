@@ -11,7 +11,7 @@ import numpy as np
 
 from forecastconsumption import forecastconsumption
 from dynamictariff import dynamictariff as tariff_factory
-from inverter import inverter
+from inverter import inverter as inverter_factory
 from logfilelimiter import logfilelimiter
 
 from forecastsolar import solar as solar_factory
@@ -110,7 +110,7 @@ class Batcontrol(object):
             DELAY_EVALUATION_BY_SECONDS
         )
 
-        self.inverter = inverter.Inverter(config['inverter'])
+        self.inverter = inverter_factory.Inverter.create_inverter(config['inverter'])
 
         self.pvsettings = config['pvinstallations']
         self.fc_solar = solar_factory.ForecastSolar.create_solar_provider(self.pvsettings, 
