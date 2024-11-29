@@ -18,7 +18,7 @@ The following topics are published:
 - /stored_usable_energy_capacity: energy stored in battery in Wh and usable (min SOC considered)
 - /reserved_energy_capacity: estimated energy reserved for discharge in Wh
 - /SOC: state of charge in %
-- /min_price_difference: minimum price difference in EUR
+- /min_price_difference : minimum price difference in EUR
 - /discharge_blocked        : bool  # Discharge is blocked by other sources
 
 The following statistical arrays are published as JSON arrays:
@@ -284,14 +284,14 @@ class MqttApi:
                 f'{charge_limit:.2f}'
             )
 
-    def publish_min_price_difference(self, min_price_differences:float) -> None:
+    def publish_min_price_difference(self, min_price_difference:float) -> None:
         """ Publish the minimum price difference to MQTT found in config
-            /min_price_differences
+            /min_price_difference
         """
         if self.client.is_connected():
             self.client.publish(
-                self.base_topic + '/min_price_differences',
-                f'{min_price_differences:.3f}'
+                self.base_topic + '/min_price_difference',
+                f'{min_price_difference:.3f}'
             )
 
     def publish_max_energy_capacity(self, max_capacity:float) -> None:
