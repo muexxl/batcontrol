@@ -8,7 +8,6 @@ import requests
 
 logger = logging.getLogger('__main__')
 logger.info(f'[FCSolar] loading module ')
-logger.setLevel(logging.DEBUG)
 
 class ForecastSolar(object):
     def __init__(self, pvinstallations, timezone,

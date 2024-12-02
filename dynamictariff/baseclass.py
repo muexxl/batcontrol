@@ -4,7 +4,6 @@ import random
 import logging
 
 logger = logging.getLogger('__main__')
-logger.setLevel(logging.DEBUG)
 
 class DynamicTariffBaseclass:
     """ Parent Class for implementing different tariffs"""
