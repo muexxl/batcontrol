@@ -96,13 +96,14 @@ class Batcontrol(object):
         self.dynamic_tariff = dynamictariff.DynamicTariff(
             config['utility'],
             timezone,
-            TIME_BETWEEN_UTILITY_API_CALLS
+            TIME_BETWEEN_UTILITY_API_CALLS,
+            DELAY_EVALUATION_BY_SECONDS
         )
 
         self.inverter = inverter.Inverter(config['inverter'])
 
         self.pvsettings = config['pvinstallations']
-        self.fc_solar = forecastsolar.ForecastSolar(self.pvsettings, timezone)
+        self.fc_solar = forecastsolar.ForecastSolar(self.pvsettings, timezone, DELAY_EVALUATION_BY_SECONDS)
 
         self.load_profile = config['consumption_forecast']['load_profile']
         try:
@@ -112,7 +113,7 @@ class Batcontrol(object):
             annual_consumption = 0
 
         self.fc_consumption = forecastconsumption.ForecastConsumption(
-            self.load_profile, timezone, annual_consumption)
+            self.load_profile, timezone, annual_consumption )
 
         self.batconfig = config['battery_control']
         self.time_at_forecast_error = -1
@@ -817,7 +818,7 @@ if __name__ == '__main__':
                                                    microseconds=now.microsecond)
             # add time increments to trigger next evaluation
             next_eval += datetime.timedelta(minutes=EVALUATIONS_EVERY_MINUTES,
-                                              seconds=DELAY_EVALUATION_BY_SECONDS,
+                                              seconds=0,
                                               microseconds=0)
             sleeptime = (next_eval - now).total_seconds()
             logger.info("[Main] Next evaluation at %s. Sleeping for %.0f seconds",

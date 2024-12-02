@@ -34,7 +34,8 @@ class Evcc(DynamicTariffBaseclass):
         Inherits from DynamicTariffBaseclass
     """
     def __init__(self, timezone , url , min_time_between_API_calls=60):
-        super().__init__(timezone,min_time_between_API_calls)
+        super().__init__(timezone,min_time_between_API_calls, 0)
+        self.delay_evaluation_by_seconds=0
         self.url=url
 
     def get_raw_data_from_provider(self):
