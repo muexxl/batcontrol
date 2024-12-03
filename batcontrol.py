@@ -431,19 +431,32 @@ class Batcontrol(object):
         if self.is_discharge_allowed(net_consumption, prices):
             self.allow_discharging()
         else:  # discharge not allowed
-            charging_limit = self.max_charging_from_grid_limit
+            logger.debug('[Rule] Discharging is NOT allowed')
+            charging_limit_percent = self.max_charging_from_grid_limit * 100
             required_recharge_energy = self.get_required_required_recharge_energy(
                 net_consumption[:max_hour],
                 prices
             )
-            is_charging_possible = self.get_SOC() < ( 100 * charging_limit)
+            is_charging_possible = self.get_SOC() < charging_limit_percent
 
-            logger.debug('[BatCTRL] Discharging is NOT allowed')
             logger.debug('[BatCTRL] Charging allowed: %s', is_charging_possible)
-            logger.debug(
-                '[BatCTRL] Get additional energy via grid: %0.1f Wh',
-                required_recharge_energy
-                )
+            if is_charging_possible:
+                logger.debug('[Rule] Charging is allowed, because SOC is below %.0f%%',
+                               charging_limit_percent
+                             )
+            else:
+                logger.debug('[Rule] Charging is NOT allowed, because SOC is above %.0f%%',
+                                charging_limit_percent
+                             )
+
+            if required_recharge_energy > 0:
+                logger.debug(
+                    '[BatCTRL] Get additional energy via grid: %0.1f Wh',
+                    required_recharge_energy
+                    )
+            else:
+                logger.debug('[Rule] No additional energy required or possible price found.')
+
             # charge if battery capacity available and more stored energy is required
             if is_charging_possible and required_recharge_energy > 0:
                 remaining_time = (
@@ -451,7 +464,7 @@ class Batcontrol(object):
                 charge_rate = required_recharge_energy/remaining_time
 
                 if charge_rate < MIN_CHARGE_RATE:
-                    logger.debug("[BatCTRL] Charge rate increased to %d W from %d W",
+                    logger.debug("[Rule] Charge rate increased to minimum %d W from %f.1 W",
                                     MIN_CHARGE_RATE ,
                                     charge_rate
                                 )
@@ -508,7 +521,13 @@ class Batcontrol(object):
             required_energy += energy_to_shift
 
         if required_energy > 0:
+            logger.debug("[Rule]: Required Energy: %0.1f Wh", required_energy)
+            logger.debug("[Rule]: Based on next high price hours: %s", high_price_hours[::-1])
             recharge_energy = required_energy-self.get_stored_usable_energy()
+            logger.debug("[Rule]: Stored usable Energy: %0.1f , Recharge Energy: %0.1f Wh",
+                         self.get_stored_usable_energy(),
+                         recharge_energy
+                         )
         else:
             recharge_energy = 0
 
@@ -516,6 +535,7 @@ class Batcontrol(object):
 
         if recharge_energy > free_capacity:
             recharge_energy = free_capacity
+            logger.debug("[Rule]: Recharge limited by free capacity: %0.1f Wh", recharge_energy)
         if recharge_energy < 0:
             recharge_energy = 0
 
@@ -529,7 +549,7 @@ class Batcontrol(object):
         discharge_limit = self.get_max_capacity() * self.always_allow_discharge_limit
         if stored_energy > discharge_limit:
             logger.debug(
-                '[BatCTRL] Battery with %s above discharge limit %s',
+                '[BatCTRL] Battery with %d Wh above discharge limit %d Wh',
                 stored_energy,
                 discharge_limit
                 )
@@ -549,6 +569,7 @@ class Batcontrol(object):
         stored_usable_energy = self.get_stored_usable_energy()
 
         if self.__is_above_always_allow_discharge_limit():
+            logger.info("[Rule] Discharge allowed due to always_allow_discharge_limit")
             return True
 
         current_price = prices[0]
@@ -559,13 +580,20 @@ class Batcontrol(object):
             future_price = prices[h]
             if future_price <= current_price-min_price_difference:
                 max_hour = h
+                logger.debug("[Rule] Recharge possible in %d hours, limiting evaluation window.", h)
+                logger.debug("[Rule] Future price: %.3f < Current price: %.3f - min_price_diff. %.3f ",
+                             current_price,
+                             future_price,
+                             self.min_price_difference
+                        )
                 break
         dt = datetime.timedelta(hours=max_hour-1)
         t0 = datetime.datetime.now()
         t1 = t0+dt
         last_hour = t1.astimezone(self.timezone).strftime("%H:59")
+
         logger.debug(
-              '[BatCTRL] Evaluating next %d hours until %s',
+              '[Rule] Evaluating next %d hours until %s',
               max_hour,
               last_hour
             )
@@ -608,11 +636,20 @@ class Batcontrol(object):
             # add_remaining required_energy to reserved_storage
             reserved_storage += required_energy
 
-        logger.debug(
-            "[BatCTRL] Reserved Energy: %0.1f Wh. Usable in Battery: %0.1f Wh",
-            reserved_storage,
-            stored_usable_energy
-        )
+        if len(higher_price_hours) > 0:
+            # This message is somehow confusing, because we are working with an
+            # hour offset "the next 2 hours", but people may read "2 o'clock".
+            logger.debug("[Rule] Reserved Energy will be used in the next hours: %s",
+                         higher_price_hours[::-1])
+            logger.debug(
+                "[Rule] Reserved Energy: %0.1f Wh. Usable in Battery: %0.1f Wh",
+                reserved_storage,
+                stored_usable_energy
+            )
+        else:
+            logger.debug("[Rule] No reserved energy required, because no "
+                         "high price hours in evaluation window.")
+
 
         # for API
         self.set_reserved_energy(reserved_storage)
@@ -626,9 +663,20 @@ class Batcontrol(object):
 
         if (stored_usable_energy > reserved_storage):
             # allow discharging
+            logger.debug(
+                "[Rule] Discharge allowed. Stored usable energy %0.1f Wh > Reserved energy %0.1f Wh",
+                         stored_usable_energy,
+                         reserved_storage
+                         )
             return True
         else:
             # forbid discharging
+            logger.debug(
+                "[Rule] Discharge forbidden. Stored usable energy %0.1f Wh <= Reserved energy %0.1f Wh",
+                         stored_usable_energy,
+                         reserved_storage
+                         )
+
             return False
 
     def __set_charge_rate(self, charge_rate: int):
