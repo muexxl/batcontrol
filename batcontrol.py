@@ -521,10 +521,12 @@ class Batcontrol(object):
             required_energy += energy_to_shift
 
         if required_energy > 0:
-            logger.debug("[Rule]: Required Energy: %0.1f Wh", required_energy)
-            logger.debug("[Rule]: Based on next high price hours: %s", high_price_hours[::-1])
+            logger.debug("[Rule] Required Energy: %0.1f Wh is based on next 'high price' hours %s",
+                          required_energy,
+                          high_price_hours
+                          )
             recharge_energy = required_energy-self.get_stored_usable_energy()
-            logger.debug("[Rule]: Stored usable Energy: %0.1f , Recharge Energy: %0.1f Wh",
+            logger.debug("[Rule] Stored usable Energy: %0.1f , Recharge Energy: %0.1f Wh",
                          self.get_stored_usable_energy(),
                          recharge_energy
                          )
@@ -535,7 +537,7 @@ class Batcontrol(object):
 
         if recharge_energy > free_capacity:
             recharge_energy = free_capacity
-            logger.debug("[Rule]: Recharge limited by free capacity: %0.1f Wh", recharge_energy)
+            logger.debug("[Rule] Recharge limited by free capacity: %0.1f Wh", recharge_energy)
         if recharge_energy < 0:
             recharge_energy = 0
 
@@ -648,7 +650,7 @@ class Batcontrol(object):
             )
         else:
             logger.debug("[Rule] No reserved energy required, because no "
-                         "high price hours in evaluation window.")
+                         "'high price' hours in evaluation window.")
 
 
         # for API
