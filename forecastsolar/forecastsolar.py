@@ -17,11 +17,19 @@ class ForecastSolar(object):
         self.timezone=timezone
 
     def get_forecast(self):
+        got_error = False
         t0 = time.time()
         dt = t0-self.last_update
         if dt > self.seconds_between_updates:
-            self.get_raw_forecast()
-            self.last_update = t0
+            try:
+                self.get_raw_forecast()
+                self.last_update = t0
+            except Exception as e:
+                # Catch error here.
+                # Check cached values below
+                logger.error('[FCSolar] Error getting forecast: %s', e)
+                logger.warning('[FCSolar] Using cached values')
+                got_error = True
         prediction = {}
         for hour in range(48+1):
             prediction[hour] = 0
@@ -51,8 +59,12 @@ class ForecastSolar(object):
                         prediction[rel_hour] += value
                     else:
                         prediction[rel_hour] = value
-        #complete hours without production with 0 values
+
         max_hour=max(prediction.keys())
+        if max_hour < 18 and got_error:
+            logger.error('[FCSolar] Less than 18 hours of forecast data. Stopping.')
+            raise RuntimeError('[FCSolar] Less than 18 hours of forecast data.')
+        #complete hours without production with 0 values
         for h in range(max_hour+1):
             if h not in prediction.keys():
                 prediction[h]=0
