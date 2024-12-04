@@ -1,4 +1,5 @@
 import datetime
+import random
 import time
 import math
 import json
@@ -9,12 +10,14 @@ logger = logging.getLogger('__main__')
 logger.info(f'[FCSolar] loading module ')
 
 class ForecastSolar(object):
-    def __init__(self, pvinstallations, timezone) -> None:
+    def __init__(self, pvinstallations, timezone,
+                 delay_evaluation_by_seconds) -> None:
         self.pvinstallations = pvinstallations
         self.results = {}
         self.last_update = 0
         self.seconds_between_updates = 900
         self.timezone=timezone
+        self.delay_evaluation_by_seconds=delay_evaluation_by_seconds
 
     def get_forecast(self):
         got_error = False
@@ -22,6 +25,12 @@ class ForecastSolar(object):
         dt = t0-self.last_update
         if dt > self.seconds_between_updates:
             try:
+                if self.last_update > 0 and self.delay_evaluation_by_seconds > 0:
+                    sleeptime = random.randrange(0, self.delay_evaluation_by_seconds, 1)
+                    logger.debug(
+                        '[FCSolar] Waiting for %d seconds before requesting new data',
+                        sleeptime)
+                    time.sleep(sleeptime)
                 self.get_raw_forecast()
                 self.last_update = t0
             except Exception as e:

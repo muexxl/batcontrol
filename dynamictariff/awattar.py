@@ -32,8 +32,8 @@ class Awattar(DynamicTariffBaseclass):
         Inherits from DynamicTariffBaseclass
     """
 
-    def __init__(self, timezone ,country:str, min_time_between_API_calls=0):
-        super().__init__(timezone,min_time_between_API_calls)
+    def __init__(self, timezone ,country:str, min_time_between_API_calls=0, delay_evaluation_by_seconds=0):
+        super().__init__(timezone,min_time_between_API_calls, delay_evaluation_by_seconds)
         country= country.lower()
         if country in ['at','de']:
             self.url=f'https://api.awattar.{country}/v1/marketdata'

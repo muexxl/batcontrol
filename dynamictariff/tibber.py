@@ -10,8 +10,8 @@ class Tibber(DynamicTariffBaseclass):
     """ Implement Tibber API to get dynamic electricity prices
         Inherits from DynamicTariffBaseclass
     """
-    def __init__(self, timezone , token, min_time_between_API_calls=0):
-        super().__init__(timezone,min_time_between_API_calls)
+    def __init__(self, timezone , token, min_time_between_API_calls=0, delay_evaluation_by_seconds=0):
+        super().__init__(timezone,min_time_between_API_calls, delay_evaluation_by_seconds)
         self.access_token=token
         self.url="https://api.tibber.com/v1-beta/gql"
 

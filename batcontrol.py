@@ -20,8 +20,10 @@ LOGFILE = "logs/batcontrol.log"
 CONFIGFILE = "config/batcontrol_config.yaml"
 VALID_UTILITIES = ['tibber', 'awattar_at', 'awattar_de', 'evcc']
 VALID_INVERTERS = ['fronius_gen24', 'testdriver']
-ERROR_IGNORE_TIME = 600
-TIME_BETWEEN_EVALUATIONS = 120
+ERROR_IGNORE_TIME = 600 # 10 Minutes
+EVALUATIONS_EVERY_MINUTES = 3 # Every x minutes on the clock
+DELAY_EVALUATION_BY_SECONDS = 15 # Delay evaluation for x seconds at every trigger
+TIME_BETWEEN_EVALUATIONS = EVALUATIONS_EVERY_MINUTES * 60 # Interval between evaluations in seconds
 TIME_BETWEEN_UTILITY_API_CALLS = 900  # 15 Minutes
 # Minimum charge rate to controlling loops between charging and
 #   self discharge.
@@ -102,13 +104,14 @@ class Batcontrol(object):
         self.dynamic_tariff = dynamictariff.DynamicTariff(
             config['utility'],
             timezone,
-            TIME_BETWEEN_UTILITY_API_CALLS
+            TIME_BETWEEN_UTILITY_API_CALLS,
+            DELAY_EVALUATION_BY_SECONDS
         )
 
         self.inverter = inverter.Inverter(config['inverter'])
 
         self.pvsettings = config['pvinstallations']
-        self.fc_solar = forecastsolar.ForecastSolar(self.pvsettings, timezone)
+        self.fc_solar = forecastsolar.ForecastSolar(self.pvsettings, timezone, DELAY_EVALUATION_BY_SECONDS)
 
         self.load_profile = config['consumption_forecast']['load_profile']
         try:
@@ -118,7 +121,7 @@ class Batcontrol(object):
             annual_consumption = 0
 
         self.fc_consumption = forecastconsumption.ForecastConsumption(
-            self.load_profile, timezone, annual_consumption)
+            self.load_profile, timezone, annual_consumption )
 
         self.batconfig = config['battery_control']
         self.time_at_forecast_error = -1
@@ -842,10 +845,17 @@ if __name__ == '__main__':
         while (1):
             bc.run()
             now = datetime.datetime.now().astimezone(bc.timezone)
-            next_minute = (now + datetime.timedelta(seconds=TIME_BETWEEN_EVALUATIONS)).replace(second=0, microsecond=0)
-            sleeptime = (next_minute - now).total_seconds()
+            # reset base to full minutes on the clock
+            next_eval = now - datetime.timedelta(minutes=now.minute % EVALUATIONS_EVERY_MINUTES,
+                                                   seconds=now.second,
+                                                   microseconds=now.microsecond)
+            # add time increments to trigger next evaluation
+            next_eval += datetime.timedelta(minutes=EVALUATIONS_EVERY_MINUTES,
+                                              seconds=0,
+                                              microseconds=0)
+            sleeptime = (next_eval - now).total_seconds()
             logger.info("[Main] Next evaluation at %s. Sleeping for %.0f seconds",
-                         next_minute.strftime("%H:%M:%S"), sleeptime)
+                         next_eval.strftime("%H:%M:%S"), sleeptime)
             time.sleep(sleeptime)
     finally:
         bc.shutdown()
