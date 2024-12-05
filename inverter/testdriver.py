@@ -1,8 +1,9 @@
 import logging
 from .baseclass import InverterBaseclass
+from .inverter_interface import InverterInterface
 
 logger = logging.getLogger('__main__')
-logger.info(f'[Testdriver] loading module ')
+logger.info('[Testdriver] loading module')
 
 #from .fronius import InverterBaseclass
 
@@ -14,8 +15,9 @@ logger.info(f'[Testdriver] loading module ')
 
 
 class Testdriver(InverterBaseclass):
-    def __init__(self, max_grid_charge:float):
-        self.max_grid_charge_rate=max_grid_charge
+    def __init__(self, config):
+        super().__init__(config)
+        self.max_grid_charge_rate=config['max_grid_charge_rate']
         self.installed_capacity=11000 # in Wh
         self.SOC=69.0 # static simulation SOC in percent
         self.min_soc=8 # in percent
@@ -32,21 +34,8 @@ class Testdriver(InverterBaseclass):
     def set_mode_avoid_discharge(self):
         self.mode='avoid_discharge'
 
-    def get_free_capacity(self):
-        current_soc = self.get_SOC()
-        capa = self.get_capacity()
-        free_capa = (self.max_soc - current_soc) / 100 * capa
-        return free_capa
-
     def get_capacity(self):
         return self.installed_capacity
-
-    def get_max_capacity(self):
-        return self.max_soc/100*self.get_capacity()
-
-    def get_usable_capacity(self):
-        usable_capa = (self.max_soc-self.min_soc)/100*self.get_capacity()
-        return usable_capa
 
     def get_SOC(self):
         return self.SOC
@@ -62,12 +51,15 @@ class Testdriver(InverterBaseclass):
         import mqtt_api
         self.mqtt_api = api_mqtt_api
         # /set is appended to the topic
-        self.mqtt_api.register_set_callback(self._get_mqtt_topic() + 'SOC', self.api_set_SOC, int)
+        self.mqtt_api.register_set_callback(self.__get_mqtt_topic() + 'SOC', self.api_set_SOC, int)
 
     def refresh_api_values(self):
+        super().refresh_api_values()
         if self.mqtt_api:
-            self.mqtt_api.generic_publish(self._get_mqtt_topic() + 'SOC', self.get_SOC())
-            self.mqtt_api.generic_publish(self._get_mqtt_topic() + 'mode', self.mode)
-            self.mqtt_api.generic_publish(self._get_mqtt_topic() + 'stored_energy', self.get_stored_energy())
-            self.mqtt_api.generic_publish(self._get_mqtt_topic() + 'free_capacity', self.get_free_capacity())
-            self.mqtt_api.generic_publish(self._get_mqtt_topic() + 'max_capacity', self.get_max_capacity())
+            self.mqtt_api.generic_publish(self.__get_mqtt_topic() + 'mode', self.mode)
+
+    def shutdown(self):
+        pass
+
+    def __get_mqtt_topic(self) -> str:
+        return f'inverters/{self.inverter_num}/'
