@@ -19,11 +19,11 @@ To integrate batcontrol with Home Assistant, use the following repository: [ha_a
 
 ## Install:
 ```sh
-git clone https://github.com/muexxl/batcontrol.git  
-cd batcontrol  
-virtualenv venv  
-source venv/bin/activate  
-pip install -r requirements.txt  
+git clone https://github.com/muexxl/batcontrol.git
+cd batcontrol
+virtualenv venv
+source venv/bin/activate
+pip install -r requirements.txt
 ```
 
 ## run
