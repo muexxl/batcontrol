@@ -59,9 +59,10 @@ jobs:
       - name: Export digest
         run: |
           mkdir -p /tmp/digests
+          rm -v /tmp/digests/* || true
           digest="${{ steps.build.outputs.digest }}"
-          touch "/tmp/digests/${digest#sha256:}"          
-      
+          touch "/tmp/digests/${digest#sha256:}"
+
       - name: Upload digest
         uses: actions/upload-artifact@v4
         with:
