@@ -50,7 +50,7 @@ mqtt_api = None
 ## Callbacks go through
 def on_connect( client, userdata, flags, rc ): # pylint: disable=unused-argument
     """ Callback for MQTT connection to serve /status"""
-    logger.info('[MQTT] Connected with result code {rc}')
+    logger.info(f'[MQTT] Connected with result code {rc}')
     # Make public, that we are running.
     client.publish(mqtt_api.base_topic + '/status', 'online', retain=True)
 
