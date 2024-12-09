@@ -17,12 +17,16 @@ Raises:
 from .awattar import Awattar
 from .tibber import Tibber
 from .evcc import Evcc
+from .dynamictariff_interface import TariffInterface
 
 class DynamicTariff:
-    """ Select and configure a dynamic tariff provider based on the given configuration """
-    def __new__(cls,  config:dict, timezone,
-                min_time_between_API_calls,  # pylint: disable=invalid-name
-                delay_evaluation_by_seconds):
+    """ DynamicTariff factory"""
+    @staticmethod
+    def create_tarif_provider(config:dict, timezone,
+                              min_time_between_api_calls,
+                              delay_evaluation_by_seconds
+                              ) -> TariffInterface:
+        """ Select and configure a dynamic tariff provider based on the given configuration """
         selected_tariff=None
         provider=config['type']
 
@@ -68,7 +72,7 @@ class DynamicTariff:
                     'Please provide "url" in your configuration file, '
                     'like http://evcc.local/api/tariff/grid'
                     )
-            selected_tariff= Evcc(timezone,config['url'],min_time_between_API_calls)
+            selected_tariff= Evcc(timezone,config['url'],min_time_between_api_calls)
         else:
             raise RuntimeError(f'[DynamicTariff] Unkown provider {provider}')
         return selected_tariff
