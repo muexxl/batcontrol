@@ -63,9 +63,7 @@ evcc:
   port: 1883
   status_topic: evcc/status
   # one loadpoints that should be monitored
-  loadpoint_topic:
-    - evcc/loadpoints/1/charging
-    - evcc/loadpoints/2/charging
+  loadpoint_topic: evcc/loadpoints/1/charging
   username: user
   password: password
   tls: false
