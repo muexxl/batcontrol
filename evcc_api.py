@@ -56,19 +56,10 @@ class EvccApi():
         self.evcc_is_online = False
         self.evcc_is_charging = False
 
-        self.evcc_loadpoint_status = {}
-
         self.block_function = None
 
         self.topic_status = config['status_topic']
-        self.list_topics_loadpoint = []
-
-        if isinstance(config['loadpoint_topic'], str):
-            self.list_topics_loadpoint.append(config['loadpoint_topic'])
-        elif isinstance(config['loadpoint_topic'], list):
-            self.list_topics_loadpoint = config['loadpoint_topic']
-        else:
-            logger.error('[EVCC] Invalid loadpoint_topic type')
+        self.topic_loadpoint = config['loadpoint_topic']
 
         self.client = mqtt.Client()
         if 'logger' in config and config['logger'] is True:
@@ -94,13 +85,9 @@ class EvccApi():
         self.wait_ready()
         # Subscribe to status and loadpoint(s)
         self.client.subscribe(config['status_topic'])
-        for topic in self.list_topics_loadpoint:
-            logger.info('[EVCC] Subscribing to %s', topic)
-            self.__store_loadpoint_status(topic, False)
-            self.client.subscribe(topic)
-            self.client.message_callback_add(topic, self._handle_message)
-
+        self.client.subscribe(config['loadpoint_topic'])
         self.client.message_callback_add(config['status_topic'], self._handle_message)
+        self.client.message_callback_add(config['loadpoint_topic'], self._handle_message)
 
     def wait_ready(self) -> bool:
         """ Wait until the MQTT client is connected to the broker """
@@ -131,7 +118,6 @@ class EvccApi():
                     logger.error('[EVCC] EVCC was charging, remove block')
                     self.evcc_is_charging = False
                     self.block_function(False)
-                    self.__reset_loadpoint_status()
             else:
                 logger.info('[EVCC] EVCC is online')
             self.evcc_is_online = online
@@ -150,28 +136,6 @@ class EvccApi():
                 self.block_function(False)
         self.evcc_is_charging = charging
 
-    def __store_loadpoint_status(self, topic:str, is_charging:bool):
-        """ Store the loadpoint status """
-        send_info = False
-        if topic not in self.evcc_loadpoint_status:
-            self.evcc_loadpoint_status[topic] = is_charging
-            send_info = True
-        if self.evcc_loadpoint_status[topic] != is_charging:
-            self.evcc_loadpoint_status[topic] = is_charging
-            send_info = True
-        # Send info if status changed
-        if send_info is True:
-            if is_charging is False:
-                logger.info('[EVCC] Loadpoint %s is not charging.', topic)
-            else:
-                logger.info('[EVCC] Loadpoint %s is charging.', topic)
-
-
-    def __reset_loadpoint_status(self):
-        """ Reset the loadpoint status """
-        for topic in self.list_topics_loadpoint:
-            self.evcc_loadpoint_status[topic] = False
-
     def handle_status_messages(self, message):
         """ Handle incoming status messages from the MQTT broker """
         if message.payload == b'online':
@@ -182,27 +146,16 @@ class EvccApi():
     def handle_charging_message(self, message):
         """ Handle incoming charging messages from the MQTT broker """
         if re.match(b'true', message.payload, re.IGNORECASE):
-            self.__store_loadpoint_status(message.topic, True)
+            self.set_evcc_charging(True)
         elif re.match(b'false', message.payload, re.IGNORECASE):
-            self.__store_loadpoint_status(message.topic, False)
-
-        self.evaluate_charging_status()
-
-    def evaluate_charging_status(self):
-        """ Go through the loadpoints and check if one is charging """
-        for _, is_charging in self.evcc_loadpoint_status.items():
-            if is_charging is True:
-                self.set_evcc_charging(True)
-                return
-        self.set_evcc_charging(False)
+            self.set_evcc_charging(False)
 
     def _handle_message(self, client, userdata, message): # pylint: disable=unused-argument
         """ Message dispatching function """
         logger.debug('[EVCC] Received message on %s', message.topic)
         if message.topic == self.config['status_topic']:
             self.handle_status_messages(message)
-        # Check if message.topic is in self.list_topics_loadpoint
-        elif message.topic in self.list_topics_loadpoint:
+        elif message.topic == self.config['loadpoint_topic']:
             self.handle_charging_message(message)
         else:
             logger.warning('[EVCC] No callback registered for %s', message.topic)
