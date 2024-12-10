@@ -86,7 +86,7 @@ class MqttApi:
         client.publish(self.base_topic + '/status', 'online', retain=True)
         # Handle reconnect case
         for topic in self.callbacks:
-            logger.debug('[MQTT] Re-registering callback for %s', topic)
+            logger.debug('[MQTT] Subscribing topic: %s', topic)
             for topic in self.callbacks:
                 client.subscribe(topic)
 
