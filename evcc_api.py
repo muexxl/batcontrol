@@ -81,13 +81,19 @@ class EvccApi():
 
         self.client.loop_start()
         self.client.connect(config['broker'], config['port'], 60)
+        self.client.on_connect = self.on_connect
 
         self.wait_ready()
+        # Register callback functions, survives reconnects
+        self.client.message_callback_add(self.topic_status, self._handle_message)
+        self.client.message_callback_add(self.topic_loadpoint, self._handle_message)
+
+    def on_connect(self, client, userdata, flags, rc): # pylint: disable=unused-argument
+        """ Callback function for MQTT on_connect """
+        logger.info('[EVCC] Connected to MQTT Broker with result code %s', rc)
         # Subscribe to status and loadpoint(s)
-        self.client.subscribe(config['status_topic'])
-        self.client.subscribe(config['loadpoint_topic'])
-        self.client.message_callback_add(config['status_topic'], self._handle_message)
-        self.client.message_callback_add(config['loadpoint_topic'], self._handle_message)
+        self.client.subscribe(self.topic_status)
+        self.client.subscribe(self.topic_loadpoint)
 
     def wait_ready(self) -> bool:
         """ Wait until the MQTT client is connected to the broker """
