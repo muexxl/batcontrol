@@ -45,16 +45,6 @@ import numpy as np
 logger = logging.getLogger('__main__')
 logger.info('[MQTT] loading module ')
 
-mqtt_api = None
-
-## Callbacks go through
-def on_connect( client, userdata, flags, rc ): # pylint: disable=unused-argument
-    """ Callback for MQTT connection to serve /status"""
-    logger.info(f'[MQTT] Connected with result code {rc}')
-    # Make public, that we are running.
-    client.publish(mqtt_api.base_topic + '/status', 'online', retain=True)
-
-
 class MqttApi:
     """ MQTT API to publish data from batcontrol to MQTT for further processing+visualization"""
     SET_SUFFIX = '/set'
@@ -72,8 +62,6 @@ class MqttApi:
             self.client.username_pw_set(config['username'], config['password'])
 
         self.client.will_set(self.base_topic + '/status', 'offline', retain=True)
-        global mqtt_api
-        mqtt_api = self
 
         # TLS , not tested yet
         if config['tls'] is True:
@@ -86,10 +74,21 @@ class MqttApi:
                 ciphers=config['tls']['ciphers']
             )
 
-        self.client.on_connect = on_connect
+        self.client.on_connect = self.on_connect
         self.client.loop_start()
 
         self.client.connect(config['broker'], config['port'], 60)
+
+    def on_connect(self, client, userdata, flags, rc):
+        """ Callback for MQTT connection to serve /status"""
+        logger.info('[MQTT] Connected with result code %s', rc)
+        # Make public, that we are running.
+        client.publish(self.base_topic + '/status', 'online', retain=True)
+        # Handle reconnect case
+        for topic in self.callbacks:
+            logger.debug('[MQTT] Re-registering callback for %s', topic)
+            for topic in self.callbacks:
+                client.subscribe(topic)
 
     def wait_ready(self) -> bool:
         """ Wait for MQTT connection to be ready"""
