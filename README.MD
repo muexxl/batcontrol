@@ -5,12 +5,13 @@ To integrate batcontrol with Home Assistant, use the following repository: [ha_a
 
 1. A PV installation with a BYD Battery and a Fronius Gen24 inverter.
 2. An EPEX Spot based contract with hourly electricity pricing, like Awattar, Tibber etc. (Get a €50 bonus on sign-up to Tibber using this [link](https://invite.tibber.com/x8ci52nj).)
+3. Customer login details to the inverter.
 
 ## Preparations:
 
 # Local installation
 ## Preparations:
-1. Verify the credentials of your inverter for customer or technician access.
+1. Verify the credentials of your inverter for customer or technician access. You can use either.
 2. Obtain your Tibber API key from [Tibber Developer](https://developer.tibber.com/), if you use Tibber. 
 3. Create your `batcontrol_config.yaml` in the config folder.
 4. Configure your electricity tariff and pv installation.
