@@ -85,6 +85,7 @@ class FroniusWR(InverterBaseclass):
             )
         self.max_soc = self.previous_battery_config['BAT_M0_SOC_MAX']
         self.get_time_of_use()  # save timesofuse
+        self.set_allow_grid_charging(True)
 
     def get_SOC(self):
         path = '/solar_api/v1/GetPowerFlowRealtimeData.fcgi'
@@ -292,12 +293,9 @@ class FroniusWR(InverterBaseclass):
                           "TimeTable": {"Start": "00:00", "End": "23:59"},
                           "Weekdays": {"Mon": True, "Tue": True, "Wed": True, "Thu": True, "Fri": True, "Sat": True, "Sun": True}
                           }]
-        self.set_allow_grid_charging(False)
         return self.set_time_of_use(timeofuselist)
 
     def set_mode_allow_discharge(self):
-        self.set_allow_grid_charging(False)
-
         timeofuselist = []
         if self.max_pv_charge_rate > 0:
             timeofuselist = [{'Active': True,
@@ -320,7 +318,6 @@ class FroniusWR(InverterBaseclass):
                           "TimeTable": {"Start": "00:00", "End": "23:59"},
                           "Weekdays": {"Mon": True, "Tue": True, "Wed": True, "Thu": True, "Fri": True, "Sat": True, "Sun": True}
                           }]
-        self.set_allow_grid_charging(True)
         return self.set_time_of_use(timeofuselist)
 
     def restore_time_of_use_config(self):
