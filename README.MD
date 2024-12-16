@@ -103,3 +103,14 @@ Running other software that controls the inverter or battery is currently not su
 
 Changing settings through the local webinterface of the inverter is possible, but not recommended. 
 The recommended course of action is to shut down batcontrol, make the necessary changes and then restart batcontrol to avoid any conflicts and ensure the correct configuration is saved.
+
+# Uninstall
+
+To uninstall batcontrol and restore the inverter settings follow these steps:
+1. Check if batcontrol is running.
+2. If batcontrol is not running, check you your inverters battery control schedule in the web UI. If it does not look right, batcontrol might have crashed recently. In that case restart batcontrol and then shut it down after it has finished the first evaluation.
+3. If batcontrol is running, shut it down to restore the saved inverter settings.
+4. Check your inverters local web UI to confirm that the inverter settings have been correctly restored.
+5. Remove the software from wherever it was running from or delete the docker container.
+6. Disable the Solar API in your inverters web UI, if it is not needed by any other third party software or wallboxes. For example the Fronius Wattpilot will NOT work with the solar API disabled.
+
