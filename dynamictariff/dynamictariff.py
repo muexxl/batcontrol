@@ -40,7 +40,7 @@ class DynamicTariff:
             vat = float(config['vat'])
             markup = float(config['markup'])
             fees = float(config['fees'])
-            selected_tariff= Awattar(timezone,'at',min_time_between_API_calls, delay_evaluation_by_seconds)
+            selected_tariff= Awattar(timezone,'at',min_time_between_api_calls, delay_evaluation_by_seconds)
             selected_tariff.set_price_parameters(vat,fees,markup)
 
         elif provider.lower()=='awattar_de':
@@ -53,7 +53,7 @@ class DynamicTariff:
             vat = float(config['vat'])
             markup = float(config['markup'])
             fees = float(config['fees'])
-            selected_tariff= Awattar(timezone,'de',min_time_between_API_calls, delay_evaluation_by_seconds)
+            selected_tariff= Awattar(timezone,'de',min_time_between_api_calls, delay_evaluation_by_seconds)
             selected_tariff.set_price_parameters(vat,fees,markup)
 
         elif provider.lower()=='tibber':
@@ -63,7 +63,7 @@ class DynamicTariff:
                     'Please provide "apikey :YOURKEY" in your configuration file'
                     )
             token = config['apikey']
-            selected_tariff=Tibber(timezone,token,min_time_between_API_calls, delay_evaluation_by_seconds)
+            selected_tariff=Tibber(timezone,token,min_time_between_api_calls, delay_evaluation_by_seconds)
 
         elif provider.lower()=='evcc':
             if not 'url' in config.keys() :

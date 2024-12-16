@@ -40,7 +40,7 @@ class FCSolar(ForecastSolarInterface):
                         '[FCSolar] Waiting for %d seconds before requesting new data',
                         sleeptime)
                     time.sleep(sleeptime)
-                self.get_raw_forecast()
+                self.__get_raw_forecast()
                 self.last_update = t0
             except Exception as e:
                 # Catch error here.
@@ -124,7 +124,7 @@ class FCSolar(ForecastSolarInterface):
 
 
 if __name__ == '__main__':
-    pvinstallations = [{'name': 'Nordhalle',
+    test_pvinstallations = [{'name': 'Nordhalle',
                         'lat': '49.632461',
                         'lon': '8.617459',
                         'declination': '15',
@@ -136,5 +136,5 @@ if __name__ == '__main__':
                            'declination': '20',
                            'azimuth': '7',
                            'kWp': '25.030'}]
-    fcs=ForecastSolar(pvinstallations)
+    fcs=FCSolar( test_pvinstallations, 'Europe/Berlin' , 10)
     print (fcs.get_forecast())

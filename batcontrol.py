@@ -113,8 +113,8 @@ class Batcontrol(object):
         self.inverter = inverter_factory.Inverter.create_inverter(config['inverter'])
 
         self.pvsettings = config['pvinstallations']
-        self.fc_solar = solar_factory.ForecastSolar.create_solar_provider(self.pvsettings, 
-                                                                          timezone, 
+        self.fc_solar = solar_factory.ForecastSolar.create_solar_provider(self.pvsettings,
+                                                                          timezone,
                                                                           DELAY_EVALUATION_BY_SECONDS
                                                                          )
 
