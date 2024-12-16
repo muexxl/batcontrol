@@ -96,3 +96,8 @@ The `max_charging_from_grid_limit` parameter charges from the minimum up to the 
 ## Can I run other software that attempts to control the battery and inverter at the same time?
 
 Running other software that controls the inverter or battery is currently not supported and will likely cause conflicts. 
+
+## What if I need to change inverter settings while batcontrol is running?
+
+Changing settings through the local webinterface of the inverter is possible, but not recommended. 
+The recommended course of action is to shut down batcontrol, make the necessary changes and then restart batcontrol to avoid any conflicts and ensure the correct configuration is saved.
