@@ -535,3 +535,7 @@ class FroniusWR(InverterBaseclass):
         logger.info(
             f'[Inverter] API: Setting max_pv_charge_rate: {max_pv_charge_rate}W')
         self.max_pv_charge_rate = max_pv_charge_rate
+
+    def __get_mqtt_topic(self) -> str:
+        """ Used to implement the mqtt basic topic."""
+        return f'inverters/{self.inverter_num}/'

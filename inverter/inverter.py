@@ -2,16 +2,15 @@
 
 from .inverter_interface import InverterInterface
 
-# Instances of the inverter classes are created here
-NUM_INVERTERS = 0
+
 
 class Inverter:
     """ Factory for inverter providers """
+    # Instances of the inverter classes are created here
+    num_inverters = 0
     @staticmethod
     def create_inverter(config: dict) -> InverterInterface:
         """ Select and configure an inverter based on the given configuration """
-        global NUM_INVERTERS
-
         # renaming of parameters max_charge_rate -> max_grid_charge_rate
         if not 'max_grid_charge_rate' in config.keys():
             config['max_grid_charge_rate'] = config['max_charge_rate']
@@ -43,6 +42,6 @@ class Inverter:
         else:
             raise RuntimeError(f'[Inverter] Unkown inverter type {config["type"]}')
 
-        inverter.inverter_num = NUM_INVERTERS
-        NUM_INVERTERS += 1
+        inverter.inverter_num = Inverter.num_inverters
+        Inverter.num_inverters += 1
         return inverter

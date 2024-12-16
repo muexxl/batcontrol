@@ -64,7 +64,6 @@ class InverterBaseclass(InverterInterface):
         return free_capa
 
     # Used to implement the mqtt basic topic.
-    # Currently there is only one inverter, so the number is hardcoded
     def __get_mqtt_topic(self) -> str:
         return f'inverters/{self.inverter_num}/'
 
