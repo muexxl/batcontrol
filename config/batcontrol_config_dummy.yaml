@@ -20,13 +20,13 @@ utility:
   vat: 0.20 # only required for awattar
   fees: 0.015 # only required for awattar
   markup: 0.03 # only required for awattar
-  url: http://evcc.local/api/tariff/grid # only required for evcc
+  url: http://evcc.local:7070/api/tariff/grid # only required for evcc
 mqtt:
   enabled: false
   logger: false
   broker: localhost
   port: 1883
-  topic: batcontrol
+  topic: house/batcontrol
   username: user
   password: password
   tls: false
@@ -51,7 +51,7 @@ pvinstallations:
     azimuth: 87
     kWp: 6.030
     api: #fcsolarapi
-consumption_forecast: 
+consumption_forecast:
   annual_consumption: 4500 # total consumption in kWh p.a. the load profile 
   load_profile: load_profile.csv #name of the load profile file within the config folder
 
@@ -63,7 +63,9 @@ evcc:
   port: 1883
   status_topic: evcc/status
   # one loadpoints that should be monitored
-  loadpoint_topic: evcc/loadpoints/1/charging
+  loadpoint_topic:
+    - evcc/loadpoints/1/charging
+    - evcc/loadpoints/2/charging
   username: user
   password: password
   tls: false

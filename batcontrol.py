@@ -592,8 +592,8 @@ class Batcontrol(object):
                 max_hour = h
                 logger.debug("[Rule] Recharge possible in %d hours, limiting evaluation window.", h)
                 logger.debug("[Rule] Future price: %.3f < Current price: %.3f - min_price_diff. %.3f ",
-                             current_price,
                              future_price,
+                             current_price,
                              self.min_price_difference
                         )
                 break

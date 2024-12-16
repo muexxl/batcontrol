@@ -48,6 +48,7 @@ class FroniusWR(InverterBaseclass):
         # default values
         self.max_soc = 100
         self.min_soc = 5
+        self.set_solar_api_active(True)
 
         if not self.previous_battery_config:
             raise RuntimeError(
@@ -85,6 +86,7 @@ class FroniusWR(InverterBaseclass):
             )
         self.max_soc = self.previous_battery_config['BAT_M0_SOC_MAX']
         self.get_time_of_use()  # save timesofuse
+        self.set_allow_grid_charging(True)
 
     def get_SOC(self):
         path = '/solar_api/v1/GetPowerFlowRealtimeData.fcgi'
@@ -192,6 +194,22 @@ class FroniusWR(InverterBaseclass):
                 raise RuntimeError(f'failed to set {expected_write_success}')
         return response
 
+    def set_solar_api_active(self, value: bool):
+        """ Switches Solar.API on (true) or off. Solar.API is required to get SOC values."""
+        if value:
+            payload = '{"SolarAPIv1Enabled": true}'
+        else:
+            payload = '{"SolarAPIv1Enabled": false}'
+        path = '/config/solar_api'
+        response = self.send_request(
+            path, method='POST', payload=payload, auth=True)
+        response_dict = json.loads(response.text)
+        expected_write_successes = ['SolarAPIv1Enabled']
+        for expected_write_success in expected_write_successes:
+            if not expected_write_success in response_dict['writeSuccess']:
+                raise RuntimeError(f'failed to set {expected_write_success}')
+        return response
+
     def set_wr_parameters(self, minsoc, maxsoc, allow_grid_charging, grid_power):
         """set power at grid-connection point negative values for Feed-In"""
         path = '/config/batteries'
@@ -262,12 +280,9 @@ class FroniusWR(InverterBaseclass):
                           "TimeTable": {"Start": "00:00", "End": "23:59"},
                           "Weekdays": {"Mon": True, "Tue": True, "Wed": True, "Thu": True, "Fri": True, "Sat": True, "Sun": True}
                           }]
-        self.set_allow_grid_charging(False)
         return self.set_time_of_use(timeofuselist)
 
     def set_mode_allow_discharge(self):
-        self.set_allow_grid_charging(False)
-
         timeofuselist = []
         if self.max_pv_charge_rate > 0:
             timeofuselist = [{'Active': True,
@@ -290,7 +305,6 @@ class FroniusWR(InverterBaseclass):
                           "TimeTable": {"Start": "00:00", "End": "23:59"},
                           "Weekdays": {"Mon": True, "Tue": True, "Wed": True, "Thu": True, "Fri": True, "Sat": True, "Sun": True}
                           }]
-        self.set_allow_grid_charging(True)
         return self.set_time_of_use(timeofuselist)
 
     def restore_time_of_use_config(self):
