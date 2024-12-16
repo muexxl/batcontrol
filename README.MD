@@ -86,3 +86,13 @@ The parameters follow this order:
 The `always_allow_discharge_limit` parameter overrides any logic and allows the battery to discharge freely according to the inverter's logic.
 
 The `max_charging_from_grid_limit` parameter charges from the minimum up to the `always_allow_discharge_limit`.
+
+## What inverter settings will this change?
+
+1. The software will enable the Solar.API (local network only), without which it cannot work.
+2. It will save the current configuration of the battery and its usage schedule (this will be restored on shut down).
+3. The battery settings will be changed on every run of the software according to the three modes.
+
+## Can I run other software that attempts to control the battery and inverter at the same time?
+
+Running other software that controls the inverter or battery is currently not supported and will likely cause conflicts. 
