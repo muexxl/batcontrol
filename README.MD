@@ -90,9 +90,10 @@ The `max_charging_from_grid_limit` parameter charges from the minimum up to the 
 
 ## What inverter settings will this change?
 
-1. The software will enable the Solar.API (local network only), without which it cannot work.
-2. It will save the current configuration of the battery and its usage schedule (this will be restored on shut down).
-3. The battery settings will be changed on every run of the software according to the three modes.
+1. The software will enable the Solar.API (local network only), without which it cannot work and this will remain enabled on shut down.
+2. It will save the current configuration of the battery and its usage schedule (and this will be restored to the original settings on shut down).
+3. Charging from grid will be enabled (and this will be restored to the original setting on shut down).
+4. The battery settings will be changed on every run of the software according to the three modes.
 
 ## Can I run other software that attempts to control the battery and inverter at the same time?
 
