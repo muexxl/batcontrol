@@ -1,4 +1,4 @@
-**Optimize your Electricity cost by re-charging your PV Battery when Electricity is cheap and there is not enough Solarpower available.**
+**Optimize your electricity costs by re-charging your PV battery when electricity is cheap and there is not enough solar power available.**
 To integrate batcontrol with Home Assistant, use the following repository: [ha_addons](https://github.com/muexxl/ha_addons/)
 
 ## Prerequisites:
