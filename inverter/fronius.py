@@ -47,6 +47,7 @@ class FroniusWR(InverterBaseclass):
         # default values
         self.max_soc = 100
         self.min_soc = 5
+        self.set_solar_api_active(True)
 
         if not self.previous_battery_config:
             raise RuntimeError(
@@ -200,6 +201,22 @@ class FroniusWR(InverterBaseclass):
             path, method='POST', payload=payload, auth=True)
         response_dict = json.loads(response.text)
         expected_write_successes = ['HYB_EVU_CHARGEFROMGRID']
+        for expected_write_success in expected_write_successes:
+            if not expected_write_success in response_dict['writeSuccess']:
+                raise RuntimeError(f'failed to set {expected_write_success}')
+        return response
+
+    def set_solar_api_active(self, value: bool):
+        """ Switches Solar.API on (true) or off. Solar.API is required to get SOC values."""
+        if value:
+            payload = '{"SolarAPIv1Enabled": true}'
+        else:
+            payload = '{"SolarAPIv1Enabled": false}'
+        path = '/config/solar_api'
+        response = self.send_request(
+            path, method='POST', payload=payload, auth=True)
+        response_dict = json.loads(response.text)
+        expected_write_successes = ['SolarAPIv1Enabled']
         for expected_write_success in expected_write_successes:
             if not expected_write_success in response_dict['writeSuccess']:
                 raise RuntimeError(f'failed to set {expected_write_success}')
