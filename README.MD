@@ -4,16 +4,18 @@ To integrate batcontrol with Home Assistant, use the following repository: [ha_a
 ## Prerequisites:
 
 1. A PV installation with a BYD Battery and a Fronius inverter.
-2. A Tibber or aWattar contract with hourly electricity pricing. (Get a €50 bonus on sign-up using this [link](https://invite.tibber.com/x8ci52nj).)
+2. An EPEX Spot based contract with hourly electricity pricing, like Awattar, Tibber etc. (Get a €50 bonus on sign-up to Tibber using this [link](https://invite.tibber.com/x8ci52nj).)
 
 ## Preparations:
 
 # Local installation
 ## Preparations:
 1. Verify the credentials of your inverter for customer or technician access.
-2. Obtain your Tibber API key from [Tibber Developer](https://developer.tibber.com/).
+2. Obtain your Tibber API key from [Tibber Developer](https://developer.tibber.com/), if you use Tibber. 
 3. Create your `batcontrol_config.yaml` in the config folder.
-4. Customize your load profile or use the default one.
+4. Configure your electricity tariff and pv installation.
+5. Customize your load profile or use the default one and set your annual consumption.
+
 
 ## Installation:
 
@@ -81,6 +83,6 @@ The parameters follow this order:
 
 `MIN_SOC -> Backup-Power-Reserved -> max_charging_from_grid_limit -> always_allow_discharge_limit -> MAX_SOC`
 
-The `always_allow_discharge_limit` parameter overrides any logic and allows the battery to operate freely according to the inverter's logic.
+The `always_allow_discharge_limit` parameter overrides any logic and allows the battery to discharge freely according to the inverter's logic.
 
 The `max_charging_from_grid_limit` parameter charges from the minimum up to the `always_allow_discharge_limit`.
