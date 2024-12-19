@@ -16,6 +16,7 @@ To integrate batcontrol with Home Assistant, use the following repository: [ha_a
 3. Create your `batcontrol_config.yaml` in the config folder.
 4. Configure your electricity tariff and pv installation.
 5. Customize your load profile or use the default one and set your annual consumption.
+6. If you have run any third-party tools using Modbus or ran some Modbus commands yourself, switch these off and restart the inverter.
 
 
 ## Installation:
