@@ -52,7 +52,11 @@ class FCSolar(ForecastSolarInterface):
                     got_error = True
             else:
                 remaining_time = self.rate_limit_blackout_window - t0
-                logger.info('[FCSolar] Rate limit blackout window in place until %s (another %d seconds)', self.rate_limit_blackout_window, remaining_time)
+                logger.info(
+                    '[FCSolar] Rate limit blackout window in place until %s (another %d seconds)',
+                      self.rate_limit_blackout_window,
+                      remaining_time
+                )
         prediction = {}
         for hour in range(48+1):
             prediction[hour] = 0
@@ -61,7 +65,6 @@ class FCSolar(ForecastSolarInterface):
         if not self.results:
             logger.warning('[FCSolar] No results from FC Solar API available')
             raise RuntimeWarning('[FCSolar] No results from FC Solar API available')
-
 
         prediction={}
         now = datetime.datetime.now().astimezone(self.timezone)
@@ -123,19 +126,25 @@ class FCSolar(ForecastSolarInterface):
             if response.status_code == 200:
                 self.results[name] = json.loads(response.text)
             elif response.status_code == 429:
-
-                
                 retry_after = response.headers.get('X-Ratelimit-Retry-At')
-                
                 if retry_after:
                     retry_after_timestamp = datetime.datetime.fromisoformat(retry_after)
                     now = datetime.datetime.now().astimezone(self.timezone)
                     retry_seconds = (retry_after_timestamp - now).total_seconds()
                     self.rate_limit_blackout_window = retry_after_timestamp.timestamp()
                     logger.warning(
-                    '[ForecastSolar] forecast solar API rate limit exceeded [%s]. Retry after %d seconds at %s', response.text, retry_seconds, retry_after_timestamp)
+                      '[ForecastSolar] forecast solar API rate limit exceeded [%s]. '
+                      'Retry after %d seconds at %s',
+                      response.text,
+                      retry_seconds,
+                      retry_after_timestamp
+                    )
                 else:
-                    logger.warning('[ForecastSolar] forecast solar API rate limit exceeded [%s]. No retry after information available, dumping headers', response.text)
+                    logger.warning(
+                        '[ForecastSolar] forecast solar API rate limit exceeded [%s]. '
+                        'No retry after information available, dumping headers',
+                        response.text
+                    )
                     for header, value in response.headers.items():
                         logger.debug('[ForecastSolar 429] Header: %s = %s', header, value)
 
