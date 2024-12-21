@@ -93,18 +93,21 @@ class ForecastSolar(object):
                 self.results[name] = json.loads(response.text)
             elif response.status_code == 429:
 
-                for header, value in response.headers.items():
-                    logger.info(f'[ForecastSolar 429] Header: {header} = {value}')
                 
-                retry_after = response.headers.get('Retry-After')
+                retry_after = response.headers.get('X-Ratelimit-Retry-At')
                 
                 if retry_after:
                     retry_after_timestamp = datetime.datetime.fromisoformat(retry_after)
                     now = datetime.datetime.now().astimezone(self.timezone)
                     retry_seconds = (retry_after_timestamp - now).total_seconds()
-                    self.rate_limit_blackout_window = int(retry_seconds)
-                logger.warning(
+                    self.rate_limit_blackout_window = retry_after_timestamp.timestamp()
+                    logger.warning(
                     f'[ForecastSolar] forecast solar API rate limit exceeded [{response.text}]. Retry after {retry_after} seconds at {retry_after_timestamp}')
+                else:
+                    logger.warning(f'[ForecastSolar] forecast solar API rate limit exceeded [{response.text}]. No retry after information available, dumping headers')
+                    for header, value in response.headers.items():
+                        logger.debug(f'[ForecastSolar 429] Header: {header} = {value}')
+
             else:
                 logger.warning(
                     f'[ForecastSolar] forecast solar API returned {response.status_code} - {response.text}')
