@@ -17,28 +17,34 @@ class ForecastSolar(object):
         self.last_update = 0
         self.seconds_between_updates = 900
         self.timezone=timezone
+        self.rate_limit_blackout_window = 0
         self.delay_evaluation_by_seconds=delay_evaluation_by_seconds
 
+        
     def get_forecast(self):
         got_error = False
         t0 = time.time()
         dt = t0-self.last_update
         if dt > self.seconds_between_updates:
-            try:
-                if self.last_update > 0 and self.delay_evaluation_by_seconds > 0:
-                    sleeptime = random.randrange(0, self.delay_evaluation_by_seconds, 1)
-                    logger.debug(
-                        '[FCSolar] Waiting for %d seconds before requesting new data',
-                        sleeptime)
-                    time.sleep(sleeptime)
-                self.get_raw_forecast()
-                self.last_update = t0
-            except Exception as e:
-                # Catch error here.
-                # Check cached values below
-                logger.error('[FCSolar] Error getting forecast: %s', e)
-                logger.warning('[FCSolar] Using cached values')
-                got_error = True
+            if self.rate_limit_blackout_window < t0:
+                try:
+                    if self.last_update > 0 and self.delay_evaluation_by_seconds > 0:
+                        sleeptime = random.randrange(0, self.delay_evaluation_by_seconds, 1)
+                        logger.debug(
+                            '[FCSolar] Waiting for %d seconds before requesting new data',
+                            sleeptime)
+                        time.sleep(sleeptime)
+                    self.get_raw_forecast()
+                    self.last_update = t0
+                except Exception as e:
+                    # Catch error here.
+                    # Check cached values below
+                    logger.error('[FCSolar] Error getting forecast: %s', e)
+                    logger.warning('[FCSolar] Using cached values')
+                    got_error = True
+            else:
+                remaining_time = self.rate_limit_blackout_window - t0
+                logger.info('[FCSolar] Rate limit blackout window in place until %s (another %d seconds)', self.rate_limit_blackout_window, remaining_time)
         prediction = {}
         for hour in range(48+1):
             prediction[hour] = 0
@@ -107,9 +113,26 @@ class ForecastSolar(object):
             response = requests.get(url)
             if response.status_code == 200:
                 self.results[name] = json.loads(response.text)
+            elif response.status_code == 429:
+
+                
+                retry_after = response.headers.get('X-Ratelimit-Retry-At')
+                
+                if retry_after:
+                    retry_after_timestamp = datetime.datetime.fromisoformat(retry_after)
+                    now = datetime.datetime.now().astimezone(self.timezone)
+                    retry_seconds = (retry_after_timestamp - now).total_seconds()
+                    self.rate_limit_blackout_window = retry_after_timestamp.timestamp()
+                    logger.warning(
+                    '[ForecastSolar] forecast solar API rate limit exceeded [%s]. Retry after %d seconds at %s', response.text, retry_seconds, retry_after_timestamp)
+                else:
+                    logger.warning('[ForecastSolar] forecast solar API rate limit exceeded [%s]. No retry after information available, dumping headers', response.text)
+                    for header, value in response.headers.items():
+                        logger.debug('[ForecastSolar 429] Header: %s = %s', header, value)
+
             else:
                 logger.warning(
-                    f'[ForecastSolar] forecast solar API returned {response.status_code} - {response.text}')
+                    '[ForecastSolar] forecast solar API returned %d - %s', response.status_code, response.text)
 
 
 if __name__ == '__main__':
