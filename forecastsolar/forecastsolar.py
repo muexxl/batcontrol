@@ -102,7 +102,7 @@ class ForecastSolar(object):
                     retry_seconds = (retry_after_timestamp - now).total_seconds()
                     self.rate_limit_blackout_window = retry_after_timestamp.timestamp()
                     logger.warning(
-                    f'[ForecastSolar] forecast solar API rate limit exceeded [{response.text}]. Retry after {retry_after} seconds at {retry_after_timestamp}')
+                    f'[ForecastSolar] forecast solar API rate limit exceeded [{response.text}]. Retry after {retry_seconds} seconds at {retry_after_timestamp}')
                 else:
                     logger.warning(f'[ForecastSolar] forecast solar API rate limit exceeded [{response.text}]. No retry after information available, dumping headers')
                     for header, value in response.headers.items():
