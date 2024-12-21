@@ -15,13 +15,18 @@ class ForecastSolar(object):
         self.last_update = 0
         self.seconds_between_updates = 900
         self.timezone=timezone
+        self.rate_limit_blackout_window = 0
 
     def get_forecast(self):
         t0 = time.time()
         dt = t0-self.last_update
         if dt > self.seconds_between_updates:
-            self.get_raw_forecast()
-            self.last_update = t0
+            if self.rate_limit_blackout_window < t0:
+                self.get_raw_forecast()
+                self.last_update = t0
+            else:
+                remaining_time = self.rate_limit_blackout_window - t0
+                logger.info(f'[FCSolar] Rate limit blackout window in place until {self.rate_limit_blackout_window} (another {remaining_time} seconds)')
         prediction = {}
         for hour in range(48+1):
             prediction[hour] = 0
@@ -86,6 +91,20 @@ class ForecastSolar(object):
             response = requests.get(url)
             if response.status_code == 200:
                 self.results[name] = json.loads(response.text)
+            elif response.status_code == 429:
+
+                for header, value in response.headers.items():
+                    logger.info(f'[ForecastSolar 429] Header: {header} = {value}')
+                
+                retry_after = response.headers.get('Retry-After')
+                
+                if retry_after:
+                    retry_after_timestamp = datetime.datetime.fromisoformat(retry_after)
+                    now = datetime.datetime.now().astimezone(self.timezone)
+                    retry_seconds = (retry_after_timestamp - now).total_seconds()
+                    self.rate_limit_blackout_window = int(retry_seconds)
+                logger.warning(
+                    f'[ForecastSolar] forecast solar API rate limit exceeded [{response.text}]. Retry after {retry_after} seconds at {retry_after_timestamp}')
             else:
                 logger.warning(
                     f'[ForecastSolar] forecast solar API returned {response.status_code} - {response.text}')
