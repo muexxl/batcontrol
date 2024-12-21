@@ -1,69 +1,41 @@
-# API to publish data from batcontrol to MQTT for further processing+visualization
-#
-#  base_topic : string  # topic to publish to
-#            /status  : online/offline  # is batcontrol running?
-#
-#            /evaluation_intervall : int  # intervall in seconds
-#            /last_evaluation      : int  # timestamp of last evaluation
-#
-#            /mode    : -1 = charge from grid , 0 = avoid discharge , 10 = discharge allowed
-#
-#            /max_capacity : float  # Maximum capacity of battery in Wh
-#
-#            /max_charging_from_grid_limit : float  # Charge limit in 0.1-1
-#            /max_charging_from_grid_limit_percent : float  # Charge limit in %
-#
-#            /always_allow_discharge_limit : float  # Always Discharge limit until 0.1-1
-#            /always_allow_discharge_limit_percent : float  # Always Discharge limit in %
-#            /always_allow_discharge_limit_capacity : float  # Always discharge limit in Wh
-#                                                    (max_capacity * always_allow_discharge_limit)
-#
-#            /charge_rate : float  # Charge rate in W
-#
-#            # Battery values in absoulte values, which might be across multiple batteries.
-#            /max_energy_capacity      : float  # Maximum capacity of battery in Wh
-#            /stored_energy_capacity   : float  # Energy stored in battery in Wh
-#
-#            /reserved_energy_capacity : float  # Estimated energy reserved for discharge in Wh
-#                                                   in the next hours
-#
-#            /SOC                      : float  # State of charge in % calculated from
-#                                                   stored_energy_capacity / max_energy_capacity
-#
-#            /min_price_difference     : float  # Minimum price difference in EUR
-#
-#
-#    Following statistical arrays as JSON Arrays
-#            /FCST/production        # Forecasted production in W
-#            /FCST/consumption       # Forecasted consumption in W
-#            /FCST/prices            # Forecasted price in EUR
-#            /FCST/net_consumption   # Forecasted net consumption in W
-#
-#            Timestamps in unix time
-#            JSON schema:
-#            {
-#                "data" : [
-#                    { "time_start" : int, "value" : float, "time_end" : int },
-#                  ]
-#            }
-#
-# Implemented Input-API:
-#
-#   Values are expected as "string"  and will be converted to the correct type
-#
-#   Changing these values will stop evaluation for one interation.
-#   Make sure the update is fast enough to not miss the next evaluation.
-#
-#    /mode/set        : int  # set mode
-#           -1 = charge from grid ,
-#            0 = avoid discharge ,
-#           10 = discharge allowed
-#    /charge_rate/set : int  # set charge rate in W , sets mode to -1
-#    /always_allow_discharge_limit/set : float  # set always discharge limit in 0.1-1
-#    /max_charging_from_grid_limit/set : float  # set charge limit in NOTin 0-1
-#    /min_price_difference/set : float  # set minimum price difference in EUR
-#
+"""
+This module provides an API to publish data from batcontrol to MQTT
+for further processing and visualization.
 
+The following topics are published:
+- /status: online/offline status of batcontrol
+- /evaluation_intervall: interval in seconds
+- /last_evaluation: timestamp of last evaluation
+- /mode: operational mode (-1 = charge from grid, 0 = avoid discharge, 10 = discharge allowed)
+- /max_charging_from_grid_limit: charge limit in 0.1-1
+- /max_charging_from_grid_limit_percent: charge limit in %
+- /always_allow_discharge_limit: always discharge limit in 0.1-1
+- /always_allow_discharge_limit_percent: always discharge limit in %
+- /always_allow_discharge_limit_capacity: always discharge limit in Wh
+- /charge_rate: charge rate in W
+- /max_energy_capacity: maximum capacity of battery in Wh
+- /stored_energy_capacity: energy stored in battery in Wh
+- /stored_usable_energy_capacity: energy stored in battery in Wh and usable (min SOC considered)
+- /reserved_energy_capacity: estimated energy reserved for discharge in Wh
+- /SOC: state of charge in %
+- /min_price_difference : minimum price difference in EUR
+- /discharge_blocked        : bool  # Discharge is blocked by other sources
+
+The following statistical arrays are published as JSON arrays:
+- /FCST/production: forecasted production in W
+- /FCST/consumption: forecasted consumption in W
+- /FCST/prices: forecasted price in EUR
+- /FCST/net_consumption: forecasted net consumption in W
+
+Implemented Input-API:
+- /mode/set: set mode (-1 = charge from grid, 0 = avoid discharge, 10 = discharge allowed)
+- /charge_rate/set: set charge rate in W, sets mode to -1
+- /always_allow_discharge_limit/set: set always discharge limit in 0.1-1
+- /max_charging_from_grid_limit/set: set charge limit in 0-1
+- /min_price_difference/set: set minimum price difference in EUR
+
+The module uses the paho-mqtt library for MQTT communication and numpy for handling arrays.
+"""
 import time
 import json
 import logging
@@ -71,22 +43,10 @@ import paho.mqtt.client as mqtt
 import numpy as np
 
 logger = logging.getLogger('__main__')
-logger.info(f'[MQTT] loading module ')
+logger.info('[MQTT] loading module ')
 
-mqtt_api = None
-
-## Callbacks go through
-def on_connect( client, userdata, flags, rc ):
-    logger.info(f'[MQTT] Connected with result code {rc}')
-    # Make public, that we are running.
-    client.publish(mqtt_api.base_topic + '/status', 'online', retain=True)
-
-def on_message_msgs(mosq, obj, msg):
-    # This callback will only be called for messages with topics that match
-    # $SYS/broker/messages/#
-    print("MESSAGES: " + msg.topic + " " + str(msg.qos) + " " + str(msg.payload))
-
-class MQTT_API(object):
+class MqttApi:
+    """ MQTT API to publish data from batcontrol to MQTT for further processing+visualization"""
     SET_SUFFIX = '/set'
     def __init__(self, config:dict):
         self.config=config
@@ -95,18 +55,16 @@ class MQTT_API(object):
         self.callbacks = {}
 
         self.client = mqtt.Client()
-        if 'logger' in config and config['logger'] == True:
+        if 'logger' in config and config['logger'] is True:
             self.client.enable_logger(logger)
 
         if 'username' in config and 'password' in config:
             self.client.username_pw_set(config['username'], config['password'])
 
         self.client.will_set(self.base_topic + '/status', 'offline', retain=True)
-        global mqtt_api
-        mqtt_api = self
 
         # TLS , not tested yet
-        if config['tls'] == True:
+        if config['tls'] is True:
             self.client.tls_set(
                 config['tls']['ca_certs'],
                 config['tls']['certfile'],
@@ -116,136 +74,191 @@ class MQTT_API(object):
                 ciphers=config['tls']['ciphers']
             )
 
-        self.client.on_connect = on_connect
+        self.client.on_connect = self.on_connect
         self.client.loop_start()
 
         self.client.connect(config['broker'], config['port'], 60)
 
-        return
+    def on_connect(self, client, userdata, flags, rc):
+        """ Callback for MQTT connection to serve /status"""
+        logger.info('[MQTT] Connected with result code %s', rc)
+        # Make public, that we are running.
+        client.publish(self.base_topic + '/status', 'online', retain=True)
+        # Handle reconnect case
+        for topic in self.callbacks:
+            logger.debug('[MQTT] Subscribing topic: %s', topic)
+            for topic in self.callbacks:
+                client.subscribe(topic)
 
     def wait_ready(self) -> bool:
+        """ Wait for MQTT connection to be ready"""
         retry = 30
         # Check if we are connected and wait for it
-        while self.client.is_connected() == False:
+        while self.client.is_connected() is False:
             retry -= 1
             if retry == 0:
-                logger.error(f'[MQTT] Could not connect to MQTT Broker')
+                logger.error('[MQTT] Could not connect to MQTT Broker')
                 return False
-            logger.info(f'[MQTT] Waiting for connection')
+            logger.info('[MQTT] Waiting for connection')
             time.sleep(1)
 
         return True
 
-    def _handle_message(self, client, userdata, message):
-        logger.debug(f'[MQTT] Received message on {message.topic}')
+    def _handle_message(self, client, userdata, message):  # pylint: disable=unused-argument
+        """ Handle and dispatch incoming messages"""
+        logger.debug('[MQTT] Received message on %s', message.topic)
         if message.topic in self.callbacks:
             try:
                 self.callbacks[message.topic]['function'](
                     self.callbacks[message.topic]['convert'](message.payload)
                 )
             except Exception as e:
-                logger.error(f'[MQTT] Error in callback {message.topic} : {e}')
+                logger.error('[MQTT] Error in callback %s : %s', message.topic, e)
         else:
-            logger.warning(f'[MQTT] No callback registered for {message.topic}')
-        return
+            logger.warning('[MQTT] No callback registered for %s', message.topic)
 
     def register_set_callback(self, topic:str,  callback:callable, convert: callable) -> None:
-        topic_string = self.base_topic + "/" + topic + MQTT_API.SET_SUFFIX
-        logger.debug(f'[MQTT] Registering callback for {topic_string}')
+        """ Generic- register a callback for changing values inside batcontrol via
+            MQTT set topics
+        """
+        topic_string = self.base_topic + "/" + topic + MqttApi.SET_SUFFIX
+        logger.debug('[MQTT] Registering callback for %s', topic_string)
                 # set api endpoints, generic subscription
         self.callbacks[topic_string] = { 'function' : callback , 'convert' : convert }
         self.client.subscribe(topic_string)
         self.client.message_callback_add(topic_string , self._handle_message)
-        return
 
     def publish_mode(self, mode:int) -> None:
-        if self.client.is_connected() == True:
+        """ Publish the mode (charge, lock, discharge) to MQTT
+            /mode
+        """
+        if self.client.is_connected():
             self.client.publish(self.base_topic + '/mode', mode)
-        return
 
     def publish_charge_rate(self, rate:float) -> None:
-        if self.client.is_connected() == True:
+        """ Publish the forced charge rate in W to MQTT
+            /charge_rate
+        """
+        if self.client.is_connected():
             self.client.publish(self.base_topic + '/charge_rate', rate)
-        return
 
     def publish_production(self, production:np.ndarray, timestamp:float) -> None:
-        if self.client.is_connected() == True:
+        """ Publish the production to MQTT
+            /FCST/production
+            The value is in W and based of solar forecast API.
+            The length is the same as used in internal arrays.
+        """
+        if self.client.is_connected():
             self.client.publish(
                 self.base_topic + '/FCST/production',
                 json.dumps(self._create_forecast(production, timestamp))
             )
-        return
 
     def _create_forecast(self, forecast:np.ndarray, timestamp:float) -> dict:
+        """ Create a forecast JSON object
+            from a numpy array and a timestamp
+        """
         # Take timestamp and reduce it to the first second of the hour
         now = timestamp - (timestamp % 3600)
 
-        list = []
-        for h in range(0, len(forecast)):
-            # nächste stunde nach now
-            list.append (
-                { 'time_start' :now + h * 3600,
-                  'value' :   forecast[h],
-                  'time_end' : now -1  + ( h+1) *3600
-                }
+        data_list = []
+        for h, value in enumerate(forecast):
+            # next hour after now
+            data_list.append(
+            {
+                'time_start': now + h * 3600,
+                'value': value,
+                'time_end': now - h + (h + 1) * 3600
+            }
             )
 
-        data = { 'data' : list }
+        data = { 'data' : data_list }
         return data
 
 
     def publish_consumption(self, consumption:np.ndarray, timestamp:float) -> None:
-        if self.client.is_connected() == True:
+        """ Publish the consumption to MQTT
+            /FCST/consumption
+            The value is in W and based of load profile and multiplied with
+                personal yearly consumption.
+            The length is the same as used in internal arrays.
+        """
+        if self.client.is_connected():
             self.client.publish(
                 self.base_topic + '/FCST/consumption',
                 json.dumps(self._create_forecast(consumption,timestamp))
             )
-        return
 
     def publish_prices(self, price:np.ndarray ,timestamp:float) -> None:
-        if self.client.is_connected() == True:
+        """ Publish the prices to MQTT
+            /FCST/prices
+            The length is the same as used in internal arrays.
+        """
+        if self.client.is_connected():
             self.client.publish(
                 self.base_topic + '/FCST/prices',
                 json.dumps(self._create_forecast(price,timestamp))
             )
-        return
 
     def publish_net_consumption(self, net_consumption:np.ndarray, timestamp:float) -> None:
-        if self.client.is_connected() == True:
+        """ Publish the net consumption in W to MQTT
+            /FCST/net_consumption
+            The length is the same as used in internal arrays.
+            This is the difference between production and consumption.
+        """
+        if self.client.is_connected():
             self.client.publish(
                 self.base_topic + '/FCST/net_consumption',
                 json.dumps(self._create_forecast(net_consumption,timestamp))
             )
-        return
 
-    def publish_SOC(self, soc:float) -> None:
-        if self.client.is_connected() == True:
+    def publish_SOC(self, soc:float) -> None:       # pylint: disable=invalid-name
+        """ Publish the state of charge in % to MQTT
+            /SOC
+        """
+        if self.client.is_connected():
             self.client.publish(self.base_topic + '/SOC', f'{int(soc):03}')
-        return
 
     def publish_stored_energy_capacity(self, stored_energy:float) -> None:
-        if self.client.is_connected() == True:
+        """ Publish the stored energy capacity in Wh to MQTT
+            /stored_energy_capacity
+        """
+        if self.client.is_connected():
             self.client.publish(self.base_topic + '/stored_energy_capacity', f'{stored_energy:.1f}')
-        return
+
+    def publish_stored_usable_energy_capacity(self, stored_energy:float) -> None:
+        """ Publish the stored usable energy capacity in Wh to MQTT
+            /stored_usable_energy_capacity
+        """
+        if self.client.is_connected():
+            self.client.publish(self.base_topic + '/stored_usable_energy_capacity', f'{stored_energy:.1f}')
 
     def publish_reserved_energy_capacity(self, reserved_energy:float) -> None:
-        if self.client.is_connected() == True:
+        """ Publish the reserved energy capacity in Wh to MQTT
+            /reserved_energy_capacity
+        """
+        if self.client.is_connected():
             self.client.publish(
                 self.base_topic + '/reserved_energy_capacity',
                 f'{reserved_energy:.1f}'
             )
-        return
 
     def publish_always_allow_discharge_limit_capacity(self, discharge_limit:float) -> None:
-        if self.client.is_connected() == True:
+        """ Publish the always discharge limit in Wh to MQTT
+            /always_allow_discharge_limit_capacity
+        """
+        if self.client.is_connected():
             self.client.publish(
                 self.base_topic + '/always_allow_discharge_limit_capacity',
                 f'{discharge_limit:.1f}'
             )
-        return
 
     def publish_always_allow_discharge_limit(self, allow_discharge_limit:float) -> None:
-        if self.client.is_connected() == True:
+        """ Publish the always discharge limit to MQTT
+            /always_allow_discharge_limit as digit
+            /always_allow_discharge_limit_percent
+        """
+        if self.client.is_connected():
             self.client.publish(
                 self.base_topic + '/always_allow_discharge_limit',
                 f'{allow_discharge_limit:.2f}'
@@ -254,10 +267,13 @@ class MQTT_API(object):
                 self.base_topic + '/always_allow_discharge_limit_percent',
                 f'{allow_discharge_limit * 100:.0f}'
             )
-        return
 
     def publish_max_charging_from_grid_limit(self, charge_limit:float) -> None:
-        if self.client.is_connected() == True:
+        """ Publish the maximum charging limit to MQTT
+            /max_charging_from_grid_limit_percent
+            /max_charging_from_grid_limit   as digit.
+        """
+        if self.client.is_connected():
             self.client.publish(
                 self.base_topic + '/max_charging_from_grid_limit_percent',
                 f'{charge_limit * 100:.0f}'
@@ -266,36 +282,53 @@ class MQTT_API(object):
                 self.base_topic + '/max_charging_from_grid_limit',
                 f'{charge_limit:.2f}'
             )
-        return
 
-    def publish_min_price_difference(self, min_price_differences:float) -> None:
-        if self.client.is_connected() == True:
+    def publish_min_price_difference(self, min_price_difference:float) -> None:
+        """ Publish the minimum price difference to MQTT found in config
+            /min_price_difference
+        """
+        if self.client.is_connected():
             self.client.publish(
-                self.base_topic + '/min_price_differences',
-                f'{min_price_differences:.3f}'
+                self.base_topic + '/min_price_difference',
+                f'{min_price_difference:.3f}'
             )
-        return
 
     def publish_max_energy_capacity(self, max_capacity:float) -> None:
-        if self.client.is_connected() == True:
+        """ Publish the maximum energy capacity to MQTT
+            /max_energy_capacity
+        """
+        if self.client.is_connected():
             self.client.publish(
                 self.base_topic + '/max_energy_capacity',
                 f'{max_capacity:.1f}'
             )
-        return
 
     def publish_evaluation_intervall(self, intervall:int) -> None:
-        if self.client.is_connected() == True:
+        """ Publish the evaluation intervall to MQTT
+            /evaluation_intervall
+        """
+        if self.client.is_connected():
             self.client.publish(self.base_topic + '/evaluation_intervall', f'{intervall:.0f}')
-        return
 
     def publish_last_evaluation_time(self, timestamp:float) -> None:
-        if self.client.is_connected() == True:
+        """ Publish the last evaluation timestamp to MQTT
+            This is the time when the last evaluation was started.
+            /last_evaluation
+        """
+        if self.client.is_connected():
             self.client.publish(self.base_topic + '/last_evaluation', f'{timestamp:.0f}')
-        return
+
+    def publish_discharge_blocked(self, discharge_blocked:bool) -> None:
+        """ Publish the discharge blocked status to MQTT
+            /discharge_blocked
+        """
+        if self.client.is_connected():
+            self.client.publish(self.base_topic + '/discharge_blocked', str(discharge_blocked))
 
     # For depended APIs like the Fronius Inverter classes, which is not directly batcontrol.
     def generic_publish(self, topic:str, value:str) -> None:
-        if self.client.is_connected() == True:
+        """ Publish a generic value to a topic
+            For depended APIs like the Fronius Inverter classes, which is not directly batcontrol.
+        """
+        if self.client.is_connected():
             self.client.publish(self.base_topic + '/' + topic, value)
-        return

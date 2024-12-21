@@ -1,4 +1,5 @@
 import datetime
+import random
 import time
 import math
 import json
@@ -9,21 +10,38 @@ logger = logging.getLogger('__main__')
 logger.info(f'[FCSolar] loading module ')
 
 class ForecastSolar(object):
-    def __init__(self, pvinstallations, timezone) -> None:
+    def __init__(self, pvinstallations, timezone,
+                 delay_evaluation_by_seconds) -> None:
         self.pvinstallations = pvinstallations
         self.results = {}
         self.last_update = 0
         self.seconds_between_updates = 900
         self.timezone=timezone
         self.rate_limit_blackout_window = 0
+        self.delay_evaluation_by_seconds=delay_evaluation_by_seconds
 
+        
     def get_forecast(self):
+        got_error = False
         t0 = time.time()
         dt = t0-self.last_update
         if dt > self.seconds_between_updates:
             if self.rate_limit_blackout_window < t0:
-                self.get_raw_forecast()
-                self.last_update = t0
+                try:
+                    if self.last_update > 0 and self.delay_evaluation_by_seconds > 0:
+                        sleeptime = random.randrange(0, self.delay_evaluation_by_seconds, 1)
+                        logger.debug(
+                            '[FCSolar] Waiting for %d seconds before requesting new data',
+                            sleeptime)
+                        time.sleep(sleeptime)
+                    self.get_raw_forecast()
+                    self.last_update = t0
+                except Exception as e:
+                    # Catch error here.
+                    # Check cached values below
+                    logger.error('[FCSolar] Error getting forecast: %s', e)
+                    logger.warning('[FCSolar] Using cached values')
+                    got_error = True
             else:
                 remaining_time = self.rate_limit_blackout_window - t0
                 logger.info(f'[FCSolar] Rate limit blackout window in place until {self.rate_limit_blackout_window} (another {remaining_time} seconds)')
@@ -56,8 +74,12 @@ class ForecastSolar(object):
                         prediction[rel_hour] += value
                     else:
                         prediction[rel_hour] = value
-        #complete hours without production with 0 values
+
         max_hour=max(prediction.keys())
+        if max_hour < 18 and got_error:
+            logger.error('[FCSolar] Less than 18 hours of forecast data. Stopping.')
+            raise RuntimeError('[FCSolar] Less than 18 hours of forecast data.')
+        #complete hours without production with 0 values
         for h in range(max_hour+1):
             if h not in prediction.keys():
                 prediction[h]=0

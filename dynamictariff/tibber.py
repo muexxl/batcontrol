@@ -1,15 +1,22 @@
+""" Implement Tibber API to get dynamic electricity prices
+"""
+
 import datetime
 import math
 import requests
 from .baseclass import DynamicTariffBaseclass
 
 class Tibber(DynamicTariffBaseclass):
-    def __init__(self, timezone , token, min_time_between_API_calls=0):
-        super().__init__(timezone,min_time_between_API_calls)
+    """ Implement Tibber API to get dynamic electricity prices
+        Inherits from DynamicTariffBaseclass
+    """
+    def __init__(self, timezone , token, min_time_between_API_calls=0, delay_evaluation_by_seconds=0):
+        super().__init__(timezone,min_time_between_API_calls, delay_evaluation_by_seconds)
         self.access_token=token
         self.url="https://api.tibber.com/v1-beta/gql"
 
     def get_raw_data_from_provider(self):
+        """ Get raw data from Tibber API """
         if not self.access_token:
             raise RuntimeError
         headers={"Authorization":"Bearer " + self.access_token,
@@ -17,7 +24,7 @@ class Tibber(DynamicTariffBaseclass):
         data="""{ "query":
         "{viewer {homes {currentSubscription {priceInfo { current {total startsAt } today {total startsAt } tomorrow {total startsAt }}}}}}" }
         """
-        response=requests.post(self.url,data,headers=headers)
+        response=requests.post(self.url, data, headers=headers, timeout=30)
         if response.status_code != 200:
             raise RuntimeError(f'[Tibber] Tibber Api responded with Error {response}')
         raw_data=response.json()
@@ -25,6 +32,7 @@ class Tibber(DynamicTariffBaseclass):
 
 
     def get_prices_from_raw_data(self,homeid=0):
+        """ Extract prices from raw to internal datastracture based on hours """
         rawdata=self.raw_data['data']
         now=datetime.datetime.now().astimezone(self.timezone)
         prices={}
