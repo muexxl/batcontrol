@@ -153,7 +153,6 @@ class FCSolar(ForecastSolarInterface):
                     '[ForecastSolar] forecast solar API returned %s - %s',
                       response.status_code, response.text)
 
-
 if __name__ == '__main__':
     test_pvinstallations = [{'name': 'Nordhalle',
                         'lat': '49.632461',
