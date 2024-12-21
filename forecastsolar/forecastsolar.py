@@ -44,7 +44,7 @@ class ForecastSolar(object):
                     got_error = True
             else:
                 remaining_time = self.rate_limit_blackout_window - t0
-                logger.info(f'[FCSolar] Rate limit blackout window in place until {self.rate_limit_blackout_window} (another {remaining_time} seconds)')
+                logger.info('[FCSolar] Rate limit blackout window in place until %s (another %d seconds)', self.rate_limit_blackout_window, remaining_time)
         prediction = {}
         for hour in range(48+1):
             prediction[hour] = 0
@@ -124,15 +124,15 @@ class ForecastSolar(object):
                     retry_seconds = (retry_after_timestamp - now).total_seconds()
                     self.rate_limit_blackout_window = retry_after_timestamp.timestamp()
                     logger.warning(
-                    f'[ForecastSolar] forecast solar API rate limit exceeded [{response.text}]. Retry after {retry_seconds} seconds at {retry_after_timestamp}')
+                    '[ForecastSolar] forecast solar API rate limit exceeded [%s]. Retry after %d seconds at %s', response.text, retry_seconds, retry_after_timestamp)
                 else:
-                    logger.warning(f'[ForecastSolar] forecast solar API rate limit exceeded [{response.text}]. No retry after information available, dumping headers')
+                    logger.warning('[ForecastSolar] forecast solar API rate limit exceeded [%s]. No retry after information available, dumping headers', response.text)
                     for header, value in response.headers.items():
-                        logger.debug(f'[ForecastSolar 429] Header: {header} = {value}')
+                        logger.debug('[ForecastSolar 429] Header: %s = %s', header, value)
 
             else:
                 logger.warning(
-                    f'[ForecastSolar] forecast solar API returned {response.status_code} - {response.text}')
+                    '[ForecastSolar] forecast solar API returned %d - %s', response.status_code, response.text)
 
 
 if __name__ == '__main__':
