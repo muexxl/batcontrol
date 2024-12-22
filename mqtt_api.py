@@ -118,8 +118,20 @@ class MQTT_API(object):
 
         self.client.on_connect = on_connect
         self.client.loop_start()
-
-        self.client.connect(config['broker'], config['port'], 60)
+        retry_attempts = config.get('retry_attempts', 5)
+        retry_delay = config.get('retry_delay', 10)
+        while retry_attempts > 0:
+            try:
+                self.client.connect(config['broker'], config['port'], 60)
+                break
+            except Exception as e:
+                logger.error('[MQTT] Connection failed: %s, retrying[%d]x in [%d] seconds', e, retry_attempts, retry_delay)
+                retry_attempts -= 1
+                if retry_attempts == 0:
+                    logger.error('[MQTT] All retry attempts failed')
+                    raise
+                logger.info('[MQTT] Retrying connection in %d seconds...', retry_delay)
+                time.sleep(retry_delay)
 
         return
 
