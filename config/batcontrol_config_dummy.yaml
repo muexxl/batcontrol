@@ -27,6 +27,8 @@ mqtt:
   topic: batcontrol
   username: user
   password: password
+  retry_attempts: 5 # optional, default: 5
+  retry_delay: 10 # seconds, optional, default: 10
   tls: false
   cafile: /etc/ssl/certs/ca-certificates.crt
   certfile: /etc/ssl/certs/client.crt
