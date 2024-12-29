@@ -1191,7 +1191,7 @@ class ThermiaHeatpump(
             for index, (start_time, handler) in enumerate(
                 self.high_price_handlers.items()
             ):
-                mqtt_handler_topic = handlers_prefix + str(index)
+                mqtt_handler_topic = handlers_prefix + f"{index:02d}"
                 self.mqtt_client.generic_publish(
                     mqtt_handler_topic,
                     start_time.strftime("%Y-%m-%d_%H:%M")
@@ -1224,7 +1224,7 @@ class ThermiaHeatpump(
             for index, (start_time, strategy) in enumerate(
                 self.high_price_strategies.items()
             ):
-                high_price_strategy_topic = strategies_prefix + str(index)
+                high_price_strategy_topic = strategies_prefix + f"{index:02d}"
                 self.mqtt_client.generic_publish(
                     high_price_strategy_topic,
                     start_time.strftime("%Y-%m-%d %H:%M") + ":" + strategy.mode,
