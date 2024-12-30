@@ -416,7 +416,7 @@ class FroniusWR(InverterBaseclass):
                         logger.info('[Inverter] Login successful')
                         self.login_attempts = 0
                     else:
-                        logger.info('[Inverter] Login failed')
+                        logger.error('[Inverter] Login failed, Response: %s', response)
                 else:
                     raise RuntimeError(
                         f"[Inverter] Request failed with {response.status_code}-{response.reason}. \n\turl:{url}, \n\tparams:{params} \n\theaders {headers} \n\tnonce {self.nonce} \n\tpayload {payload}")
@@ -439,7 +439,7 @@ class FroniusWR(InverterBaseclass):
         path = '/commands/Logout'
         response = self.send_request(path, auth=True)
         if not response:
-            logger.warn('[Inverter] Logout failed. No response from server')
+            logger.warning('[Inverter] Logout failed. No response from server')
         if response.status_code == 200:
             logger.info('[Inverter] Logout successful')
         else:
