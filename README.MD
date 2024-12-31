@@ -1,6 +1,9 @@
 **Optimize your electricity costs by re-charging your PV battery when electricity is cheap and there is not enough solar power available.**
 To integrate batcontrol with Home Assistant, use the following repository: [ha_addons](https://github.com/muexxl/ha_addons/)
 
+[![Pylint](https://github.com/muexxl/batcontrol/actions/workflows/pylint.yml/badge.svg?branch=main)](https://github.com/muexxl/batcontrol/actions/workflows/pylint.yml)
+[![Docker Image CI](https://github.com/muexxl/batcontrol/actions/workflows/docker-image.yml/badge.svg?branch=main)](https://github.com/muexxl/batcontrol/actions/workflows/docker-image.yml)
+
 ## Prerequisites:
 
 1. A PV installation with a BYD Battery and a Fronius Gen24 inverter.
