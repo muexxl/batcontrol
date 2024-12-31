@@ -10,10 +10,12 @@ import pytz
 import numpy as np
 
 from forecastconsumption import forecastconsumption
-from forecastsolar import forecastsolar
-from dynamictariff import dynamictariff
-from inverter import inverter
+from dynamictariff import dynamictariff as tariff_factory
+from inverter import inverter as inverter_factory
 from logfilelimiter import logfilelimiter
+
+from forecastsolar import solar as solar_factory
+
 
 LOGFILE_ENABLED_DEFAULT = True
 LOGFILE = "logs/batcontrol.log"
@@ -101,17 +103,20 @@ class Batcontrol(object):
             os.environ['TZ'] = config['timezone']
         time.tzset()
 
-        self.dynamic_tariff = dynamictariff.DynamicTariff(
+        self.dynamic_tariff = tariff_factory.DynamicTariff.create_tarif_provider(
             config['utility'],
             timezone,
             TIME_BETWEEN_UTILITY_API_CALLS,
             DELAY_EVALUATION_BY_SECONDS
         )
 
-        self.inverter = inverter.Inverter(config['inverter'])
+        self.inverter = inverter_factory.Inverter.create_inverter(config['inverter'])
 
         self.pvsettings = config['pvinstallations']
-        self.fc_solar = forecastsolar.ForecastSolar(self.pvsettings, timezone, DELAY_EVALUATION_BY_SECONDS)
+        self.fc_solar = solar_factory.ForecastSolar.create_solar_provider(self.pvsettings,
+                                                                          timezone,
+                                                                          DELAY_EVALUATION_BY_SECONDS
+                                                                         )
 
         self.load_profile = config['consumption_forecast']['load_profile']
         try:
@@ -654,7 +659,6 @@ class Batcontrol(object):
         else:
             logger.debug("[Rule] No reserved energy required, because no "
                          "'high price' hours in evaluation window.")
-
 
         # for API
         self.set_reserved_energy(reserved_storage)
