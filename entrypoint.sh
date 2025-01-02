@@ -36,5 +36,9 @@ if test ! -e "/app/logs/batcontrol.log" ; then
   ln -s /app/logs/batcontrol.log /app/batcontrol.log
 fi
 
+# Output the timezone
+echo "Current local time is: $(date)"
+echo "Configured timezone (env var TZ) is: $TZ"
+
 # Start batcontrol.py
 exec python /app/batcontrol.py
