@@ -51,7 +51,7 @@ jobs:
     - name: Get changed files
       id: changed-files
       run: |
-        CHANGED_FILES=$(git diff --name-only $BASE_BRANCH...HEAD -- '*.py')
+        CHANGED_FILES=$(git diff --name-only $BASE_BRANCH...HEAD -- '*.py' | tr '\n' ' ')
         echo "CHANGED_FILES=$CHANGED_FILES" >> $GITHUB_ENV
 
     - name: Analysing the code with pylint
