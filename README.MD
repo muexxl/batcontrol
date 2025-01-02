@@ -51,7 +51,6 @@ mkdir -p ./config -p ./logs
 - Download the the latest [batcontrol_config.yaml](https://raw.githubusercontent.com/muexxl/batcontrol/refs/heads/main/config/batcontrol_config_dummy.yaml) sample, adjust and place it to config/batcontrol_config.yaml.
 
 - Use the default load_profile (automatically) or create your own.-
-
 ### Plain Docker
 
 ```
@@ -79,6 +78,39 @@ services:
 ```
 
 Then start the container using `docker-compose up -d`.
+
+### Adjusting Timezone
+
+To adjust the timezone for logging and output, set the `TZ` environment variable.
+
+#### Plain Docker
+
+```
+docker run -d \
+  --name batcontrol \
+  -v /path/to/config:/app/config \
+  -v /path/to/logs:/app/logs \
+  -e TZ=Europe/Berlin \
+  muexx/batcontrol:latest
+```
+
+#### Docker-compose example
+
+Add the `TZ` environment variable to your `docker-compose.yml`:
+
+```
+version: '3.8'
+
+services:
+  batcontrol:
+    image: muexx/batcontrol:latest
+    volumes:
+      - ./config:/app/config
+      - ./logs:/app/logs
+    environment:
+      - TZ=Europe/Berlin
+    restart: unless-stopped
+```
 
 # FAQs
 
