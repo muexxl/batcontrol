@@ -41,7 +41,9 @@ jobs:
           git fetch origin main
         else
           BASE_BRANCH="upstream/main"
-          git remote add upstream https://github.com/${{ github.repository_owner }}/${{ github.event.repository.name }}.git
+          if ! git remote | grep upstream; then
+            git remote add upstream https://github.com/${{ github.repository_owner }}/${{ github.event.repository.name }}.git
+          fi
           git fetch upstream main
         fi
         echo "BASE_BRANCH=$BASE_BRANCH" >> $GITHUB_ENV
