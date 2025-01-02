@@ -5,6 +5,7 @@
 *.vscode*
 *venv*
 log
-test.py
+test*.py
 config/batcontrol_config.yaml.bck
 run_infinite.sh
+debug.txt

@@ -13,6 +13,11 @@ from forecastconsumption import forecastconsumption
 from dynamictariff import dynamictariff as tariff_factory
 from inverter import inverter as inverter_factory
 from logfilelimiter import logfilelimiter
+from heatpump import heatpump
+
+## Add the subdirectory to the Python path
+#sys.path.append(os.path.join(os.path.dirname(__file__), 'thermia_online_api'))
+
 
 from forecastsolar import solar as solar_factory
 
@@ -111,6 +116,9 @@ class Batcontrol(object):
         )
 
         self.inverter = inverter_factory.Inverter.create_inverter(config['inverter'])
+        self.heatpump = heatpump.Heatpump(config['heatpump'], timezone) 
+
+        self.inverter = inverter_factory.Inverter.create_inverter(config['inverter'])
 
         self.pvsettings = config['pvinstallations']
         self.fc_solar = solar_factory.ForecastSolar.create_solar_provider(self.pvsettings,
@@ -169,8 +177,14 @@ class Batcontrol(object):
                     self.api_set_min_price_difference,
                     float
                 )
+                logger.info(f'[Main] MQTT Callbacks registered ')   
+
                 # Inverter Callbacks
                 self.inverter.activate_mqtt(self.mqtt_api)
+                # Heatpump Callbacks
+                self.heatpump.activate_mqtt(self.mqtt_api)
+                logger.info(f'[Main] MQTT Connection to Heatpump ready ')
+
 
         self.evcc_api = None
         if 'evcc' in config.keys():
@@ -181,12 +195,16 @@ class Batcontrol(object):
                 self.evcc_api.register_block_function(self.set_discharge_blocked)
                 self.evcc_api.wait_ready()
                 logger.info('[Main] EVCC Connection ready')
-
+        
+ 
     def shutdown(self):
         logger.info('[Main] Shutting down Batcontrol')
         try:
             self.inverter.shutdown()
+            # todo: shutdown other components
             del self.inverter
+            self.heatpump.shutdown()
+            del self.heatpump
         except:
             pass
 
@@ -430,6 +448,10 @@ class Batcontrol(object):
             datetime.datetime.now().astimezone(self.timezone).minute/60
 
         self.set_wr_parameters(net_consumption, price_dict)
+        self.heatpump.set_heatpump_parameters(net_consumption, price_dict)
+
+    # %%
+    
 
         # %%
     def set_wr_parameters(self, net_consumption: np.ndarray, prices: dict):
@@ -839,6 +861,8 @@ class Batcontrol(object):
             self.mqtt_api.publish_discharge_blocked(self.discharge_blocked)
             # Trigger Inverter
             self.inverter.refresh_api_values()
+            if self.heatpump is not None:
+                self.heatpump.refresh_api_values()
 
     def api_set_mode(self, mode: int):
         # Check if mode is valid

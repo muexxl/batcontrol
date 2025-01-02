@@ -26,7 +26,7 @@ class FCSolar(ForecastSolarInterface):
         self.seconds_between_updates = 900
         self.timezone=timezone
         self.rate_limit_blackout_window = 0
-        self.delay_evaluation_by_seconds=delay_evaluation_by_seconds
+        self.delay_evaluation_by_seconds = delay_evaluation_by_seconds
 
     def get_forecast(self) -> dict:
         """ Get hourly forecast from provider """
