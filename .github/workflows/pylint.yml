@@ -14,9 +14,9 @@ on:
 
 jobs:
   lint:
-   runs-on: self-hosted
-   #runs-on: ubuntu-latest
-   strategy:
+    runs-on: self-hosted
+    #runs-on: ubuntu-latest
+    strategy:
       matrix:
         python-version: ["3.8", "3.9", "3.10"]
     steps:
