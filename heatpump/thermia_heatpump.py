@@ -793,7 +793,7 @@ class ThermiaHeatpump(
                     start_index = i
                     current_mode = heat_modes[i]
             # Handle the last range
-            self.apply_mode(current_mode, start_index, max_hour)
+            self.apply_mode(current_mode, start_index, max_hour - 1)
 
             for i in range(max_hour):
                 hours_until_range_start = datetime.timedelta(hours=i)
@@ -911,8 +911,8 @@ class ThermiaHeatpump(
 
         hours_until_range_start = datetime.timedelta(hours=start_index)
         range_duration = datetime.timedelta(
-            hours=end_index - start_index
-        )
+            hours=end_index - start_index + 1
+        )  # add one hour to include the duration of even an single 1-hour slot +0:00 - +0:00
 
         curr_hour_start = (
             datetime.datetime.now()
@@ -1108,7 +1108,6 @@ class ThermiaHeatpump(
             logger.debug(
                 "[ThermiaHeatpump] Removed high price strategy for %s", start_time
             )
-
 
     def cleanup_high_price_handlers(self):
         """
