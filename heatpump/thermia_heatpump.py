@@ -475,7 +475,6 @@ class ThermiaHeatpump(
             None
         """
 
-        logger.debug("[ThermiaHeatpump] Refreshing API values")
         self.__ensure_connection()
 
         if self.mqtt_client and self.heat_pump:
@@ -492,7 +491,6 @@ class ThermiaHeatpump(
                     self.mqtt_client.generic_publish(
                         self._get_mqtt_topic() + name, value
                     )
-                logger.debug("[ThermiaHeatpump] API values refreshed")
 
                 # Publish all config values with config/ prefix
                 config_topic_prefix = self._get_mqtt_topic() + "config/"
@@ -565,7 +563,7 @@ class ThermiaHeatpump(
                     self.max_hot_water_boost_hours,
                 )
 
-                logger.debug("[ThermiaHeatpump] config values published to MQTT  ...")
+                logger.debug("[ThermiaHeatpump] values published to MQTT  ...")
 
             except Exception as e:  # pylint: disable=broad-except
                 logger.error("[ThermiaHeatpump] Failed to refresh API values: %s", e)
