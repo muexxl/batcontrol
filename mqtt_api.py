@@ -364,7 +364,7 @@ class MqttApi:
         logger.debug('[MQTT] Deleting all topics with prefix %s', f_q_prefix)
         if self.client.is_connected():
             def on_message_delete(client, userdata, message): # pylint: disable=unused-argument # callback
-                logger.info('[MQTT] Deleting topic %s', message.topic)
+                logger.debug('[MQTT] Deleting topic %s', message.topic)
                 self.client.publish(message.topic, None, retain=True)
 
             topic_wildcard = f_q_prefix + '/#'

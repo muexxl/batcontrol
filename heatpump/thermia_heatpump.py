@@ -34,11 +34,15 @@ logger = logging.getLogger("__main__")
 logger.info("[Heatpump] loading module ")
 
 #### hack to add the submodule to the python path before import fails
-if os.path.isdir("thermia_online_api") and os.path.exists("thermia_online_api/ThermiaOnlineAPI"):
+if os.path.isdir("thermia_online_api") and os.path.exists(
+    "thermia_online_api/ThermiaOnlineAPI"
+):
     sys.path.append(os.path.abspath("thermia_online_api"))
-    logger.warning("ThermiaOnlineAPI module added to Python path from 'thermia_online_api' "
-                   +"subdirectory. This is a hack because of the forked library being "
-                   +"integrated as submodule in a subdir instead of root dir.")
+    logger.warning(
+        "ThermiaOnlineAPI module added to Python path from 'thermia_online_api' "
+        + "subdirectory. This is a hack because of the forked library being "
+        + "integrated as submodule in a subdir instead of root dir."
+    )
 
 from ThermiaOnlineAPI.const import (
     CAL_FUNCTION_EVU_MODE,
@@ -52,7 +56,6 @@ from ThermiaOnlineAPI.utils import utils
 
 from mqtt_api import MqttApi
 from .baseclass import HeatpumpBaseclass, NoHeatPumpsFoundException
-
 
 
 @dataclass
@@ -159,8 +162,6 @@ class ThermiaStrategySlot:
             )
         else:
             return f"STRATEGY({self.start_time}-{self.end_time}:[{self.mode}])"
-
-
 
 
 class ThermiaHeatpump(
@@ -570,7 +571,7 @@ class ThermiaHeatpump(
                 logger.error("[ThermiaHeatpump] Failed to refresh API values: %s", e)
 
     def _get_all_properties(self, obj):
-        for name, method in inspect.getmembers( # pylint: disable=unused-variable
+        for name, method in inspect.getmembers(  # pylint: disable=unused-variable
             obj.__class__, lambda m: isinstance(m, property)
         ):
             yield name, getattr(obj, name)
@@ -1183,7 +1184,8 @@ class ThermiaHeatpump(
             handlers_prefix = self._get_mqtt_topic() + "handlers/"
 
             logger.debug(
-                "[ThermiaHeatpump] Cleaning up all previously published handlers at %s",
+                "[ThermiaHeatpump] Cleaning up all previously published "
+                + "MQTT topics for handlers at %s",
                 handlers_prefix,
             )
             self.mqtt_client.delete_all_topics(handlers_prefix)
@@ -1216,7 +1218,8 @@ class ThermiaHeatpump(
             # Delete all existing high price strategies
             strategies_prefix = self._get_mqtt_topic() + "strategies/"
             logger.debug(
-                "[ThermiaHeatpump] Cleaning up all previously published strategies at %s",
+                "[ThermiaHeatpump] Cleaning up all previously published  "
+                + "MQTT topics for strategies at %s",
                 strategies_prefix,
             )
             self.mqtt_client.delete_all_topics(strategies_prefix)
