@@ -1085,10 +1085,6 @@ class ThermiaHeatpump(
         - The number of remaining high price strategies after cleanup.
 
         """
-        logger.debug(
-            "[ThermiaHeatpump] Cleaning up high price strategies, currently %d strategies",
-            len(self.high_price_strategies),
-        )
         now = datetime.datetime.now(
             self.batcontrol_timezone
         )  # Make 'now' an aware datetime object in the heat pump's timezone
@@ -1112,10 +1108,7 @@ class ThermiaHeatpump(
             logger.debug(
                 "[ThermiaHeatpump] Removed high price strategy for %s", start_time
             )
-        logger.debug(
-            "[ThermiaHeatpump] Cleanup complete. Remaining strategies: %d",
-            len(self.high_price_strategies),
-        )
+
 
     def cleanup_high_price_handlers(self):
         """
@@ -1144,11 +1137,7 @@ class ThermiaHeatpump(
             logger.debug(
                 "[ThermiaHeatpump] Removed high price handler for %s", start_time
             )
-        logger.debug(
-            "[ThermiaHeatpump] Cleanup complete. Remaining handlers: %d",
-            len(self.high_price_handlers),
-        )
-
+        
     def publish_strategies_to_mqtt(self):
         """
         Publishes high price handlers and strategies to MQTT.
