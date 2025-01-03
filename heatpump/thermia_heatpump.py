@@ -911,8 +911,8 @@ class ThermiaHeatpump(
 
         hours_until_range_start = datetime.timedelta(hours=start_index)
         range_duration = datetime.timedelta(
-            hours=end_index - start_index + 1
-        )  # add one hour to include the druartion of evenan single 1-hour slot
+            hours=end_index - start_index
+        )
 
         curr_hour_start = (
             datetime.datetime.now()
