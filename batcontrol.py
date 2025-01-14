@@ -543,11 +543,15 @@ class Batcontrol(object):
 
         free_capacity = self.get_free_capacity()
 
+        if recharge_energy <= 0:
+            logger.debug(
+                "[Rule] No additional energy required, because stored energy is sufficient."
+                )
+            recharge_energy = 0
+
         if recharge_energy > free_capacity:
             recharge_energy = free_capacity
             logger.debug("[Rule] Recharge limited by free capacity: %0.1f Wh", recharge_energy)
-        if recharge_energy < 0:
-            recharge_energy = 0
 
         return recharge_energy
 
