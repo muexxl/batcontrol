@@ -364,7 +364,8 @@ class Batcontrol(object):
         # for API
         self.refresh_static_values()
         self.set_discharge_limit(
-            self.get_max_capacity() * self.always_allow_discharge_limit)
+            self.get_max_capacity() * self.always_allow_discharge_limit
+            )
         self.last_run_time = time.time()
 
         # prune log file if file is too large
@@ -666,8 +667,6 @@ class Batcontrol(object):
 
         # for API
         self.set_reserved_energy(reserved_storage)
-        self.set_stored_energy(stored_energy)
-        self.set_stored_usable_energy(stored_usable_energy)
 
         if self.discharge_blocked:
             logger.debug(
@@ -765,7 +764,7 @@ class Batcontrol(object):
         """ Returns the stored eneregy in the battery in kWh without
             considering the minimum SOC"""
         if not self.fetched_stored_energy:
-            self.last_stored_energy = self.inverter.get_stored_energy()
+            self.set_stored_energy(self.inverter.get_stored_energy())
             self.fetched_stored_energy = True
         return self.last_stored_energy
 
@@ -773,7 +772,7 @@ class Batcontrol(object):
         """ Returns the stored eneregy in the battery in kWh with considering
             the MIN_SOC of inverters. """
         if not self.fetched_stored_usable_energy:
-            self.last_stored_usable_energy = self.inverter.get_stored_usable_energy()
+            self.set_stored_usable_energy( self.inverter.get_stored_usable_energy())
             self.fetched_stored_usable_energy = True
         return self.last_stored_usable_energy
 
