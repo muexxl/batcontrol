@@ -413,7 +413,7 @@ class FroniusWR(InverterBaseclass):
                     if (response.status_code == 200):
                         logger.info('[Inverter] Login successful')
                         self.login_attempts = 0
-                        self.first_login = True
+                        self.first_login = False
                     else:
                         logger.error('[Inverter] Login failed, Response: %s', response)
                         if not self.first_login:
