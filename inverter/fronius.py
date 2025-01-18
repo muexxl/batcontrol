@@ -51,6 +51,7 @@ class FroniusWR(InverterBaseclass):
         self.max_soc = 100
         self.min_soc = 5
         self.set_solar_api_active(True)
+        self.first_login = True
 
         if not self.previous_battery_config:
             raise RuntimeError(
@@ -412,8 +413,12 @@ class FroniusWR(InverterBaseclass):
                     if (response.status_code == 200):
                         logger.info('[Inverter] Login successful')
                         self.login_attempts = 0
+                        self.first_login = True
                     else:
                         logger.error('[Inverter] Login failed, Response: %s', response)
+                        if not self.first_login:
+                            logger.info("[Inverter] Retrying login in 10 seconds")
+                            time.sleep(10)
                 else:
                     raise RuntimeError(
                         f"[Inverter] Request failed with {response.status_code}-{response.reason}. \n\turl:{url}, \n\tparams:{params} \n\theaders {headers} \n\tnonce {self.nonce} \n\tpayload {payload}")
