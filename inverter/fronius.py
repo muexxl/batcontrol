@@ -535,8 +535,7 @@ class FroniusWR(InverterBaseclass):
         HA2 = hash_utf8(A2)
         noncebit = f"{nonce}:{ncvalue}:{cnonce}:auth:{HA2}"
         respdig = hash_utf8(f"{HA1}:{noncebit}")
-        auth_header = f'Digest username="{user}", realm="{realm}", nonce="{nonce}", uri="{
-            path}", algorithm="MD5", qop=auth, nc={ncvalue}, cnonce="{cnonce}", response="{respdig}"'
+        auth_header = f'Digest username="{user}", realm="{realm}", nonce="{nonce}", uri="{path}", algorithm="MD5", qop=auth, nc={ncvalue}, cnonce="{cnonce}", response="{respdig}"'
         return auth_header
 
     def shutdown(self):
