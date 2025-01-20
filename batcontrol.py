@@ -143,7 +143,9 @@ class Batcontrol(object):
         if self.batconfig['a1_tuning']['soften_price_difference_on_charging']:
             self.soften_price_difference_on_charging = True
             self.soften_price_difference_on_charging_factor = self.batconfig['a1_tuning']['soften_price_difference_on_charging_factor']
-
+        self.round_price_digits = 4
+        if self.batconfig['a1_tuning']['round_price_digits']:
+            self.round_price_digits = self.batconfig['a1_tuning']['round_price_digits']
 
         self.mqtt_api = None
         if 'mqtt' in config.keys():
@@ -410,7 +412,7 @@ class Batcontrol(object):
         for h in range(fc_period+1):
             production[h] = production_forecast[h]
             consumption[h] = consumption_forecast[h]
-            prices[h] = price_dict[h]
+            prices[h] = round(price_dict[h],self.round_price_digits)
 
         net_consumption = consumption-production
         logger.debug('[BatCTRL] Production FCST: %s',
@@ -419,7 +421,7 @@ class Batcontrol(object):
                      np.ndarray.round(consumption, 1))
         logger.debug('[BatCTRL] Net Consumption FCST: %s',
                      np.ndarray.round(net_consumption, 1))
-        logger.debug('[BatCTRL] Prices: %s', np.ndarray.round(prices, 3))
+        logger.debug('[BatCTRL] Prices: %s', np.ndarray.round(prices, self.round_price_digits))
         # negative = charging or feed in
         # positive = dis-charging or grid consumption
 
