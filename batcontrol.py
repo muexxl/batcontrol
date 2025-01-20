@@ -134,18 +134,34 @@ class Batcontrol(object):
         self.always_allow_discharge_limit = self.batconfig['always_allow_discharge_limit']
         self.max_charging_from_grid_limit = self.batconfig['max_charging_from_grid_limit']
         self.min_price_difference = self.batconfig['min_price_difference']
-        if self.batconfig['a1_tuning']['charge_rate_multiplier']:
-            self.charge_rate_multiplier = self.batconfig['a1_tuning']['charge_rate_multiplier']
-        else:
-            self.charge_rate_multiplier = 1.1
+
+        self.charge_rate_multiplier = 1.1
         self.soften_price_difference_on_charging = False
         self.soften_price_difference_on_charging_factor = 5
-        if self.batconfig['a1_tuning']['soften_price_difference_on_charging']:
-            self.soften_price_difference_on_charging = True
-            self.soften_price_difference_on_charging_factor = self.batconfig['a1_tuning']['soften_price_difference_on_charging_factor']
         self.round_price_digits = 4
-        if self.batconfig['a1_tuning']['round_price_digits']:
-            self.round_price_digits = self.batconfig['a1_tuning']['round_price_digits']
+
+        if self._is_config_key_valid(config, 'a1_tuning'):
+            a1_tuning = self.config['a1_tuning']
+            self.soften_price_difference_on_charging = self._get_config_with_defaults(
+                  a1_tuning,
+                  'soften_price_difference_on_charging',
+                  False
+                )
+            self.soften_price_difference_on_charging_factor = self._get_config_with_defaults(
+                  a1_tuning,
+                  'soften_price_difference_on_charging_factor',
+                  5
+                )
+            self.round_price_digits = self._get_config_with_defaults(
+                  a1_tuning,
+                  'round_price_digits',
+                  4
+                )
+            self.charge_rate_multiplier = self._get_config_with_defaults(
+                  a1_tuning,
+                  'charge_rate_multiplier',
+                  1.1
+                )
 
         self.mqtt_api = None
         if 'mqtt' in config.keys():
@@ -186,7 +202,7 @@ class Batcontrol(object):
 
         self.evcc_api = None
         if 'evcc' in config.keys():
-            if config['evcc']['enabled'] == True:
+            if config['evcc']['enabled'] is True:
                 logger.info('[Main] evcc Connection enabled')
                 import evcc_api
                 self.evcc_api = evcc_api.EvccApi(config['evcc'])
@@ -201,6 +217,18 @@ class Batcontrol(object):
             del self.inverter
         except:
             pass
+
+    def _get_config_with_defaults(self, config:dict, key:str, default):
+        """ Get a key from a config dictionary with a default value """
+        if key in config.keys():
+            return config[key]
+        return default
+
+    def _is_config_key_valid(self, config:dict, key:str):
+        """ Check if a key is in a config dictionary """
+        if key in config.keys():
+            return True
+        return False
 
     def load_config(self, configfile):
 
@@ -289,9 +317,7 @@ class Batcontrol(object):
                 loglevel
             )
 
-        log_is_enabled = LOGFILE_ENABLED_DEFAULT
-        if 'logfile_enabled' in config.keys():
-            log_is_enabled = config['logfile_enabled']
+        log_is_enabled = self._get_config_with_defaults(config, 'logfile_enabled', LOGFILE_ENABLED_DEFAULT)
 
         if log_is_enabled:
             self.setup_logfile(config)
