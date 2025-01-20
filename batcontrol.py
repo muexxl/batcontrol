@@ -52,7 +52,7 @@ logger.setLevel(loglevel)
 logger.info('[Main] Starting Batcontrol')
 
 
-class Batcontrol(object):
+class Batcontrol:
     def __init__(self, configfile):
         # For API
         self.api_overwrite = False
@@ -307,10 +307,8 @@ class Batcontrol(object):
                 f"Config Entry in general: timezone {config['timezone']} " +
                 "not valid. Try e.g. 'Europe/Berlin'"
             )
-        try:
-            loglevel = config['loglevel']
-        except KeyError:
-            loglevel = 'info'
+
+        loglevel = self.__get_config_with_defaults(config, 'loglevel', 'info' )
 
         if loglevel == 'debug':
             logger.setLevel(logging.DEBUG)
@@ -385,17 +383,19 @@ class Batcontrol(object):
         logger.addHandler(filehandler)
 
     def reset_forecast_error(self):
+        """ Reset the forecast error timer """
         self.time_at_forecast_error = -1
 
     def handle_forecast_error(self):
-        now = time.time()
+        """ Handle forecast errors and fallback to discharging """
+        error_ts = time.time()
 
         # set time_at_forecast_error if it is at the default value of -1
         if self.time_at_forecast_error == -1:
-            self.time_at_forecast_error = now
+            self.time_at_forecast_error = error_ts
 
         # get time delta since error
-        time_passed = now-self.time_at_forecast_error
+        time_passed = error_ts-self.time_at_forecast_error
 
         if time_passed < ERROR_IGNORE_TIME:
             # keep current mode
