@@ -134,6 +134,10 @@ class Batcontrol(object):
         self.always_allow_discharge_limit = self.batconfig['always_allow_discharge_limit']
         self.max_charging_from_grid_limit = self.batconfig['max_charging_from_grid_limit']
         self.min_price_difference = self.batconfig['min_price_difference']
+        if self.batconfig['a1_tuning']['charge_rate_multiplier']:
+            self.charge_rate_multiplier = self.batconfig['a1_tuning']['charge_rate_multiplier']
+        else:
+            self.charge_rate_multiplier = 1.1
 
         self.mqtt_api = None
         if 'mqtt' in config.keys():
@@ -471,6 +475,8 @@ class Batcontrol(object):
                 remaining_time = (
                     60-datetime.datetime.now().astimezone(self.timezone).minute)/60
                 charge_rate = required_recharge_energy/remaining_time
+                # apply multiplier for charge inefficiency
+                charge_rate *= self.charge_rate_multiplier
 
                 if charge_rate < MIN_CHARGE_RATE:
                     logger.debug("[Rule] Charge rate increased to minimum %d W from %f.1 W",

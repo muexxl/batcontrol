@@ -7,6 +7,8 @@ battery_control:
   min_price_difference: 0.05 # minimum price difference in Euro to justify charging your battery
   always_allow_discharge_limit: 0.90 # 0.00 to 1.00 above this SOC limit using energy from the battery is always allowed
   max_charging_from_grid_limit: 0.90 # 0.00 to 1.00 charging from the grid is only allowed until this SOC limit
+a1_tuning:
+  charge_rate_multiplier: 1.1 # Increase (>1) calculated charge rate to compensate charge inefficencies.
 inverter:
   type: fronius_gen24 #currently only fronius_gen24 supported
   address: 192.168.0.XX # the local IP of your inverter. needs to be reachable from the machine that runs batcontrol
