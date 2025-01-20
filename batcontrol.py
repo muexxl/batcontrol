@@ -134,7 +134,7 @@ class Batcontrol(object):
         self.always_allow_discharge_limit = self.batconfig['always_allow_discharge_limit']
         self.max_charging_from_grid_limit = self.batconfig['max_charging_from_grid_limit']
         self.min_price_difference = self.batconfig['min_price_difference']
-        self.min_price_difference_rel = self._get_config_with_defaults(
+        self.min_price_difference_rel = self.__get_config_with_defaults(
                                             self.batconfig,
                                             'min_price_difference_rel',
                                             0
@@ -145,24 +145,24 @@ class Batcontrol(object):
         self.soften_price_difference_on_charging_factor = 5
         self.round_price_digits = 4
 
-        if self._is_config_key_valid(config, 'a1_tuning'):
+        if self.__is_config_key_valid(config, 'a1_tuning'):
             a1_tuning = self.config['a1_tuning']
-            self.soften_price_difference_on_charging = self._get_config_with_defaults(
+            self.soften_price_difference_on_charging = self.__get_config_with_defaults(
                   a1_tuning,
                   'soften_price_difference_on_charging',
                   False
                 )
-            self.soften_price_difference_on_charging_factor = self._get_config_with_defaults(
+            self.soften_price_difference_on_charging_factor = self.__get_config_with_defaults(
                   a1_tuning,
                   'soften_price_difference_on_charging_factor',
                   5
                 )
-            self.round_price_digits = self._get_config_with_defaults(
+            self.round_price_digits = self.__get_config_with_defaults(
                   a1_tuning,
                   'round_price_digits',
                   4
                 )
-            self.charge_rate_multiplier = self._get_config_with_defaults(
+            self.charge_rate_multiplier = self.__get_config_with_defaults(
                   a1_tuning,
                   'charge_rate_multiplier',
                   1.1
@@ -228,13 +228,13 @@ class Batcontrol(object):
         except:
             pass
 
-    def _get_config_with_defaults(self, config:dict, key:str, default):
+    def __get_config_with_defaults(self, config:dict, key:str, default):
         """ Get a key from a config dictionary with a default value """
         if key in config.keys():
             return config[key]
         return default
 
-    def _is_config_key_valid(self, config:dict, key:str):
+    def __is_config_key_valid(self, config:dict, key:str):
         """ Check if a key is in a config dictionary """
         if key in config.keys():
             return True
@@ -327,7 +327,7 @@ class Batcontrol(object):
                 loglevel
             )
 
-        log_is_enabled = self._get_config_with_defaults(
+        log_is_enabled = self.__get_config_with_defaults(
                                     config,
                                     'logfile_enabled',
                                     LOGFILE_ENABLED_DEFAULT
@@ -346,7 +346,7 @@ class Batcontrol(object):
     def setup_logfile(self, config):
         """ Setup the logfile and correpsonding handlers """
 
-        if self._is_config_key_valid(config , 'max_logfile_size'):
+        if self.__is_config_key_valid(config , 'max_logfile_size'):
             if type(config['max_logfile_size']) == int:
                 pass
             else:
