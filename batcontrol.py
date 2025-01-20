@@ -138,6 +138,12 @@ class Batcontrol(object):
             self.charge_rate_multiplier = self.batconfig['a1_tuning']['charge_rate_multiplier']
         else:
             self.charge_rate_multiplier = 1.1
+        self.soften_price_difference_on_charging = False
+        self.soften_price_difference_on_charging_factor = 5
+        if self.batconfig['a1_tuning']['soften_price_difference_on_charging']:
+            self.soften_price_difference_on_charging = True
+            self.soften_price_difference_on_charging_factor = self.batconfig['a1_tuning']['soften_price_difference_on_charging_factor']
+
 
         self.mqtt_api = None
         if 'mqtt' in config.keys():
@@ -504,7 +510,15 @@ class Batcontrol(object):
         # evaluation period until price is first time lower then current price
         for h in range(1, max_hour):
             future_price = prices[h]
-            if future_price <= current_price:
+            found_lower_price = False
+            # Soften the price difference to avoid too early charging
+            if self.soften_price_difference_on_charging:
+                modified_price = current_price-min_price_difference/self.soften_price_difference_on_charging_factor
+                found_lower_price = future_price <= modified_price
+            else:
+                found_lower_price = future_price <= current_price
+
+            if found_lower_price:
                 max_hour = h
                 break
 

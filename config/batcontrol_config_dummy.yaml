@@ -9,6 +9,9 @@ battery_control:
   max_charging_from_grid_limit: 0.90 # 0.00 to 1.00 charging from the grid is only allowed until this SOC limit
 a1_tuning:
   charge_rate_multiplier: 1.1 # Increase (>1) calculated charge rate to compensate charge inefficencies.
+  soften_price_difference_on_charging: False # enable earlier charging based on a more relaxed calculation
+                                             # future_price <= current_price-min_price_difference/soften_price_difference_on_charging_factor
+  soften_price_difference_on_charging_factor: 5
 inverter:
   type: fronius_gen24 #currently only fronius_gen24 supported
   address: 192.168.0.XX # the local IP of your inverter. needs to be reachable from the machine that runs batcontrol
