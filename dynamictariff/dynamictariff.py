@@ -78,7 +78,7 @@ class DynamicTariff:
         elif provider.lower()=='evcc':
             if not 'url' in config.keys() :
                 raise RuntimeError (
-                    '[Dynamic Tariff] EVCC requires an URL. '
+                    '[Dynamic Tariff] evcc requires an URL. '
                     'Please provide "url" in your configuration file, '
                     'like http://evcc.local/api/tariff/grid'
                     )
