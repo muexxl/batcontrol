@@ -175,12 +175,12 @@ class Batcontrol(object):
         self.evcc_api = None
         if 'evcc' in config.keys():
             if config['evcc']['enabled'] == True:
-                logger.info('[Main] EVCC Connection enabled')
+                logger.info('[Main] evcc Connection enabled')
                 import evcc_api
                 self.evcc_api = evcc_api.EvccApi(config['evcc'])
                 self.evcc_api.register_block_function(self.set_discharge_blocked)
                 self.evcc_api.wait_ready()
-                logger.info('[Main] EVCC Connection ready')
+                logger.info('[Main] evcc Connection ready')
 
     def shutdown(self):
         logger.info('[Main] Shutting down Batcontrol')
@@ -218,7 +218,7 @@ class Batcontrol(object):
                 pass
             else:
                 raise RuntimeError(
-                    '[BatCtrl] Utility EVCC requires an URL. '
+                    '[BatCtrl] Utility evcc requires an URL. '
                     'Please provide the URL in your configuration file'
                 )
         else:

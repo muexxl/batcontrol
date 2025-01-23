@@ -1,7 +1,7 @@
 
 """
 This module provides the EvccApi class for interacting with an
-EVCC (Electric Vehicle Charging Controller) via MQTT.
+evcc (Electric Vehicle Charging Controller) via MQTT.
 """
 import time
 import re
@@ -9,19 +9,19 @@ import logging
 import paho.mqtt.client as mqtt
 
 logger = logging.getLogger('__main__')
-logger.info('[EVCC] loading module')
+logger.info('[evcc] loading module')
 
 class EvccApi():
     """
-    A class to interact with the EVCC (Electric Vehicle Charging Controller) via MQTT.
+    A class to interact with the evcc (Electric Vehicle Charging Controller) via MQTT.
 
     Attributes:
         config (dict): Configuration dictionary containing MQTT broker details, topics.
-        evcc_is_online (bool): Internal state indicating if EVCC is online.
-        evcc_is_charging (bool): Internal state indicating if EVCC is charging.
+        evcc_is_online (bool): Internal state indicating if evcc is online.
+        evcc_is_charging (bool): Internal state indicating if evcc is charging.
         block_function (function): Function to be called to block/unblock Battery.
-        topic_status (str): MQTT topic for EVCC status messages.
-        topic_loadpoint (str): MQTT topic for EVCC loadpoint messages.
+        topic_status (str): MQTT topic for evcc status messages.
+        topic_loadpoint (str): MQTT topic for evcc loadpoint messages.
         client (mqtt.Client): MQTT client instance.
 
     Methods:
@@ -35,10 +35,10 @@ class EvccApi():
             Registers a function to be called to block/unblock charging.
 
         set_evcc_online(online: bool):
-            Sets the EVCC online status and handles state changes.
+            Sets the evcc online status and handles state changes.
 
         set_evcc_charging(charging: bool):
-            Sets the EVCC charging status and handles state changes.
+            Sets the evcc charging status and handles state changes.
 
         handle_status_messages(message):
             Handles incoming status messages from the MQTT broker.
@@ -68,7 +68,7 @@ class EvccApi():
         elif isinstance(config['loadpoint_topic'], list):
             self.list_topics_loadpoint = config['loadpoint_topic']
         else:
-            logger.error('[EVCC] Invalid loadpoint_topic type')
+            logger.error('[evcc] Invalid loadpoint_topic type')
 
         self.client = mqtt.Client()
         if 'logger' in config and config['logger'] is True:
@@ -101,11 +101,11 @@ class EvccApi():
 
     def on_connect(self, client, userdata, flags, rc): # pylint: disable=unused-argument
         """ Callback function for MQTT on_connect """
-        logger.info('[EVCC] Connected to MQTT Broker with result code %s', rc)
+        logger.info('[evcc] Connected to MQTT Broker with result code %s', rc)
         # Subscribe to status and loadpoint(s)
         self.client.subscribe(self.topic_status)
         for topic in self.list_topics_loadpoint:
-            logger.info('[EVCC] Subscribing to %s', topic)
+            logger.info('[evcc] Subscribing to %s', topic)
             self.client.subscribe(topic)
 
     def wait_ready(self) -> bool:
@@ -115,9 +115,9 @@ class EvccApi():
         while self.client.is_connected() is False:
             retry -= 1
             if retry == 0:
-                logger.error('[EVCC] Could not connect to MQTT Broker')
+                logger.error('[evcc] Could not connect to MQTT Broker')
                 return False
-            logger.info('[EVCC] Waiting for connection')
+            logger.info('[evcc] Waiting for connection')
             time.sleep(1)
         return True
 
@@ -126,32 +126,32 @@ class EvccApi():
         self.block_function = function
 
     def set_evcc_online(self, online:bool):
-        """ Set the EVCC online status and handle state changes.
-            If the EVCC goes offline while charging, we remove an existing block.
+        """ Set the evcc online status and handle state changes.
+            If the evcc goes offline while charging, we remove an existing block.
         """
         if self.evcc_is_online != online:
             if online is False:
-                logger.error('[EVCC] EVCC went offline')
+                logger.error('[evcc] evcc went offline')
                 if self.evcc_is_charging is True:
                     # We remove the block, that we set to not end endless in block mode
-                    logger.error('[EVCC] EVCC was charging, remove block')
+                    logger.error('[evcc] evcc was charging, remove block')
                     self.evcc_is_charging = False
                     self.block_function(False)
                     self.__reset_loadpoint_status()
             else:
-                logger.info('[EVCC] EVCC is online')
+                logger.info('[evcc] evcc is online')
             self.evcc_is_online = online
 
     def set_evcc_charging(self, charging:bool):
-        """ Set the EVCC charging status and handle state changes """
+        """ Set the evcc charging status and handle state changes """
         if self.evcc_is_charging != charging:
             if charging is True:
                 # We set the block, so we do not discharge the battery
-                logger.info('[EVCC] EVCC is charging, set block')
+                logger.info('[evcc] evcc is charging, set block')
                 self.evcc_is_charging = True
                 self.block_function(True)
             else:
-                logger.info('[EVCC] EVCC is not charging, remove block')
+                logger.info('[evcc] evcc is not charging, remove block')
                 self.evcc_is_charging = False
                 self.block_function(False)
         self.evcc_is_charging = charging
@@ -168,9 +168,9 @@ class EvccApi():
         # Send info if status changed
         if send_info is True:
             if is_charging is False:
-                logger.info('[EVCC] Loadpoint %s is not charging.', topic)
+                logger.info('[evcc] Loadpoint %s is not charging.', topic)
             else:
-                logger.info('[EVCC] Loadpoint %s is charging.', topic)
+                logger.info('[evcc] Loadpoint %s is charging.', topic)
 
 
     def __reset_loadpoint_status(self):
@@ -204,11 +204,11 @@ class EvccApi():
 
     def _handle_message(self, client, userdata, message): # pylint: disable=unused-argument
         """ Message dispatching function """
-        logger.debug('[EVCC] Received message on %s', message.topic)
+        logger.debug('[evcc] Received message on %s', message.topic)
         if message.topic == self.config['status_topic']:
             self.handle_status_messages(message)
         # Check if message.topic is in self.list_topics_loadpoint
         elif message.topic in self.list_topics_loadpoint:
             self.handle_charging_message(message)
         else:
-            logger.warning('[EVCC] No callback registered for %s', message.topic)
+            logger.warning('[evcc] No callback registered for %s', message.topic)
