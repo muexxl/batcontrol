@@ -32,12 +32,12 @@ else
   ln -sf $LOAD_PROFILE_DEFAULT $LOAD_PROFILE
 fi
 
-# Check if logfile exists. If not
-# Create a symlink to /app/log/batcontrol.log
+# Check if logfile exists. If not create an empty log file.
 if test ! -e $LOG_FILE ; then
   echo "Creating log file at $LOG_FILE"
   touch $LOG_FILE
 fi
+# Create a symlink to /app/log/batcontrol.log
 ln -sf $LOG_FILE /app/logs/batcontrol.log
 
 # Start batcontrol.py
