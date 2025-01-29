@@ -420,7 +420,11 @@ class FroniusWR(InverterBaseclass):
         return capacity
 
     def send_request(self,  path, method='GET', payload="", params=None, headers={}, auth=False, is_login=False):
-        """Send a HTTP REST request to the inverter."""
+        """Send a HTTP REST request to the inverter.
+
+            auth = This request needs to be run with authentication.
+            is_login = This request is a login request. Do not retry on 401.
+        """
         for i in range(3):
             url = 'http://' + self.address + path
             fullpath = path
