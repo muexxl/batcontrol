@@ -444,6 +444,11 @@ class FroniusWR(InverterBaseclass):
                     return response
                 elif response.status_code == 401:  # unauthorized
                     self.nonce = self.get_nonce(response)
+                    # Go through relogin processing only on non-auth
+                    #   requests.
+                    if auth:
+                        return response
+
                     if self.login_attempts >= 3:
                         logger.info(
                             '[Inverter] Login failed 3 times .. aborting'
