@@ -419,7 +419,7 @@ class FroniusWR(InverterBaseclass):
         self.capacity = capacity
         return capacity
 
-    def send_request(self,  path, method='GET', payload="", params=None, headers={}, auth=False):
+    def send_request(self,  path, method='GET', payload="", params=None, headers={}, auth=False, is_login=False):
         """Send a HTTP REST request to the inverter."""
         for i in range(3):
             url = 'http://' + self.address + path
@@ -446,7 +446,7 @@ class FroniusWR(InverterBaseclass):
                     self.nonce = self.get_nonce(response)
                     # Go through relogin processing only on non-auth
                     #   requests.
-                    if auth:
+                    if is_login:
                         return response
 
                     if self.login_attempts >= 3:
@@ -490,7 +490,7 @@ class FroniusWR(InverterBaseclass):
         """Login to Fronius API"""
         path = '/commands/Login'
         self.login_attempts += 1
-        return self.send_request(path, auth=True)
+        return self.send_request(path, auth=True, is_login=True)
 
     def logout(self):
         """Logout from Fronius API"""
