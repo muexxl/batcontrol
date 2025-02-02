@@ -51,6 +51,12 @@ class MqttApi:
     def __init__(self, config:dict):
         self.config=config
         self.base_topic = config['topic']
+        self.auto_discover_enable = config['auto_discover_enable']
+        if self.auto_discover_enable == None:
+            self.auto_discover_enable = False
+        self.auto_discover_topic = config['auto_discover_topic']
+        if self.auto_discover_topic == None:
+            self.auto_discover_topic = "homeassistant"
 
         self.callbacks = {}
 
@@ -98,7 +104,8 @@ class MqttApi:
         # Make public, that we are running.
         client.publish(self.base_topic + '/status', 'online', retain=True)
         # publish HA mqtt AutoDiscovery messages at startup
-        self.send_mqtt_discovery_messages()
+        if self.auto_discover_enable:
+            self.send_mqtt_discovery_messages()
         # Handle reconnect case
         for topic in self.callbacks:
             logger.debug('[MQTT] Subscribing topic: %s', topic)
@@ -513,7 +520,7 @@ class MqttApi:
             payload["device"] = device
             logger.debug(
                 '[MQTT] sending HA AD config message for %s',
-                'homeassistant/' + item_type + '/' + unique_id + '/config')
+                self.auto_discover_topic + '/' + item_type + '/' + unique_id + '/config')
             self.client.publish(
-                'homeassistant/' + item_type + '/batcontrol/' + unique_id + '/config', 
+                self.auto_discover_topic + '/' + item_type + '/batcontrol/' + unique_id + '/config', 
                 json.dumps(payload), retain=True)
