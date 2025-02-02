@@ -135,6 +135,34 @@ class Batcontrol(object):
         self.max_charging_from_grid_limit = self.batconfig['max_charging_from_grid_limit']
         self.min_price_difference = self.batconfig['min_price_difference']
 
+        self.charge_rate_multiplier = 1.1
+        self.soften_price_difference_on_charging = False
+        self.soften_price_difference_on_charging_factor = 5
+        self.round_price_digits = 4
+
+        if self._is_config_key_valid(config, 'a1_tuning'):
+            a1_tuning = self.config['a1_tuning']
+            self.soften_price_difference_on_charging = self._get_config_with_defaults(
+                  a1_tuning,
+                  'soften_price_difference_on_charging',
+                  False
+                )
+            self.soften_price_difference_on_charging_factor = self._get_config_with_defaults(
+                  a1_tuning,
+                  'soften_price_difference_on_charging_factor',
+                  5
+                )
+            self.round_price_digits = self._get_config_with_defaults(
+                  a1_tuning,
+                  'round_price_digits',
+                  4
+                )
+            self.charge_rate_multiplier = self._get_config_with_defaults(
+                  a1_tuning,
+                  'charge_rate_multiplier',
+                  1.1
+                )
+
         self.mqtt_api = None
         if 'mqtt' in config.keys():
 
@@ -174,7 +202,7 @@ class Batcontrol(object):
 
         self.evcc_api = None
         if 'evcc' in config.keys():
-            if config['evcc']['enabled'] == True:
+            if config['evcc']['enabled'] is True:
                 logger.info('[Main] evcc Connection enabled')
                 import evcc_api
                 self.evcc_api = evcc_api.EvccApi(config['evcc'])
@@ -189,6 +217,18 @@ class Batcontrol(object):
             del self.inverter
         except:
             pass
+
+    def _get_config_with_defaults(self, config:dict, key:str, default):
+        """ Get a key from a config dictionary with a default value """
+        if key in config.keys():
+            return config[key]
+        return default
+
+    def _is_config_key_valid(self, config:dict, key:str):
+        """ Check if a key is in a config dictionary """
+        if key in config.keys():
+            return True
+        return False
 
     def load_config(self, configfile):
 
@@ -277,9 +317,7 @@ class Batcontrol(object):
                 loglevel
             )
 
-        log_is_enabled = LOGFILE_ENABLED_DEFAULT
-        if 'logfile_enabled' in config.keys():
-            log_is_enabled = config['logfile_enabled']
+        log_is_enabled = self._get_config_with_defaults(config, 'logfile_enabled', LOGFILE_ENABLED_DEFAULT)
 
         if log_is_enabled:
             self.setup_logfile(config)
@@ -400,7 +438,7 @@ class Batcontrol(object):
         for h in range(fc_period+1):
             production[h] = production_forecast[h]
             consumption[h] = consumption_forecast[h]
-            prices[h] = price_dict[h]
+            prices[h] = round(price_dict[h],self.round_price_digits)
 
         net_consumption = consumption-production
         logger.debug('[BatCTRL] Production FCST: %s',
@@ -409,7 +447,7 @@ class Batcontrol(object):
                      np.ndarray.round(consumption, 1))
         logger.debug('[BatCTRL] Net Consumption FCST: %s',
                      np.ndarray.round(net_consumption, 1))
-        logger.debug('[BatCTRL] Prices: %s', np.ndarray.round(prices, 3))
+        logger.debug('[BatCTRL] Prices: %s', np.ndarray.round(prices, self.round_price_digits))
         # negative = charging or feed in
         # positive = dis-charging or grid consumption
 
@@ -471,6 +509,8 @@ class Batcontrol(object):
                 remaining_time = (
                     60-datetime.datetime.now().astimezone(self.timezone).minute)/60
                 charge_rate = required_recharge_energy/remaining_time
+                # apply multiplier for charge inefficiency
+                charge_rate *= self.charge_rate_multiplier
 
                 if charge_rate < MIN_CHARGE_RATE:
                     logger.debug("[Rule] Charge rate increased to minimum %d W from %f.1 W",
@@ -498,7 +538,15 @@ class Batcontrol(object):
         # evaluation period until price is first time lower then current price
         for h in range(1, max_hour):
             future_price = prices[h]
-            if future_price <= current_price:
+            found_lower_price = False
+            # Soften the price difference to avoid too early charging
+            if self.soften_price_difference_on_charging:
+                modified_price = current_price-min_price_difference/self.soften_price_difference_on_charging_factor
+                found_lower_price = future_price <= modified_price
+            else:
+                found_lower_price = future_price <= current_price
+
+            if found_lower_price:
                 max_hour = h
                 break
 
