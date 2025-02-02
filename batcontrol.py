@@ -90,7 +90,6 @@ class Batcontrol:
         self.load_config(configfile)
         config = self.config
 
-        # TODO That handling is odd and dublicated
         try:
             tzstring = config['timezone']
             self.timezone = pytz.timezone(tzstring)
@@ -343,14 +342,7 @@ class Batcontrol:
                 f"'{config['consumption_forecast']['load_profile']}' not found"
             )
 
-        try:
-            tzstring = config['timezone']
-        except KeyError:
-            raise RuntimeError(
-                f"Config Entry in general: timezone {config['timezone']} " +
-                "not valid. Try e.g. 'Europe/Berlin'"
-            )
-
+        global loglevel
         loglevel = self.__get_config_with_defaults(config, 'loglevel', 'info' )
 
         if loglevel == 'debug':
