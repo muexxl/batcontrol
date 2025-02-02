@@ -4,9 +4,19 @@ logfile_enabled: true
 max_logfile_size: 100 #kB
 logfile_path: logs/batcontrol.log
 battery_control:
-  min_price_difference: 0.05 # minimum price difference in Euro to justify charging your battery
+                                 # min_price_difference is the absolute minimum price difference in Euro to justify charging your battery
+                                 # if min_price_difference_rel results in a higher price difference, that will be used
+  min_price_difference: 0.05     # minimum price difference in Euro to justify charging your battery
+  min_price_difference_rel: 0.10 # Percentage (in decimal) of the current price to justify charging your battery
+                                 #    _rel helps to avoid charging at high prices with less efficiency
   always_allow_discharge_limit: 0.90 # 0.00 to 1.00 above this SOC limit using energy from the battery is always allowed
   max_charging_from_grid_limit: 0.90 # 0.00 to 1.00 charging from the grid is only allowed until this SOC limit
+a1_tuning:
+  charge_rate_multiplier: 1.1 # Increase (>1) calculated charge rate to compensate charge inefficencies.
+  soften_price_difference_on_charging: False # enable earlier charging based on a more relaxed calculation
+                                             # future_price <= current_price-min_price_difference/soften_price_difference_on_charging_factor
+  soften_price_difference_on_charging_factor: 5
+  round_price_digits: 4 # round price to n digits after the comma
 inverter:
   type: fronius_gen24 #currently only fronius_gen24 supported
   address: 192.168.0.XX # the local IP of your inverter. needs to be reachable from the machine that runs batcontrol
@@ -56,7 +66,7 @@ pvinstallations:
     horizon: 30,30,30,0,0,0 # leave empty for default PVGIS horizon, only modify if solar array is shaded by trees or houses
     api: #fcsolarapi
 consumption_forecast:
-  annual_consumption: 4500 # total consumption in kWh p.a. the load profile 
+  annual_consumption: 4500 # total consumption in kWh p.a. the load profile
   load_profile: load_profile.csv #name of the load profile file within the config folder
 
 # evcc connection

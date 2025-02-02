@@ -331,6 +331,26 @@ class MqttApi:
                 f'{min_price_difference:.3f}'
             )
 
+    def publish_min_price_difference_rel(self, min_price_difference_rel:float) -> None:
+        """ Publish the relative minimum price difference to MQTT found in config
+            /min_price_difference_rel
+        """
+        if self.client.is_connected():
+            self.client.publish(
+                self.base_topic + '/min_price_difference_rel',
+                f'{min_price_difference_rel:.3f}'
+            )
+
+    def publish_min_dynamic_price_diff(self, dynamic_price_diff:float) -> None:
+        """ Publish the dynamic price difference limit to MQTT
+            /min_dynamic_price_difference
+        """
+        if self.client.is_connected():
+            self.client.publish(
+                self.base_topic + '/min_dynamic_price_difference',
+                f'{dynamic_price_diff:.3f}'
+            )
+
     def publish_max_energy_capacity(self, max_capacity:float) -> None:
         """ Publish the maximum energy capacity to MQTT
             /max_energy_capacity
