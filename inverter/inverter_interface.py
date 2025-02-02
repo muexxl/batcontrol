@@ -59,7 +59,7 @@ class InverterInterface(ABC):
         Returns:
             float: The maximum capacity of the inverter in Wh.
         """
-
+    @abstractmethod
     def get_SOC(self) -> float:  # pylint: disable=invalid-name
         """ Get the state of charge of the inverter in percentage.
         Returns:

@@ -53,7 +53,7 @@ logger.setLevel(loglevel)
 logger.info('[Main] Starting Batcontrol')
 
 
-class Batcontrol(object):
+class Batcontrol:
     def __init__(self, configfile):
         # For API
         self.api_overwrite = False
@@ -144,6 +144,67 @@ class Batcontrol(object):
         self.always_allow_discharge_limit = self.batconfig['always_allow_discharge_limit']
         self.max_charging_from_grid_limit = self.batconfig['max_charging_from_grid_limit']
         self.min_price_difference = self.batconfig['min_price_difference']
+        self.min_price_difference_rel = self.__get_config_with_defaults(
+                                            self.batconfig,
+                                            'min_price_difference_rel',
+                                            0
+                                        )
+
+        self.charge_rate_multiplier = 1.1
+        self.soften_price_difference_on_charging = False
+        self.soften_price_difference_on_charging_factor = 5
+        self.round_price_digits = 4
+
+        if self.__is_config_key_valid(config, 'a1_tuning'):
+            a1_tuning = self.config['a1_tuning']
+            self.soften_price_difference_on_charging = self.__get_config_with_defaults(
+                  a1_tuning,
+                  'soften_price_difference_on_charging',
+                  False
+                )
+            self.soften_price_difference_on_charging_factor = self.__get_config_with_defaults(
+                  a1_tuning,
+                  'soften_price_difference_on_charging_factor',
+                  5
+                )
+            self.round_price_digits = self.__get_config_with_defaults(
+                  a1_tuning,
+                  'round_price_digits',
+                  4
+                )
+            self.charge_rate_multiplier = self.__get_config_with_defaults(
+                  a1_tuning,
+                  'charge_rate_multiplier',
+                  1.1
+                )
+
+        self.charge_rate_multiplier = 1.1
+        self.soften_price_difference_on_charging = False
+        self.soften_price_difference_on_charging_factor = 5
+        self.round_price_digits = 4
+
+        if self.__is_config_key_valid(config, 'a1_tuning'):
+            a1_tuning = self.config['a1_tuning']
+            self.soften_price_difference_on_charging = self.__get_config_with_defaults(
+                  a1_tuning,
+                  'soften_price_difference_on_charging',
+                  False
+                )
+            self.soften_price_difference_on_charging_factor = self.__get_config_with_defaults(
+                  a1_tuning,
+                  'soften_price_difference_on_charging_factor',
+                  5
+                )
+            self.round_price_digits = self.__get_config_with_defaults(
+                  a1_tuning,
+                  'round_price_digits',
+                  4
+                )
+            self.charge_rate_multiplier = self.__get_config_with_defaults(
+                  a1_tuning,
+                  'charge_rate_multiplier',
+                  1.1
+                )
 
         self.mqtt_api = None
         if 'mqtt' in config.keys():
@@ -179,19 +240,24 @@ class Batcontrol(object):
                     self.api_set_min_price_difference,
                     float
                 )
+                self.mqtt_api.register_set_callback(
+                    'min_price_difference_rel',
+                    self.api_set_min_price_difference_rel,
+                    float
+                )
                 # Inverter Callbacks
                 self.inverter.activate_mqtt(self.mqtt_api)
 
         self.evcc_api = None
         if 'evcc' in config.keys():
             if config['evcc']['enabled']:
-                logger.info('[Main] EVCC Connection enabled')
+                logger.info('[Main] evcc Connection enabled')
                 import evcc_api
                 self.evcc_api = evcc_api.EvccApi(config['evcc'])
                 self.evcc_api.register_block_function(
                     self.set_discharge_blocked)
                 self.evcc_api.wait_ready()
-                logger.info('[Main] EVCC Connection ready')
+                logger.info('[Main] evcc Connection ready')
 
     def shutdown(self):
         """ Shutdown Batcontrol and dependend modules (inverter..) """
@@ -201,6 +267,19 @@ class Batcontrol(object):
             del self.inverter
         except:
             pass
+
+    def __get_config_with_defaults(self, config:dict, key:str, default):
+        """ Get a key from a config dictionary with a default value """
+        if key in config.keys():
+            return config[key]
+        return default
+
+
+    def __is_config_key_valid(self, config:dict, key:str):
+        """ Check if a key is in a config dictionary """
+        if key in config.keys():
+            return True
+        return False
 
     def load_config(self, configfile):
         """ Load the configuration file and check for validity.
@@ -232,7 +311,7 @@ class Batcontrol(object):
                 pass
             else:
                 raise RuntimeError(
-                    '[BatCtrl] Utility EVCC requires an URL. '
+                    '[BatCtrl] Utility evcc requires an URL. '
                     'Please provide the URL in your configuration file'
                 )
         else:
@@ -264,11 +343,15 @@ class Batcontrol(object):
                 f"'{config['consumption_forecast']['load_profile']}' not found"
             )
 
-        global loglevel
         try:
-            loglevel = config['loglevel']
+            tzstring = config['timezone']
         except KeyError:
-            loglevel = 'info'
+            raise RuntimeError(
+                f"Config Entry in general: timezone {config['timezone']} " +
+                "not valid. Try e.g. 'Europe/Berlin'"
+            )
+
+        loglevel = self.__get_config_with_defaults(config, 'loglevel', 'info' )
 
         if loglevel == 'debug':
             logger.setLevel(logging.DEBUG)
@@ -285,10 +368,11 @@ class Batcontrol(object):
                 loglevel
             )
 
-        log_is_enabled = LOGFILE_ENABLED_DEFAULT
-        if 'logfile_enabled' in config.keys():
-            log_is_enabled = config['logfile_enabled']
-
+        log_is_enabled = self.__get_config_with_defaults(
+                                    config,
+                                    'logfile_enabled',
+                                    LOGFILE_ENABLED_DEFAULT
+                                )
         if log_is_enabled:
             self.setup_logfile(config)
         else:
@@ -302,7 +386,7 @@ class Batcontrol(object):
     def setup_logfile(self, config):
         """ Setup the logfile and correpsonding handlers """
 
-        if 'max_logfile_size' in config.keys():
+        if self.__is_config_key_valid(config , 'max_logfile_size'):
             if config['max_logfile_size'].isinstance(int):
                 pass
             else:
@@ -341,19 +425,19 @@ class Batcontrol(object):
         logger.addHandler(filehandler)
 
     def reset_forecast_error(self):
-        """ Reset time_at_forecast_error to default value """
+        """ Reset the forecast error timer """
         self.time_at_forecast_error = -1
 
     def handle_forecast_error(self):
-        """ Handle API errors by keeping the current mode for a certain time """
-        now = time.time()
+        """ Handle forecast errors and fallback to discharging """
+        error_ts = time.time()
 
         # set time_at_forecast_error if it is at the default value of -1
         if self.time_at_forecast_error == -1:
-            self.time_at_forecast_error = now
+            self.time_at_forecast_error = error_ts
 
         # get time delta since error
-        time_passed = now-self.time_at_forecast_error
+        time_passed = error_ts-self.time_at_forecast_error
 
         if time_passed < ERROR_IGNORE_TIME:
             # keep current mode
@@ -374,7 +458,8 @@ class Batcontrol(object):
         # for API
         self.refresh_static_values()
         self.set_discharge_limit(
-            self.get_max_capacity() * self.always_allow_discharge_limit)
+            self.get_max_capacity() * self.always_allow_discharge_limit
+            )
         self.last_run_time = time.time()
 
         # prune log file if file is too large
@@ -409,7 +494,7 @@ class Batcontrol(object):
         for h in range(fc_period+1):
             production[h] = production_forecast[h]
             consumption[h] = consumption_forecast[h]
-            prices[h] = price_dict[h]
+            prices[h] = round(price_dict[h],self.round_price_digits)
 
         net_consumption = consumption-production
         logger.debug('[BatCTRL] Production FCST: %s',
@@ -418,7 +503,7 @@ class Batcontrol(object):
                      np.ndarray.round(consumption, 1))
         logger.debug('[BatCTRL] Net Consumption FCST: %s',
                      np.ndarray.round(net_consumption, 1))
-        logger.debug('[BatCTRL] Prices: %s', np.ndarray.round(prices, 3))
+        logger.debug('[BatCTRL] Prices: %s', np.ndarray.round(prices, self.round_price_digits))
         # negative = charging or feed in
         # positive = dis-charging or grid consumption
 
@@ -483,6 +568,8 @@ class Batcontrol(object):
                 remaining_time = (
                     60-datetime.datetime.now().astimezone(self.timezone).minute)/60
                 charge_rate = required_recharge_energy/remaining_time
+                # apply multiplier for charge inefficiency
+                charge_rate *= self.charge_rate_multiplier
 
                 if charge_rate < MIN_CHARGE_RATE:
                     logger.debug("[Rule] Charge rate increased to minimum %d W from %f.1 W",
@@ -498,13 +585,13 @@ class Batcontrol(object):
 
     # %%
     def get_required_required_recharge_energy(self, net_consumption: list, prices: dict) -> float:
-        """ Calculate required recharge energy based on forecast data
+        """ Calculate the required energy to shift toward high price hours.
 
-            - Calculate required energy to shift toward high price hours
-            - High price hours are defined by min_price_difference and current price
+            If a recharge price window is detected, the energy required to
+            recharge the battery to the next high price hours is calculated.
 
-            return: float
-        """
+            return: float (Energy in Wh)
+         """
         current_price = prices[0]
         max_hour = len(net_consumption)
         consumption = np.array(net_consumption)
@@ -513,11 +600,20 @@ class Batcontrol(object):
         production = -np.array(net_consumption)
         production[production < 0] = 0
         min_price_difference = self.min_price_difference
+        min_dynamic_price_difference = self.__calculate_min_dynamic_price_difference(current_price)
 
         # evaluation period until price is first time lower then current price
         for h in range(1, max_hour):
             future_price = prices[h]
-            if future_price <= current_price:
+            found_lower_price = False
+            # Soften the price difference to avoid too early charging
+            if self.soften_price_difference_on_charging:
+                modified_price = current_price-min_price_difference/self.soften_price_difference_on_charging_factor
+                found_lower_price = future_price <= modified_price
+            else:
+                found_lower_price = future_price <= current_price
+
+            if found_lower_price:
                 max_hour = h
                 break
 
@@ -525,7 +621,7 @@ class Batcontrol(object):
         high_price_hours = []
         for h in range(max_hour):
             future_price = prices[h]
-            if future_price > current_price+min_price_difference:
+            if future_price > current_price+min_dynamic_price_difference:
                 high_price_hours.append(h)
 
         # start with nearest hour
@@ -563,12 +659,16 @@ class Batcontrol(object):
 
         free_capacity = self.get_free_capacity()
 
+        if recharge_energy <= 0:
+            logger.debug(
+                "[Rule] No additional energy required, because stored energy is sufficient."
+                )
+            recharge_energy = 0
+
         if recharge_energy > free_capacity:
             recharge_energy = free_capacity
             logger.debug(
                 "[Rule] Recharge limited by free capacity: %0.1f Wh", recharge_energy)
-        if recharge_energy < 0:
-            recharge_energy = 0
 
         return recharge_energy
 
@@ -597,7 +697,7 @@ class Batcontrol(object):
 
             return: bool
         """
-        stored_energy = self.get_stored_energy()
+        self.get_stored_energy()
         stored_usable_energy = self.get_stored_usable_energy()
 
         if self.__is_above_always_allow_discharge_limit():
@@ -606,23 +706,26 @@ class Batcontrol(object):
             return True
 
         current_price = prices[0]
-        min_price_difference = self.min_price_difference
+
+        min_dynamic_price_difference = self.__calculate_min_dynamic_price_difference(current_price)
+        if self.mqtt_api is not None:
+            self.mqtt_api.publish_min_dynamic_price_diff(min_dynamic_price_difference)
+
         max_hour = len(net_consumption)
         # relevant time range : until next recharge possibility
         for h in range(1, max_hour):
             future_price = prices[h]
-            if future_price <= current_price-min_price_difference:
+            if future_price <= current_price-min_dynamic_price_difference:
                 max_hour = h
                 logger.debug(
-                    "[Rule] Recharge possible in %d hours, limiting evaluation window.",
-                    h
-                )
+                     "[Rule] Recharge possible in %d hours, limiting evaluation window.",
+                     h )
                 logger.debug(
-                    "[Rule] Future price: %.3f < Current price: %.3f - min_price_diff. %.3f ",
-                    future_price,
-                    current_price,
-                    self.min_price_difference
-                )
+                      "[Rule] Future price: %.3f < Current price: %.3f - dyn_price_diff. %.3f ",
+                      future_price,
+                      current_price,
+                      min_dynamic_price_difference
+                    )
                 break
         dt = datetime.timedelta(hours=max_hour-1)
         t0 = datetime.datetime.now()
@@ -689,31 +792,38 @@ class Batcontrol(object):
 
         # for API
         self.set_reserved_energy(reserved_storage)
-        self.set_stored_energy(stored_energy)
-        self.set_stored_usable_energy(stored_usable_energy)
 
         if self.discharge_blocked:
             logger.debug(
                 '[BatCTRL] Discharge blocked due to external lock'
-            )
+                )
             return False
 
         if stored_usable_energy > reserved_storage:
             # allow discharging
             logger.debug(
                 "[Rule] Discharge allowed. Stored usable energy %0.1f Wh >"
-                " Reserved energy %0.1f Wh",
-                stored_usable_energy,
-                reserved_storage
-            )
+                 " Reserved energy %0.1f Wh",
+                         stored_usable_energy,
+                         reserved_storage
+                         )
             return True
+
         # forbid discharging
         logger.debug(
             "[Rule] Discharge forbidden. Stored usable energy %0.1f Wh <= Reserved energy %0.1f Wh",
-            stored_usable_energy,
-            reserved_storage
-        )
+                        stored_usable_energy,
+                        reserved_storage
+                        )
+
         return False
+
+    def __calculate_min_dynamic_price_difference(self, price: float) -> float:
+        """ Calculate the dynamic limit for the current price """
+        return round(
+            max(self.min_price_difference, self.min_price_difference_rel * abs(price)),
+            self.round_price_digits
+            )
 
     def __set_charge_rate(self, charge_rate: int):
         """ Set charge rate and publish to mqtt """
@@ -731,19 +841,19 @@ class Batcontrol(object):
             self.__set_charge_rate(0)
 
     def allow_discharging(self):
-        """ Allow discharging and set to inverters. """
+        """ Allow unlimited discharging of the battery """
         logger.info('[BatCTRL] Mode: Allow Discharging')
         self.inverter.set_mode_allow_discharge()
         self.__set_mode(MODE_ALLOW_DISCHARGING)
 
     def avoid_discharging(self):
-        """ Avoid discharging and set to inverters. """
+        """ Avoid discharging the battery """
         logger.info('[BatCTRL] Mode: Avoid Discharging')
         self.inverter.set_mode_avoid_discharge()
         self.__set_mode(MODE_AVOID_DISCHARGING)
 
     def force_charge(self, charge_rate=500):
-        """ Force charging and set to inverters. """
+        """ Force the battery to charge with a given rate """
         charge_rate = int(min(charge_rate, self.inverter.max_grid_charge_rate))
         logger.info(
             '[BatCTRL] Mode: grid charging. Charge rate : %d W', charge_rate)
@@ -752,7 +862,7 @@ class Batcontrol(object):
         self.__set_charge_rate(charge_rate)
 
     def __save_run_data(self, production, consumption, net_consumption, prices):
-        """ Save forcast data arrays for API """
+        """ Save data for API """
         self.last_production = production
         self.last_consumption = consumption
         self.last_net_consumption = net_consumption
@@ -772,7 +882,7 @@ class Batcontrol(object):
         self.fetched_reserved_energy = False
         self.fetched_stored_usable_energy = False
 
-    def get_SOC(self):  # pylint: disable=invalid-name
+    def get_SOC(self) -> float:  # pylint: disable=invalid-name
         """ Returns the SOC in % (0-100) , collects data from inverter """
         if not self.fetched_soc:
             self.last_SOC = self.inverter.get_SOC()
@@ -780,7 +890,7 @@ class Batcontrol(object):
             self.fetched_soc = True
         return self.last_SOC
 
-    def get_max_capacity(self):
+    def get_max_capacity(self) -> float:
         """ Returns capacity Wh of all batteries reduced by MAX_SOC """
         if not self.fetched_max_capacity:
             self.last_max_capacity = self.inverter.get_max_capacity()
@@ -790,45 +900,44 @@ class Batcontrol(object):
                     self.last_max_capacity)
         return self.last_max_capacity
 
-    def get_stored_energy(self):
+    def get_stored_energy(self) -> float:
         """ Returns the stored eneregy in the battery in kWh without
             considering the minimum SOC"""
         if not self.fetched_stored_energy:
-            self.last_stored_energy = self.inverter.get_stored_energy()
+            self.set_stored_energy(self.inverter.get_stored_energy())
             self.fetched_stored_energy = True
         return self.last_stored_energy
 
-    def get_stored_usable_energy(self):
+    def get_stored_usable_energy(self) -> float:
         """ Returns the stored eneregy in the battery in kWh with considering
             the MIN_SOC of inverters. """
         if not self.fetched_stored_usable_energy:
-            self.last_stored_usable_energy = self.inverter.get_stored_usable_energy()
+            self.set_stored_usable_energy( self.inverter.get_stored_usable_energy())
             self.fetched_stored_usable_energy = True
         return self.last_stored_usable_energy
 
-    def get_free_capacity(self):
-        """ Returns the free capacity in the battery in kWh """
+    def get_free_capacity(self) -> float:
+        """ Returns the free capacity in Wh that is usable for (dis)charging """
         self.last_free_capacity = self.inverter.get_free_capacity()
         return self.last_free_capacity
 
-    def set_reserved_energy(self, reserved_energy):
-        """ Saves the calculated reserved energy for API """
+    def set_reserved_energy(self, reserved_energy) -> None:
+        """ Set the reserved energy in Wh """
         self.last_reserved_energy = reserved_energy
         if self.mqtt_api is not None:
             self.mqtt_api.publish_reserved_energy_capacity(reserved_energy)
 
-    def get_reserved_energy(self):
-        """ Returns the reserved energy for API """
+    def get_reserved_energy(self) -> float:
+        """ Returns the reserved energy in Wh from last calculation """
         return self.last_reserved_energy
 
-    def set_stored_energy(self, stored_energy):
-        """ Saves the plain stored energy for API
-         """
+    def set_stored_energy(self, stored_energy) -> None:
+        """ Set the stored energy in Wh """
         self.last_stored_energy = stored_energy
         if self.mqtt_api is not None:
             self.mqtt_api.publish_stored_energy_capacity(stored_energy)
 
-    def set_stored_usable_energy(self, stored_usable_energy):
+    def set_stored_usable_energy(self, stored_usable_energy) -> None:
         """ Saves the stored usable energy for API
             This is the energy that can be used for discharging. This takes
             account of MIN_SOC and MAX_SOC.
@@ -838,7 +947,7 @@ class Batcontrol(object):
             self.mqtt_api.publish_stored_usable_energy_capacity(
                 stored_usable_energy)
 
-    def set_discharge_limit(self, discharge_limit):
+    def set_discharge_limit(self, discharge_limit)-> None:
         """ Sets the always_allow_discharge_limit and publishes it to the API.
             This is the value in Wh.
         """
@@ -847,7 +956,7 @@ class Batcontrol(object):
             self.mqtt_api.publish_always_allow_discharge_limit_capacity(
                 discharge_limit)
 
-    def set_discharge_blocked(self, discharge_blocked):
+    def set_discharge_blocked(self, discharge_blocked) -> None:
         """ Avoid discharging if an external block is received,
             but take care of the always_allow_discharge_limit.
 
@@ -864,7 +973,7 @@ class Batcontrol(object):
         if not self.__is_above_always_allow_discharge_limit():
             self.avoid_discharging()
 
-    def refresh_static_values(self):
+    def refresh_static_values(self) -> None:
         """ Refresh static and some dynamic values for API.
             Collected data is stored, that it is not fetched again.
         """
@@ -880,6 +989,8 @@ class Batcontrol(object):
             #
             self.mqtt_api.publish_min_price_difference(
                 self.min_price_difference)
+            self.mqtt_api.publish_min_price_difference_rel(
+                self.min_price_difference_rel)
             #
             self.mqtt_api.publish_evaluation_intervall(
                 TIME_BETWEEN_EVALUATIONS)
@@ -890,7 +1001,7 @@ class Batcontrol(object):
             self.inverter.refresh_api_values()
 
     def api_set_mode(self, mode: int):
-        """ Set mode for battery control via external API request. """
+        """ Log and change config run mode of inverter(s) from external call """
         # Check if mode is valid
         if mode not in [MODE_FORCE_CHARGING, MODE_AVOID_DISCHARGING, MODE_ALLOW_DISCHARGING]:
             logger.warning('[BatCtrl] API: Invalid mode %s', mode)
@@ -908,7 +1019,7 @@ class Batcontrol(object):
                 self.allow_discharging()
 
     def api_set_charge_rate(self, charge_rate: int):
-        """ Set charge rate for battery control via external API request. """
+        """ Log and change config charge_rate and activate charging."""
         if charge_rate < 0:
             logger.warning(
                 '[BatCtrl] API: Invalid charge rate %d W', charge_rate)
@@ -954,6 +1065,15 @@ class Batcontrol(object):
             '[BatCtrl] API: Setting min price difference to %.3f', min_price_difference)
         self.min_price_difference = min_price_difference
 
+    def api_set_min_price_difference_rel(self, min_price_difference_rel: float):
+        """ Log and change config min_price_difference_rel from external call """
+        if min_price_difference_rel < 0:
+            logger.warning(
+                 '[BatCtrl] API: Invalid min price rel difference %.3f', min_price_difference_rel)
+            return
+        logger.info(
+              '[BatCtrl] API: Setting min price rel difference to %.3f', min_price_difference_rel)
+        self.min_price_difference_rel = min_price_difference_rel
 
 if __name__ == '__main__':
     bc = Batcontrol(CONFIGFILE)

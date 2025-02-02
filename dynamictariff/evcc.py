@@ -1,9 +1,9 @@
 """
-This module defines the Evcc class, which is used to interact with the EVCC API to fetch
+This module defines the Evcc class, which is used to interact with the evcc API to fetch
 dynamic tariff data.
 
 Classes:
-    Evcc: A class to interact with the EVCC API and process dynamic tariff data.
+    Evcc: A class to interact with the evcc API and process dynamic tariff data.
 
 Methods:
     __init__(self, timezone, url, min_time_between_API_calls=60):
@@ -11,10 +11,10 @@ Methods:
         and minimum time between API calls.
 
     get_raw_data_from_provider(self):
-        Fetches raw data from the EVCC API and returns it as a JSON object.
+        Fetches raw data from the evcc API and returns it as a JSON object.
 
     get_prices_from_raw_data(self):
-        Processes the raw data from the EVCC API and returns a dictionary of prices
+        Processes the raw data from the evcc API and returns a dictionary of prices
         indexed by the relative hour.
 
     test():
@@ -30,7 +30,7 @@ import requests
 from .baseclass import DynamicTariffBaseclass
 
 class Evcc(DynamicTariffBaseclass):
-    """ Implement EVCC API to get dynamic electricity prices
+    """ Implement evcc API to get dynamic electricity prices
         Inherits from DynamicTariffBaseclass
     """
     def __init__(self, timezone , url , min_time_between_API_calls=60):
@@ -42,7 +42,7 @@ class Evcc(DynamicTariffBaseclass):
         response=requests.get(self.url, timeout=30)
 
         if response.status_code != 200:
-            raise RuntimeError(f'[EVCC] API returned {response}')
+            raise RuntimeError(f'[evcc] API returned {response}')
 
         # {"result":
         #     { "rates": [

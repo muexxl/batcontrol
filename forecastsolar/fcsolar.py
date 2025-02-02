@@ -116,8 +116,12 @@ class FCSolar(ForecastSolarInterface):
             elif 'api' in unit.keys() and unit['api'] is not None:
                 apikey_urlmod = unit['api'] +"/" # ForecastSolar api
 
+            horizon_querymod = ''
+            if 'horizon' in unit.keys() and unit['horizon'] is not None:
+                horizon_querymod = "?horizon=" + unit['horizon']  # ForecastSolar api
+
             url = (f"https://api.forecast.solar/{apikey_urlmod}estimate/"
-                   f"watthours/period/{lat}/{lon}/{dec}/{az}/{kwp}")
+                   f"watthours/period/{lat}/{lon}/{dec}/{az}/{kwp}{horizon_querymod}")
             logger.info(
                 '[FCSolar] Requesting Information for PV Installation %s', name)
 

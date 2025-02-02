@@ -10,6 +10,10 @@ LABEL maintainer="matthias.strubel@aod-rpg.de"
 
 ENV BATCONTROL_VERSION=${VERSION}
 ENV BATCONTROL_GIT_SHA=${GIT_SHA}
+# Set default timezone to UTC, override with -e TZ=Europe/Berlin or similar 
+# when starting the container 
+# or set the timezone in docker-compose.yml in the environment section,
+ENV TZ=UTC  
 
 RUN mkdir -p /app /app/logs /app/config
 WORKDIR /app
@@ -19,13 +23,14 @@ RUN apk add --no-cache \
             py3-pandas\
             py3-yaml\
             py3-requests\
-            py3-paho-mqtt
+            py3-paho-mqtt \
+            tzdata
 
 
 COPY *.py ./
 COPY LICENSE ./
-COPY default_load_profile.csv ./config/load_profile.csv
-COPY default_load_profile.csv ./
+COPY config/load_profile_default.csv ./config/load_profile.csv
+COPY config/load_profile_default.csv ./default_load_profile.csv
 COPY config ./config_template
 COPY dynamictariff ./dynamictariff
 COPY inverter ./inverter
