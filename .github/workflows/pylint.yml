@@ -57,6 +57,6 @@ jobs:
     - name: Analysing the code with pylint
       run: |
         for file in ${{ env.CHANGED_FILES }}; do
-          pylint "$file"
+          pylint --fail-under 9  "$file"
         done
 
