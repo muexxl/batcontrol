@@ -23,6 +23,7 @@ import logging
 import json
 import hashlib
 import requests
+import mqtt_api
 from .baseclass import InverterBaseclass
 
 logger = logging.getLogger('__main__')
@@ -39,7 +40,7 @@ def hash_utf8(x):
 def strip_dict(original):
     """Strip all keys starting with '_' from a dictionary."""
     # return unmodified original if its not a dict
-    if not type(original) == dict:
+    if not isinstance(original, dict):
         return original
     stripped_copy = {}
     for key in original.keys():
@@ -256,7 +257,7 @@ class FroniusWR(InverterBaseclass):
     def set_wr_parameters(self, minsoc, maxsoc, allow_grid_charging, grid_power):
         """set power at grid-connection point negative values for Feed-In"""
         path = '/config/batteries'
-        if not type(allow_grid_charging) == bool:
+        if not isinstance(allow_grid_charging , bool):
             raise RuntimeError(
                 f'Expected type: bool actual type: {type(allow_grid_charging)}')
 
@@ -360,20 +361,26 @@ class FroniusWR(InverterBaseclass):
     def set_mode_force_charge(self, chargerate=500):
         """ Set the inverter to charge the battery with a specific power from GRID."""
         # activate timeofuse rules
-        if chargerate > self.max_grid_charge_rate:
-            chargerate = self.max_grid_charge_rate
+        chargerate = min( chargerate, self.max_grid_charge_rate)
         timeofuselist = [{'Active': True,
                           'Power': int(chargerate),
                           'ScheduleType': 'CHARGE_MIN',
                           "TimeTable": {"Start": "00:00", "End": "23:59"},
-                          "Weekdays": {"Mon": True, "Tue": True, "Wed": True, "Thu": True, "Fri": True, "Sat": True, "Sun": True}
+                          "Weekdays":
+                                {"Mon": True,
+                                 "Tue": True,
+                                 "Wed": True,
+                                 "Thu": True,
+                                 "Fri": True,
+                                 "Sat": True,
+                                 "Sun": True}
                           }]
         return self.set_time_of_use(timeofuselist)
 
     def restore_time_of_use_config(self):
         """ Restore the previous time of use config from a backup file."""
         try:
-            with open(TIMEOFUSE_CONFIG_FILENAME, 'r') as f:
+            with open(TIMEOFUSE_CONFIG_FILENAME, 'r', encoding="utf-8") as f:
                 time_of_use_config_json = f.read()
         except OSError:
             logger.error('[Inverter] could not restore timeofuse config')
@@ -466,10 +473,11 @@ class FroniusWR(InverterBaseclass):
                 raise RuntimeError(
                     f"[Inverter] Request {i} failed with {response.status_code}-"
                     f"{response.reason}. \n"
-                    f"\path:{path}, \n\tparams:{params} \n\theaders {headers} \n"
+                    f"\t path:{path}, \n\tparams:{params} \n\theaders {headers} \n"
                     f"\tnonce {self.nonce} \n"
                     f"\tpayload {payload}"
                 )
+        return None
 
     def __send_one_http_request(self, path, method='GET', payload="",
                                         params=None, headers=None, auth=False):
@@ -502,7 +510,8 @@ class FroniusWR(InverterBaseclass):
                 return response
             except requests.exceptions.ConnectionError as err:
                 logger.error(
-                    "[Inverter] Connection to Inverter failed on %s. (%d) Retrying in 60 seconds, Error %s",
+                    "[Inverter] Connection to Inverter failed on %s. (%d) "
+                    "Retrying in 60 seconds, Error %s",
                     self.address,
                     i,
                     err
@@ -528,13 +537,13 @@ class FroniusWR(InverterBaseclass):
                 logger.info('[Inverter] Login successful')
                 self.login_attempts = 0
                 return
-            else:
-                logger.error(
-                    '[Inverter] Login -%d- failed, Response: %s', i, response)
-                if self.subsequent_login:
-                    logger.info(
-                        "[Inverter] Retrying login in 10 seconds")
-                    time.sleep(10)
+
+            logger.error(
+                '[Inverter] Login -%d- failed, Response: %s', i, response)
+            if self.subsequent_login:
+                logger.info(
+                    "[Inverter] Retrying login in 10 seconds")
+                time.sleep(10)
         if self.login_attempts  >= 3:
             logger.info(
                 '[Inverter] Login failed 3 times .. aborting'
@@ -585,13 +594,15 @@ class FroniusWR(InverterBaseclass):
         if len(self.password) < 4:
             raise RuntimeError("Password needed for Authorization")
 
-        A1 = f"{user}:{realm}:{password}"
-        A2 = f"{method}:{path}"
-        HA1 = hash_utf8(A1)
-        HA2 = hash_utf8(A2)
-        noncebit = f"{nonce}:{ncvalue}:{cnonce}:auth:{HA2}"
-        respdig = hash_utf8(f"{HA1}:{noncebit}")
-        auth_header = f'Digest username="{user}", realm="{realm}", nonce="{nonce}", uri="{path}", algorithm="MD5", qop=auth, nc={ncvalue}, cnonce="{cnonce}", response="{respdig}"'
+        a1 = f"{user}:{realm}:{password}"
+        a2 = f"{method}:{path}"
+        ha1 = hash_utf8(a1)
+        ha2 = hash_utf8(a2)
+        noncebit = f"{nonce}:{ncvalue}:{cnonce}:auth:{ha2}"
+        respdig = hash_utf8(f"{ha1}:{noncebit}")
+        auth_header  = f'Digest username="{user}", realm="{realm}", nonce="{nonce}", uri="{path}", '
+        auth_header += f'algorithm="MD5", qop=auth, nc={ncvalue}, cnonce="{cnonce}", '
+        auth_header += f'response="{respdig}"'
         return auth_header
 
     def shutdown(self):
@@ -618,7 +629,6 @@ class FroniusWR(InverterBaseclass):
             api_mqtt_api: The MQTT API instance to be used for registering callbacks.
 
         """
-        import mqtt_api
         self.mqtt_api = api_mqtt_api
         # /set is appended to the topic
         self.mqtt_api.register_set_callback(self.__get_mqtt_topic(
