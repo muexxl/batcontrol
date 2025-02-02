@@ -168,6 +168,34 @@ class Batcontrol:
                   1.1
                 )
 
+        self.charge_rate_multiplier = 1.1
+        self.soften_price_difference_on_charging = False
+        self.soften_price_difference_on_charging_factor = 5
+        self.round_price_digits = 4
+
+        if self._is_config_key_valid(config, 'a1_tuning'):
+            a1_tuning = self.config['a1_tuning']
+            self.soften_price_difference_on_charging = self._get_config_with_defaults(
+                  a1_tuning,
+                  'soften_price_difference_on_charging',
+                  False
+                )
+            self.soften_price_difference_on_charging_factor = self._get_config_with_defaults(
+                  a1_tuning,
+                  'soften_price_difference_on_charging_factor',
+                  5
+                )
+            self.round_price_digits = self._get_config_with_defaults(
+                  a1_tuning,
+                  'round_price_digits',
+                  4
+                )
+            self.charge_rate_multiplier = self._get_config_with_defaults(
+                  a1_tuning,
+                  'charge_rate_multiplier',
+                  1.1
+                )
+
         self.mqtt_api = None
         if 'mqtt' in config.keys():
 
@@ -233,6 +261,7 @@ class Batcontrol:
         if key in config.keys():
             return config[key]
         return default
+
 
     def __is_config_key_valid(self, config:dict, key:str):
         """ Check if a key is in a config dictionary """
@@ -330,7 +359,6 @@ class Batcontrol:
                                     'logfile_enabled',
                                     LOGFILE_ENABLED_DEFAULT
                                 )
-
         if log_is_enabled:
             self.setup_logfile(config)
         else:
