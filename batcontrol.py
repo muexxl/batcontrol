@@ -379,7 +379,7 @@ class Batcontrol:
         """ Setup the logfile and correpsonding handlers """
 
         if self.__is_config_key_valid(config , 'max_logfile_size'):
-            if config['max_logfile_size'].isinstance(int):
+            if isinstance(config['max_logfile_size'],int):
                 pass
             else:
                 raise RuntimeError(
