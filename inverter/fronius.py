@@ -527,6 +527,7 @@ class FroniusWR(InverterBaseclass):
                 self.subsequent_login = True
                 logger.info('[Inverter] Login successful')
                 self.login_attempts = 0
+                return
             else:
                 logger.error(
                     '[Inverter] Login -%d- failed, Response: %s', i, response)
