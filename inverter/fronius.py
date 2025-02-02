@@ -3,6 +3,19 @@ This module provides a class `FroniusWR` for handling Fronius GEN24 Inverters.
 It includes methods for interacting with the inverter's API, managing battery
 configurations, and controlling various inverter settings.
 
+The Fronius Web-API is a bit quirky, which is reflected in the code.
+
+The Web-Login form does send a first request without authentication, which
+returns a nonce. This nonce is then used to create a digest for the login
+request.
+
+Parts of the information can be called without authentication, but some
+settings require authentication. We tackle a 401 as a signal to login again
+and retry the request.
+
+Yes, the Webfronted does send the password on each authenticated request hashed
+with MD5, nounce etc.
+
 """
 import time
 import os
@@ -181,7 +194,7 @@ class FroniusWR(InverterBaseclass):
             if key in self.previous_battery_config.keys():
                 settings[key] = self.previous_battery_config[key]
             else:
-                RuntimeError(
+                raise RuntimeError(
                     f"Unable to restore settings. Parameter {key} is missing"
                 )
         path = '/config/batteries'
@@ -312,7 +325,14 @@ class FroniusWR(InverterBaseclass):
                           'Power': int(0),
                           'ScheduleType': 'DISCHARGE_MAX',
                           "TimeTable": {"Start": "00:00", "End": "23:59"},
-                          "Weekdays": {"Mon": True, "Tue": True, "Wed": True, "Thu": True, "Fri": True, "Sat": True, "Sun": True}
+                          "Weekdays":
+                               {"Mon": True,
+                                "Tue": True,
+                                "Wed": True,
+                                "Thu": True,
+                                "Fri": True,
+                                "Sat": True,
+                                "Sun": True}
                           }]
         return self.set_time_of_use(timeofuselist)
 
@@ -324,7 +344,14 @@ class FroniusWR(InverterBaseclass):
                               'Power': int(self.max_pv_charge_rate),
                               'ScheduleType': 'CHARGE_MAX',
                               "TimeTable": {"Start": "00:00", "End": "23:59"},
-                              "Weekdays": {"Mon": True, "Tue": True, "Wed": True, "Thu": True, "Fri": True, "Sat": True, "Sun": True}
+                              "Weekdays":
+                                    {"Mon": True,
+                                     "Tue": True,
+                                     "Wed": True,
+                                     "Thu": True,
+                                     "Fri": True,
+                                     "Sat": True,
+                                     "Sun": True}
                               }]
         response = self.set_time_of_use(timeofuselist)
 
@@ -354,7 +381,7 @@ class FroniusWR(InverterBaseclass):
 
         try:
             time_of_use_config = json.loads(time_of_use_config_json)
-        except:
+        except:  # pylint: disable=bare-except
             logger.error(
                 '[Inverter] could not parse timeofuse config from %s',
                 TIMEOFUSE_CONFIG_FILENAME
@@ -419,82 +446,101 @@ class FroniusWR(InverterBaseclass):
         self.capacity = capacity
         return capacity
 
-    def send_request(self,  path, method='GET', payload="", params=None, headers={}, auth=False, is_login=False):
+    def send_request (self, path, method='GET', payload="", params=None, headers=None, auth=False):
         """Send a HTTP REST request to the inverter.
 
             auth = This request needs to be run with authentication.
             is_login = This request is a login request. Do not retry on 401.
         """
+        if not headers:
+            headers = {}
+        for i in range(2):
+            # Try tp send the request, if it fails, try to login and resend
+            response = self.__send_one_http_request(path, method, payload, params, headers, auth)
+            if response.status_code == 200:
+                return response
+            if response.status_code == 401:  # unauthorized
+                self.nonce = self.get_nonce(response)
+                self.login()
+            else:
+                raise RuntimeError(
+                    f"[Inverter] Request {i} failed with {response.status_code}-"
+                    f"{response.reason}. \n"
+                    f"\path:{path}, \n\tparams:{params} \n\theaders {headers} \n"
+                    f"\tnonce {self.nonce} \n"
+                    f"\tpayload {payload}"
+                )
+
+    def __send_one_http_request(self, path, method='GET', payload="",
+                                        params=None, headers=None, auth=False):
+        """ Send one HTTP Request to the backend.
+            This method does not handle application errors, only connection errors.
+        """
+        if not headers:
+            headers = {}
+        url = 'http://' + self.address + path
+        fullpath = path
+        if params:
+            fullpath += '?' + \
+                "&".join(
+                    [f'{k+"="+str(params[k])}' for k in params.keys()])
+        if auth:
+            headers['Authorization'] = self.get_auth_header(
+                method=method, path=fullpath)
+
         for i in range(3):
-            url = 'http://' + self.address + path
-            fullpath = path
-            if params:
-                fullpath += '?' + \
-                    "&".join(
-                        [f'{k+"="+str(params[k])}' for k in params.keys()])
-            if auth:
-                headers['Authorization'] = self.get_auth_header(
-                    method=method, path=fullpath)
+            # 3 retries if connection can't be established
             try:
                 response = requests.request(
-                                        method=method,
-                                        url=url,
-                                        params=params,
-                                        headers=headers,
-                                        data=payload,
-                                        timeout=30
-                                    )
-                if response.status_code == 200:
-                    return response
-                elif response.status_code == 401:  # unauthorized
-                    self.nonce = self.get_nonce(response)
-                    # Go through relogin processing only on non-auth
-                    #   requests.
-                    if is_login:
-                        return response
-
-                    if self.login_attempts >= 3:
-                        logger.info(
-                            '[Inverter] Login failed 3 times .. aborting'
-                            )
-                        raise RuntimeError(
-                            '[Inverter] Login failed repeatedly .. wrong credentials?'
-                            )
-                    response = self.login()
-                    if (response.status_code == 200):
-                        logger.info('[Inverter] Login successful')
-                        self.login_attempts = 0
-                        self.subsequent_login = True
-                    else:
-                        logger.error(
-                            '[Inverter] Login -%d- failed, Response: %s', i, response)
-                        if self.subsequent_login:
-                            logger.info(
-                                "[Inverter] Retrying login in 10 seconds")
-                            time.sleep(10)
-                else:
-                    raise RuntimeError(
-                        f"[Inverter] Request failed with {response.status_code}-"
-                        f"{response.reason}. \n"
-                        f"\turl:{url}, \n\tparams:{params} \n\theaders {headers} \n"
-                        f"\tnonce {self.nonce} \n"
-                        f"\tpayload {payload}"
-                    )
+                                    method=method,
+                                    url=url,
+                                    params=params,
+                                    headers=headers,
+                                    data=payload,
+                                    timeout=30
+                                )
+                return response
             except requests.exceptions.ConnectionError as err:
                 logger.error(
-                    "[Inverter] Connection to Inverter failed on %s. Retrying in 120 seconds",
-                    self.address
+                    "[Inverter] Connection to Inverter failed on %s. (%d) Retrying in 60 seconds, Error %s",
+                    self.address,
+                    i,
+                    err
                     )
-                time.sleep(20)
+                time.sleep(60)
 
-        response = None
-        return response
+        logger.error( '[Inverter] Request failed without response.')
+        raise RuntimeError(
+                f"\turl:{url}, \n\tparams:{params} \n\theaders {headers} \n"
+                f"\tnonce {self.nonce} \n"
+                f"\tpayload {payload}"
+            )
 
     def login(self):
         """Login to Fronius API"""
         path = '/commands/Login'
-        self.login_attempts += 1
-        return self.send_request(path, auth=True, is_login=True)
+        self.login_attempts = 0
+        for i in range(3):
+            self.login_attempts += 1
+            response = self.__send_one_http_request(path, auth=True)
+            if response.status_code == 200:
+                self.subsequent_login = True
+                logger.info('[Inverter] Login successful')
+                self.login_attempts = 0
+            else:
+                logger.error(
+                    '[Inverter] Login -%d- failed, Response: %s', i, response)
+                if self.subsequent_login:
+                    logger.info(
+                        "[Inverter] Retrying login in 10 seconds")
+                    time.sleep(10)
+        if self.login_attempts  >= 3:
+            logger.info(
+                '[Inverter] Login failed 3 times .. aborting'
+                )
+            raise RuntimeError(
+                '[Inverter] Login failed repeatedly .. wrong credentials?'
+                )
 
     def logout(self):
         """Logout from Fronius API"""
