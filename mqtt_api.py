@@ -88,7 +88,7 @@ class MqttApi:
             try:
                 self.client.connect(config['broker'], config['port'], 60)
                 break
-            except Exception as e:
+            except (ValueError, TypeError) as e:
                 logger.error('[MQTT] Connection failed: %s, retrying[%d]x in [%d] seconds',
                                 e, retry_attempts, retry_delay)
                 retry_attempts -= 1
@@ -134,7 +134,7 @@ class MqttApi:
                 self.callbacks[message.topic]['function'](
                     self.callbacks[message.topic]['convert'](message.payload)
                 )
-            except Exception as e:
+            except (ValueError, TypeError) as e:
                 logger.error('[MQTT] Error in callback %s : %s', message.topic, e)
         else:
             logger.warning('[MQTT] No callback registered for %s', message.topic)
@@ -256,7 +256,7 @@ class MqttApi:
         """
         if self.client.is_connected():
             self.client.publish(
-                self.base_topic + '/stored_usable_energy_capacity', 
+                self.base_topic + '/stored_usable_energy_capacity',
                 f'{stored_energy:.1f}'
             )
 
@@ -469,7 +469,7 @@ class MqttApi:
             self.base_topic + "/max_energy_capacity", entity_category="diagnostic")
         self.publish_mqtt_discovery_message("Always Allow Discharge Limit Capacity",
             "batcontrol_always_allow_discharge_limit_capacity", "sensor", "energy", "Wh",
-            self.base_topic + "/always_allow_discharge_limit_capacity", 
+            self.base_topic + "/always_allow_discharge_limit_capacity",
             entity_category="diagnostic")
         self.publish_mqtt_discovery_message("Stored Energy Capacity",
             "batcontrol_stored_energy_capacity", "sensor", "energy", "Wh",
@@ -493,15 +493,15 @@ class MqttApi:
         )
         self.publish_mqtt_discovery_message(
             "Batcontrol mode", "batcontrol_mode", "select", None, None, 
-            self.base_topic + "/mode", 
-            self.base_topic + "/mode/set", entity_category=None, 
-            options=["Charge from Grid", "Avoid Discharge", "Discharge Allowed"], 
+            self.base_topic + "/mode",
+            self.base_topic + "/mode/set", entity_category=None,
+            options=["Charge from Grid", "Avoid Discharge", "Discharge Allowed"],
             value_template=val_templ, command_template=cmd_templ)
 
     # Home Assistant MQTT Auto Discovery
     # https://www.home-assistant.io/docs/mqtt/discovery/
     # item_type = sensor, switch, binary_sensor, select
-    # device_class = battery, power, energy, temperature, humidity, 
+    # device_class = battery, power, energy, temperature, humidity,
     #                   timestamp, signal_strength, problem, connectivity
     def publish_mqtt_discovery_message(self, name:str, unique_id:str,
         item_type:str, device_class:str, unit_of_measurement:str,
