@@ -52,10 +52,10 @@ class MqttApi:
         self.config=config
         self.base_topic = config['topic']
         self.auto_discover_enable = config['auto_discover_enable']
-        if self.auto_discover_enable == None:
+        if self.auto_discover_enable is None:
             self.auto_discover_enable = False
         self.auto_discover_topic = config['auto_discover_topic']
-        if self.auto_discover_topic == None:
+        if self.auto_discover_topic is None:
             self.auto_discover_topic = "homeassistant"
 
         self.callbacks = {}
@@ -255,7 +255,10 @@ class MqttApi:
             /stored_usable_energy_capacity
         """
         if self.client.is_connected():
-            self.client.publish(self.base_topic + '/stored_usable_energy_capacity', f'{stored_energy:.1f}')
+            self.client.publish(
+                self.base_topic + '/stored_usable_energy_capacity', 
+                f'{stored_energy:.1f}'
+            )
 
     def publish_reserved_energy_capacity(self, reserved_energy:float) -> None:
         """ Publish the reserved energy capacity in Wh to MQTT
@@ -377,9 +380,10 @@ class MqttApi:
         if self.client.is_connected():
             self.client.publish(self.base_topic + '/' + topic, value)
 
-    # mqtt auto discovery messages
-
+    # mqtt auto discovery
     def send_mqtt_discovery_messages(self) -> None:
+        """ Publish all offered mqtt discovery config messages
+        """
         # control
         self.send_mqtt_discovery_for_mode()
         # sensors
@@ -465,23 +469,46 @@ class MqttApi:
             self.base_topic + "/max_energy_capacity", entity_category="diagnostic")
         self.publish_mqtt_discovery_message("Always Allow Discharge Limit Capacity",
             "batcontrol_always_allow_discharge_limit_capacity", "sensor", "energy", "Wh",
-            self.base_topic + "/always_allow_discharge_limit_capacity", entity_category="diagnostic")
+            self.base_topic + "/always_allow_discharge_limit_capacity", 
+            entity_category="diagnostic")
         self.publish_mqtt_discovery_message("Stored Energy Capacity",
             "batcontrol_stored_energy_capacity", "sensor", "energy", "Wh",
             self.base_topic + "/stored_energy_capacity", entity_category="diagnostic")
 
     def send_mqtt_discovery_for_mode(self) -> None:
         """ Publish Home Assistant MQTT Auto Discovery message for mode"""
-        val_templ = "{% if value == '-1' %}Charge from Grid{% elif value == '0' %}Avoid Discharge{% elif value == '10' %}Discharge Allowed{% else %}Unknown{% endif %}"
-        cmd_templ = "{% if value == 'Charge from Grid' %}-1{% elif value == 'Avoid Discharge' %}0{% elif value == 'Discharge Allowed' %}10{% else %}-1{% endif %}"
-        self.publish_mqtt_discovery_message("Batcontrol mode", "batcontrol_mode", "select", None, None, self.base_topic + "/mode", self.base_topic + "/mode/set", entity_category=None, options=["Charge from Grid", "Avoid Discharge", "Discharge Allowed"], value_template=val_templ, command_template=cmd_templ)
+        val_templ = (
+                    "{% if value == '-1' %}Charge from Grid"
+                    "{% elif value == '0' %}Avoid Discharge"
+                    "{% elif value == '10' %}Discharge Allowed"
+                    "{% else %}Unknown"
+                    "{% endif %}"
+        )
+        cmd_templ = (
+                    "{% if value == 'Charge from Grid' %}-1"
+                    "{% elif value == 'Avoid Discharge' %}0"
+                    "{% elif value == 'Discharge Allowed' %}10"
+                    "{% else %}-1"
+                    "{% endif %}"
+        )
+        self.publish_mqtt_discovery_message(
+            "Batcontrol mode", "batcontrol_mode", "select", None, None, 
+            self.base_topic + "/mode", 
+            self.base_topic + "/mode/set", entity_category=None, 
+            options=["Charge from Grid", "Avoid Discharge", "Discharge Allowed"], 
+            value_template=val_templ, command_template=cmd_templ)
 
     # Home Assistant MQTT Auto Discovery
     # https://www.home-assistant.io/docs/mqtt/discovery/
     # item_type = sensor, switch, binary_sensor, select
-    # device_class = battery, power, energy, temperature, humidity, timestamp, signal_strength, problem, connectivity
-
-    def publish_mqtt_discovery_message(self, name:str, unique_id:str, item_type:str, device_class:str, unit_of_measurement:str, state_topic:str, command_topic:str=None, entity_category:str=None, min_value=None, max_value=None, step_value=None, initial_value=None, options:str=None, value_template:str=None, command_template:str=None) -> None:
+    # device_class = battery, power, energy, temperature, humidity, 
+    #                   timestamp, signal_strength, problem, connectivity
+    def publish_mqtt_discovery_message(self, name:str, unique_id:str,
+        item_type:str, device_class:str, unit_of_measurement:str,
+        state_topic:str, command_topic:str=None, entity_category:str=None,
+        min_value=None, max_value=None, step_value=None, initial_value=None,
+        options:str=None, value_template:str=None, command_template:str=None
+        ) -> None:
         """ Publish Home Assistant MQTT Auto Discovery message"""
         if self.client.is_connected():
             payload = {}
@@ -522,5 +549,5 @@ class MqttApi:
                 '[MQTT] sending HA AD config message for %s',
                 self.auto_discover_topic + '/' + item_type + '/' + unique_id + '/config')
             self.client.publish(
-                self.auto_discover_topic + '/' + item_type + '/batcontrol/' + unique_id + '/config', 
+                self.auto_discover_topic + '/' + item_type + '/batcontrol/' + unique_id + '/config',
                 json.dumps(payload), retain=True)
