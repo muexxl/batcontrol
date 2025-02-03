@@ -51,6 +51,12 @@ class MqttApi:
     def __init__(self, config:dict):
         self.config=config
         self.base_topic = config['topic']
+        self.auto_discover_enable = config['auto_discover_enable']
+        if self.auto_discover_enable is None:
+            self.auto_discover_enable = False
+        self.auto_discover_topic = config['auto_discover_topic']
+        if self.auto_discover_topic is None:
+            self.auto_discover_topic = "homeassistant"
 
         self.callbacks = {}
 
@@ -82,8 +88,9 @@ class MqttApi:
             try:
                 self.client.connect(config['broker'], config['port'], 60)
                 break
-            except Exception as e:
-                logger.error('[MQTT] Connection failed: %s, retrying[%d]x in [%d] seconds', e, retry_attempts, retry_delay)
+            except (ValueError, TypeError) as e:
+                logger.error('[MQTT] Connection failed: %s, retrying[%d]x in [%d] seconds',
+                                e, retry_attempts, retry_delay)
                 retry_attempts -= 1
                 if retry_attempts == 0:
                     logger.error('[MQTT] All retry attempts failed')
@@ -96,6 +103,9 @@ class MqttApi:
         logger.info('[MQTT] Connected with result code %s', rc)
         # Make public, that we are running.
         client.publish(self.base_topic + '/status', 'online', retain=True)
+        # publish HA mqtt AutoDiscovery messages at startup
+        if self.auto_discover_enable:
+            self.send_mqtt_discovery_messages()
         # Handle reconnect case
         for topic in self.callbacks:
             logger.debug('[MQTT] Subscribing topic: %s', topic)
@@ -124,7 +134,7 @@ class MqttApi:
                 self.callbacks[message.topic]['function'](
                     self.callbacks[message.topic]['convert'](message.payload)
                 )
-            except Exception as e:
+            except (ValueError, TypeError) as e:
                 logger.error('[MQTT] Error in callback %s : %s', message.topic, e)
         else:
             logger.warning('[MQTT] No callback registered for %s', message.topic)
@@ -236,14 +246,19 @@ class MqttApi:
             /stored_energy_capacity
         """
         if self.client.is_connected():
-            self.client.publish(self.base_topic + '/stored_energy_capacity', f'{stored_energy:.1f}')
+            self.client.publish(
+                self.base_topic + '/stored_energy_capacity',
+                f'{stored_energy:.1f}')
 
     def publish_stored_usable_energy_capacity(self, stored_energy:float) -> None:
         """ Publish the stored usable energy capacity in Wh to MQTT
             /stored_usable_energy_capacity
         """
         if self.client.is_connected():
-            self.client.publish(self.base_topic + '/stored_usable_energy_capacity', f'{stored_energy:.1f}')
+            self.client.publish(
+                self.base_topic + '/stored_usable_energy_capacity',
+                f'{stored_energy:.1f}'
+            )
 
     def publish_reserved_energy_capacity(self, reserved_energy:float) -> None:
         """ Publish the reserved energy capacity in Wh to MQTT
@@ -364,3 +379,175 @@ class MqttApi:
         """
         if self.client.is_connected():
             self.client.publish(self.base_topic + '/' + topic, value)
+
+    # mqtt auto discovery
+    def send_mqtt_discovery_messages(self) -> None:
+        """ Publish all offered mqtt discovery config messages
+        """
+        # control
+        self.send_mqtt_discovery_for_mode()
+        # sensors
+        self.publish_mqtt_discovery_message("SOC Inverter 0",
+            "batcontrol_inverter_0_SOC",
+            "sensor", "battery", "%",
+            self.base_topic + "/inverters/0/SOC")
+        self.publish_mqtt_discovery_message("Discharge Blocked",
+            "batcontrol_discharge_blocked",
+            "sensor", None, None,
+            self.base_topic + "/discharge_blocked",
+            value_template="{% if value | lower == 'True' %}blocked{% else %}not blocked{% endif %}"
+            )
+        self.publish_mqtt_discovery_message("Reserved Energy Capacity",
+            "batcontrol_reserved_energy_capacity", "sensor", "energy", "Wh",
+            self.base_topic + "/reserved_energy_capacity")
+        self.publish_mqtt_discovery_message("Stored Usable Energy Capacity",
+            "batcontrol_stored_usable_energy_capacity", "sensor", "energy", "Wh",
+            self.base_topic + "/stored_usable_energy_capacity")
+        self.publish_mqtt_discovery_message("Min Price Difference Relative",
+            "batcontrol_min_price_difference_rel", "sensor", "monetary", None,
+            self.base_topic + "/min_price_difference_rel")
+        self.publish_mqtt_discovery_message("Min Dynamic Price Difference",
+            "batcontrol_min_dynamic_price_difference", "sensor", "monetary", None,
+            self.base_topic + "/min_dynamic_price_difference")
+        # configuration
+        self.publish_mqtt_discovery_message("Charge Rate",
+            "batcontrol_charge_rate", "number", "power", "W", 
+            self.base_topic + "/charge_rate",
+            self.base_topic + "/charge_rate/set",
+            entity_category="config",
+            min_value=0,
+            max_value=10000,
+            initial_value=10000)
+        self.publish_mqtt_discovery_message("Max Grid Charge Rate",
+            "batcontrol_max_grid_charge_rate", "number", "power", "W",
+            self.base_topic + "/inverters/0/max_grid_charge_rate",
+            self.base_topic + "/inverters/0/max_grid_charge_rate/set",
+            entity_category="config",min_value=0, max_value=10000,initial_value=10000)
+        self.publish_mqtt_discovery_message("Max PV Charge Rate",
+            "batcontrol_max_pv_charge_rate", "number", "power", "W",
+            self.base_topic + "/inverters/0/max_pv_charge_rate",
+            self.base_topic + "/inverters/0/max_pv_charge_rate/set",
+            entity_category="config",min_value=0, max_value=10000,initial_value=10000)
+        # prepared for other PR regarding /fix_discharge_with_max_power_set
+        #self.publish_mqtt_discovery_message("Max Bat Discharge Rate",
+        #   "batcontrol_max_bat_discharge_rate", "number", "power", "W",
+        #   self.base_topic + "/inverters/0/max_bat_discharge_rate",
+        #   self.base_topic + "/inverters/0/max_bat_discharge_rate/set",entity_category="config",
+        #   min_value=0, max_value=10000,initial_value=10000)
+        self.publish_mqtt_discovery_message("Always Allow Discharge Limit",
+            "batcontrol_always_allow_discharge_limit", "number", None, None,
+            self.base_topic + "/always_allow_discharge_limit",
+            self.base_topic + "/always_allow_discharge_limit/set",
+            entity_category="config",
+            min_value=0.0, max_value=1.0, step_value=0.1, initial_value=0.9)
+        self.publish_mqtt_discovery_message("Max Charging From Grid Limit",
+            "batcontrol_max_charging_from_grid_limit", "number", None, None,
+            self.base_topic + "/max_charging_from_grid_limit",
+            self.base_topic + "/max_charging_from_grid_limit/set",
+            entity_category="config",
+            min_value=0.0, max_value=1.0, step_value=0.1, initial_value=0.9)
+        self.publish_mqtt_discovery_message("Min Price Difference",
+            "batcontrol_min_price_difference", "number", "monetary", None,
+            self.base_topic + "/min_price_difference",
+            self.base_topic + "/min_price_difference/set",
+            entity_category="config",
+            min_value=0, max_value=0.5, step_value=0.01, initial_value=0.05)
+        # diagnostic
+        self.publish_mqtt_discovery_message("Status",
+            "batcontrol_status", "sensor", None, None,
+            self.base_topic + "/status", command_topic=None, entity_category="diagnostic")
+        self.publish_mqtt_discovery_message("Last Evaluation",
+            "batcontrol_last_evaluation", "sensor", "timestamp", None,
+            self.base_topic + "/last_evaluation", command_topic=None, entity_category="diagnostic",
+            options=None,
+            value_template="{{ (value | int | timestamp_local) }}",command_template=None)
+        self.publish_mqtt_discovery_message("SOC Main",
+            "batcontrol_soc", "sensor", "battery", "%",
+            self.base_topic + "/SOC", entity_category="diagnostic")
+        self.publish_mqtt_discovery_message("Max Energy Capacity",
+            "batcontrol_max_energy_capacity", "sensor", "energy", "Wh",
+            self.base_topic + "/max_energy_capacity", entity_category="diagnostic")
+        self.publish_mqtt_discovery_message("Always Allow Discharge Limit Capacity",
+            "batcontrol_always_allow_discharge_limit_capacity", "sensor", "energy", "Wh",
+            self.base_topic + "/always_allow_discharge_limit_capacity",
+            entity_category="diagnostic")
+        self.publish_mqtt_discovery_message("Stored Energy Capacity",
+            "batcontrol_stored_energy_capacity", "sensor", "energy", "Wh",
+            self.base_topic + "/stored_energy_capacity", entity_category="diagnostic")
+
+    def send_mqtt_discovery_for_mode(self) -> None:
+        """ Publish Home Assistant MQTT Auto Discovery message for mode"""
+        val_templ = (
+                    "{% if value == '-1' %}Charge from Grid"
+                    "{% elif value == '0' %}Avoid Discharge"
+                    "{% elif value == '10' %}Discharge Allowed"
+                    "{% else %}Unknown"
+                    "{% endif %}"
+        )
+        cmd_templ = (
+                    "{% if value == 'Charge from Grid' %}-1"
+                    "{% elif value == 'Avoid Discharge' %}0"
+                    "{% elif value == 'Discharge Allowed' %}10"
+                    "{% else %}-1"
+                    "{% endif %}"
+        )
+        self.publish_mqtt_discovery_message(
+            "Batcontrol mode", "batcontrol_mode", "select", None, None, 
+            self.base_topic + "/mode",
+            self.base_topic + "/mode/set", entity_category=None,
+            options=["Charge from Grid", "Avoid Discharge", "Discharge Allowed"],
+            value_template=val_templ, command_template=cmd_templ)
+
+    # Home Assistant MQTT Auto Discovery
+    # https://www.home-assistant.io/docs/mqtt/discovery/
+    # item_type = sensor, switch, binary_sensor, select
+    # device_class = battery, power, energy, temperature, humidity,
+    #                   timestamp, signal_strength, problem, connectivity
+    def publish_mqtt_discovery_message(self, name:str, unique_id:str,
+        item_type:str, device_class:str, unit_of_measurement:str,
+        state_topic:str, command_topic:str=None, entity_category:str=None,
+        min_value=None, max_value=None, step_value=None, initial_value=None,
+        options:str=None, value_template:str=None, command_template:str=None
+        ) -> None:
+        """ Publish Home Assistant MQTT Auto Discovery message"""
+        if self.client.is_connected():
+            payload = {}
+            payload["name"] = name
+            payload["unique_id"] = unique_id
+            payload["state_topic"] = state_topic
+            if value_template:
+                payload["value_template"] = value_template
+            if command_topic:
+                payload["command_topic"] = command_topic
+            if command_template:
+                payload["command_template"] = command_template
+            if device_class:
+                payload["device_class"] = device_class
+            if unit_of_measurement:
+                payload["unit_of_measurement"] = unit_of_measurement
+            if item_type == "number":
+                payload["min"] = min_value
+                payload["max"] = max_value
+                if step_value:
+                    payload["step"] = step_value
+                payload["mode"] = "box"
+            if entity_category:
+                payload["entity_category"] = entity_category
+            if initial_value:
+                payload["initial"] = initial_value
+            if options:
+                payload["options"] = options
+            device = {
+                "identifiers": "Batcontrol",
+                "name": "Batcontrol",
+                "manufacturer": "muexxl",
+                "model": "batcontrol",
+                "sw_version": "0.3.x"
+            }
+            payload["device"] = device
+            logger.debug(
+                '[MQTT] sending HA AD config message for %s',
+                self.auto_discover_topic + '/' + item_type + '/' + unique_id + '/config')
+            self.client.publish(
+                self.auto_discover_topic + '/' + item_type + '/batcontrol/' + unique_id + '/config',
+                json.dumps(payload), retain=True)
