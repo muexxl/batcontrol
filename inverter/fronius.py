@@ -3,6 +3,19 @@ This module provides a class `FroniusWR` for handling Fronius GEN24 Inverters.
 It includes methods for interacting with the inverter's API, managing battery
 configurations, and controlling various inverter settings.
 
+The Fronius Web-API is a bit quirky, which is reflected in the code.
+
+The Web-Login form does send a first request without authentication, which
+returns a nonce. This nonce is then used to create a digest for the login
+request.
+
+Parts of the information can be called without authentication, but some
+settings require authentication. We tackle a 401 as a signal to login again
+and retry the request.
+
+Yes, the Webfronted does send the password on each authenticated request hashed
+with MD5, nounce etc.
+
 """
 import time
 import os
@@ -10,6 +23,7 @@ import logging
 import json
 import hashlib
 import requests
+import mqtt_api
 from .baseclass import InverterBaseclass
 
 logger = logging.getLogger('__main__')
@@ -26,7 +40,7 @@ def hash_utf8(x):
 def strip_dict(original):
     """Strip all keys starting with '_' from a dictionary."""
     # return unmodified original if its not a dict
-    if not type(original) == dict:
+    if not isinstance(original, dict):
         return original
     stripped_copy = {}
     for key in original.keys():
@@ -44,6 +58,7 @@ class FroniusWR(InverterBaseclass):
 
     def __init__(self, config: dict) -> None:
         super().__init__(config)
+        self.subsequent_login = False
         self.login_attempts = 0
         self.address = config['address']
         self.capacity = -1
@@ -58,7 +73,6 @@ class FroniusWR(InverterBaseclass):
         self.max_soc = 100
         self.min_soc = 5
         self.set_solar_api_active(True)
-        self.subsequent_login = False
 
         if not self.previous_battery_config:
             raise RuntimeError(
@@ -181,7 +195,7 @@ class FroniusWR(InverterBaseclass):
             if key in self.previous_battery_config.keys():
                 settings[key] = self.previous_battery_config[key]
             else:
-                RuntimeError(
+                raise RuntimeError(
                     f"Unable to restore settings. Parameter {key} is missing"
                 )
         path = '/config/batteries'
@@ -243,7 +257,7 @@ class FroniusWR(InverterBaseclass):
     def set_wr_parameters(self, minsoc, maxsoc, allow_grid_charging, grid_power):
         """set power at grid-connection point negative values for Feed-In"""
         path = '/config/batteries'
-        if not type(allow_grid_charging) == bool:
+        if not isinstance(allow_grid_charging , bool):
             raise RuntimeError(
                 f'Expected type: bool actual type: {type(allow_grid_charging)}')
 
@@ -312,7 +326,14 @@ class FroniusWR(InverterBaseclass):
                           'Power': int(0),
                           'ScheduleType': 'DISCHARGE_MAX',
                           "TimeTable": {"Start": "00:00", "End": "23:59"},
-                          "Weekdays": {"Mon": True, "Tue": True, "Wed": True, "Thu": True, "Fri": True, "Sat": True, "Sun": True}
+                          "Weekdays":
+                               {"Mon": True,
+                                "Tue": True,
+                                "Wed": True,
+                                "Thu": True,
+                                "Fri": True,
+                                "Sat": True,
+                                "Sun": True}
                           }]
         return self.set_time_of_use(timeofuselist)
 
@@ -324,7 +345,14 @@ class FroniusWR(InverterBaseclass):
                               'Power': int(self.max_pv_charge_rate),
                               'ScheduleType': 'CHARGE_MAX',
                               "TimeTable": {"Start": "00:00", "End": "23:59"},
-                              "Weekdays": {"Mon": True, "Tue": True, "Wed": True, "Thu": True, "Fri": True, "Sat": True, "Sun": True}
+                              "Weekdays":
+                                    {"Mon": True,
+                                     "Tue": True,
+                                     "Wed": True,
+                                     "Thu": True,
+                                     "Fri": True,
+                                     "Sat": True,
+                                     "Sun": True}
                               }]
         response = self.set_time_of_use(timeofuselist)
 
@@ -333,20 +361,26 @@ class FroniusWR(InverterBaseclass):
     def set_mode_force_charge(self, chargerate=500):
         """ Set the inverter to charge the battery with a specific power from GRID."""
         # activate timeofuse rules
-        if chargerate > self.max_grid_charge_rate:
-            chargerate = self.max_grid_charge_rate
+        chargerate = min( chargerate, self.max_grid_charge_rate)
         timeofuselist = [{'Active': True,
                           'Power': int(chargerate),
                           'ScheduleType': 'CHARGE_MIN',
                           "TimeTable": {"Start": "00:00", "End": "23:59"},
-                          "Weekdays": {"Mon": True, "Tue": True, "Wed": True, "Thu": True, "Fri": True, "Sat": True, "Sun": True}
+                          "Weekdays":
+                                {"Mon": True,
+                                 "Tue": True,
+                                 "Wed": True,
+                                 "Thu": True,
+                                 "Fri": True,
+                                 "Sat": True,
+                                 "Sun": True}
                           }]
         return self.set_time_of_use(timeofuselist)
 
     def restore_time_of_use_config(self):
         """ Restore the previous time of use config from a backup file."""
         try:
-            with open(TIMEOFUSE_CONFIG_FILENAME, 'r') as f:
+            with open(TIMEOFUSE_CONFIG_FILENAME, 'r', encoding="utf-8") as f:
                 time_of_use_config_json = f.read()
         except OSError:
             logger.error('[Inverter] could not restore timeofuse config')
@@ -354,7 +388,7 @@ class FroniusWR(InverterBaseclass):
 
         try:
             time_of_use_config = json.loads(time_of_use_config_json)
-        except:
+        except:  # pylint: disable=bare-except
             logger.error(
                 '[Inverter] could not parse timeofuse config from %s',
                 TIMEOFUSE_CONFIG_FILENAME
@@ -419,73 +453,104 @@ class FroniusWR(InverterBaseclass):
         self.capacity = capacity
         return capacity
 
-    def send_request(self,  path, method='GET', payload="", params=None, headers={}, auth=False):
-        """Send a HTTP REST request to the inverter."""
+    def send_request (self, path, method='GET', payload="", params=None, headers=None, auth=False):
+        """Send a HTTP REST request to the inverter.
+
+            auth = This request needs to be run with authentication.
+            is_login = This request is a login request. Do not retry on 401.
+        """
+        if not headers:
+            headers = {}
+        for i in range(2):
+            # Try tp send the request, if it fails, try to login and resend
+            response = self.__send_one_http_request(path, method, payload, params, headers, auth)
+            if response.status_code == 200:
+                return response
+            if response.status_code == 401:  # unauthorized
+                self.nonce = self.get_nonce(response)
+                self.login()
+            else:
+                raise RuntimeError(
+                    f"[Inverter] Request {i} failed with {response.status_code}-"
+                    f"{response.reason}. \n"
+                    f"\t path:{path}, \n\tparams:{params} \n\theaders {headers} \n"
+                    f"\tnonce {self.nonce} \n"
+                    f"\tpayload {payload}"
+                )
+        return None
+
+    def __send_one_http_request(self, path, method='GET', payload="",
+                                        params=None, headers=None, auth=False):
+        """ Send one HTTP Request to the backend.
+            This method does not handle application errors, only connection errors.
+        """
+        if not headers:
+            headers = {}
+        url = 'http://' + self.address + path
+        fullpath = path
+        if params:
+            fullpath += '?' + \
+                "&".join(
+                    [f'{k+"="+str(params[k])}' for k in params.keys()])
+        if auth:
+            headers['Authorization'] = self.get_auth_header(
+                method=method, path=fullpath)
+
         for i in range(3):
-            url = 'http://' + self.address + path
-            fullpath = path
-            if params:
-                fullpath += '?' + \
-                    "&".join(
-                        [f'{k+"="+str(params[k])}' for k in params.keys()])
-            if auth:
-                headers['Authorization'] = self.get_auth_header(
-                    method=method, path=fullpath)
+            # 3 retries if connection can't be established
             try:
                 response = requests.request(
-                                        method=method,
-                                        url=url,
-                                        params=params,
-                                        headers=headers,
-                                        data=payload,
-                                        timeout=30
-                                    )
-                if response.status_code == 200:
-                    return response
-                elif response.status_code == 401:  # unauthorized
-                    self.nonce = self.get_nonce(response)
-                    if self.login_attempts >= 3:
-                        logger.info(
-                            '[Inverter] Login failed 3 times .. aborting'
-                            )
-                        raise RuntimeError(
-                            '[Inverter] Login failed repeatedly .. wrong credentials?'
-                            )
-                    response = self.login()
-                    if (response.status_code == 200):
-                        logger.info('[Inverter] Login successful')
-                        self.login_attempts = 0
-                        self.subsequent_login = True
-                    else:
-                        logger.error(
-                            '[Inverter] Login -%d- failed, Response: %s', i, response)
-                        if self.subsequent_login:
-                            logger.info(
-                                "[Inverter] Retrying login in 10 seconds")
-                            time.sleep(10)
-                else:
-                    raise RuntimeError(
-                        f"[Inverter] Request failed with {response.status_code}-"
-                        f"{response.reason}. \n"
-                        f"\turl:{url}, \n\tparams:{params} \n\theaders {headers} \n"
-                        f"\tnonce {self.nonce} \n"
-                        f"\tpayload {payload}"
-                    )
+                                    method=method,
+                                    url=url,
+                                    params=params,
+                                    headers=headers,
+                                    data=payload,
+                                    timeout=30
+                                )
+                return response
             except requests.exceptions.ConnectionError as err:
                 logger.error(
-                    "[Inverter] Connection to Inverter failed on %s. Retrying in 120 seconds",
-                    self.address
+                    "[Inverter] Connection to Inverter failed on %s. (%d) "
+                    "Retrying in 60 seconds, Error %s",
+                    self.address,
+                    i,
+                    err
                     )
-                time.sleep(20)
+                time.sleep(60)
 
-        response = None
-        return response
+        logger.error( '[Inverter] Request failed without response.')
+        raise RuntimeError(
+                f"\turl:{url}, \n\tparams:{params} \n\theaders {headers} \n"
+                f"\tnonce {self.nonce} \n"
+                f"\tpayload {payload}"
+            )
 
     def login(self):
         """Login to Fronius API"""
         path = '/commands/Login'
-        self.login_attempts += 1
-        return self.send_request(path, auth=True)
+        self.login_attempts = 0
+        for i in range(3):
+            self.login_attempts += 1
+            response = self.__send_one_http_request(path, auth=True)
+            if response.status_code == 200:
+                self.subsequent_login = True
+                logger.info('[Inverter] Login successful')
+                self.login_attempts = 0
+                return
+
+            logger.error(
+                '[Inverter] Login -%d- failed, Response: %s', i, response)
+            if self.subsequent_login:
+                logger.info(
+                    "[Inverter] Retrying login in 10 seconds")
+                time.sleep(10)
+        if self.login_attempts  >= 3:
+            logger.info(
+                '[Inverter] Login failed 3 times .. aborting'
+                )
+            raise RuntimeError(
+                '[Inverter] Login failed repeatedly .. wrong credentials?'
+                )
 
     def logout(self):
         """Logout from Fronius API"""
@@ -529,13 +594,15 @@ class FroniusWR(InverterBaseclass):
         if len(self.password) < 4:
             raise RuntimeError("Password needed for Authorization")
 
-        A1 = f"{user}:{realm}:{password}"
-        A2 = f"{method}:{path}"
-        HA1 = hash_utf8(A1)
-        HA2 = hash_utf8(A2)
-        noncebit = f"{nonce}:{ncvalue}:{cnonce}:auth:{HA2}"
-        respdig = hash_utf8(f"{HA1}:{noncebit}")
-        auth_header = f'Digest username="{user}", realm="{realm}", nonce="{nonce}", uri="{path}", algorithm="MD5", qop=auth, nc={ncvalue}, cnonce="{cnonce}", response="{respdig}"'
+        a1 = f"{user}:{realm}:{password}"
+        a2 = f"{method}:{path}"
+        ha1 = hash_utf8(a1)
+        ha2 = hash_utf8(a2)
+        noncebit = f"{nonce}:{ncvalue}:{cnonce}:auth:{ha2}"
+        respdig = hash_utf8(f"{ha1}:{noncebit}")
+        auth_header  = f'Digest username="{user}", realm="{realm}", nonce="{nonce}", uri="{path}", '
+        auth_header += f'algorithm="MD5", qop=auth, nc={ncvalue}, cnonce="{cnonce}", '
+        auth_header += f'response="{respdig}"'
         return auth_header
 
     def shutdown(self):
@@ -562,7 +629,6 @@ class FroniusWR(InverterBaseclass):
             api_mqtt_api: The MQTT API instance to be used for registering callbacks.
 
         """
-        import mqtt_api
         self.mqtt_api = api_mqtt_api
         # /set is appended to the topic
         self.mqtt_api.register_set_callback(self.__get_mqtt_topic(
