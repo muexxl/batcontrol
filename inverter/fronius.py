@@ -26,8 +26,10 @@ import requests
 import mqtt_api
 from .baseclass import InverterBaseclass
 
-logger = logging.getLogger('__main__')
+logger = logging.getLogger('__main__').getChild('Fronius')
+logger.setLevel(logging.INFO)
 logger.info('[Inverter] loading module ')
+
 
 
 def hash_utf8(x):
@@ -59,6 +61,8 @@ class FroniusWR(InverterBaseclass):
     def __init__(self, config: dict) -> None:
         super().__init__(config)
         self.subsequent_login = False
+        self.ncvalue_num = 1
+        self.cnonce = "NaN"
         self.login_attempts = 0
         self.address = config['address']
         self.capacity = -1
@@ -72,6 +76,7 @@ class FroniusWR(InverterBaseclass):
         # default values
         self.max_soc = 100
         self.min_soc = 5
+
         self.set_solar_api_active(True)
 
         if not self.previous_battery_config:
@@ -459,17 +464,20 @@ class FroniusWR(InverterBaseclass):
             auth = This request needs to be run with authentication.
             is_login = This request is a login request. Do not retry on 401.
         """
+        logger.debug("[Inverter] Sending request to %s", path)
         if not headers:
             headers = {}
         for i in range(2):
             # Try tp send the request, if it fails, try to login and resend
             response = self.__send_one_http_request(path, method, payload, params, headers, auth)
             if response.status_code == 200:
+                if auth:
+                    self.__retrieve_auth_from_response(response)
                 return response
             # 401 - unauthorized , relogin
             # 403 - is forbidden, what happens at 01.00 in the night
             if response.status_code in( 401, 403 ):
-                self.nonce = self.get_nonce(response)
+                self.__retrieve_auth_from_response(response)
                 self.login()
             else:
                 raise RuntimeError(
@@ -529,19 +537,25 @@ class FroniusWR(InverterBaseclass):
 
     def login(self):
         """Login to Fronius API"""
+        logger.debug("[Inverter] Logging in")
         path = '/commands/Login'
+        self.cnonce = "NaN"
+        self.ncvalue_num = 1
         self.login_attempts = 0
         for i in range(3):
             self.login_attempts += 1
             response = self.__send_one_http_request(path, auth=True)
             if response.status_code == 200:
                 self.subsequent_login = True
-                logger.info('[Inverter] Login successful')
+                logger.info('[Inverter] Login successful %s', response)
+                logger.debug("[Inverter] Response: %s", response.headers)
+                self.__retrieve_auth_from_response(response)
                 self.login_attempts = 0
                 return
 
             logger.error(
                 '[Inverter] Login -%d- failed, Response: %s', i, response)
+            logger.error('[Inverter] Response-raw: %s', response.raw)
             if self.subsequent_login:
                 logger.info(
                     "[Inverter] Retrying login in 10 seconds")
@@ -566,29 +580,53 @@ class FroniusWR(InverterBaseclass):
             logger.info('[Inverter] Logout failed')
         return response
 
-    def get_nonce(self, response):
-        """Get the nonce from the response headers."""
+    def __retrieve_auth_from_response(self, response):
+        """Get & store the authentication parts from response auth header.
+            - nc
+            - cnonce
+            - nonce
+        """
+        auth_dict = self.__split_response_auth_header(response)
+        if auth_dict.get('nc'):
+            self.ncvalue_num = int(auth_dict['nc']) + 1
+        else:
+            self.ncvalue_num = 1
+        if auth_dict.get('cnonce'):
+            self.cnonce = auth_dict['cnonce']
+        else:
+            self.cnonce = "NaN"
+        if auth_dict.get('nonce'):
+            self.nonce = auth_dict['nonce']
+
+    def __split_response_auth_header(self, response):
+        """ Split the response header into a dictionary."""
         # stupid API bug: nonce headers with different capitalization at different end points
         if 'X-WWW-Authenticate' in response.headers:
             auth_string = response.headers['X-WWW-Authenticate']
         elif 'X-Www-Authenticate' in response.headers:
             auth_string = response.headers['X-Www-Authenticate']
+        elif 'Authentication-Info' in response.headers:
+            auth_string = response.headers['Authentication-Info']
         else:
-            auth_string = ""
+            logger.error(
+                '[Inverter] No authentication header found in response')
+            return None
 
         auth_list = auth_string.replace(" ", "").replace('"', '').split(',')
+        logger.debug("[Inverter] Authentication header: %s", auth_list)
         auth_dict = {}
         for item in auth_list:
             key, value = item.split("=")
             auth_dict[key] = value
-        return auth_dict['nonce']
+            logger.debug("[Inverter] %s: %s", key, value)
+        return auth_dict
 
     def get_auth_header(self, method, path) -> str:
         """Create the Authorization header for the request."""
         nonce = self.nonce
         realm = 'Webinterface area'
-        ncvalue = "00000001"
-        cnonce = "NaN"
+        ncvalue = f"{self.ncvalue_num:08d}"
+        cnonce = self.cnonce
         user = self.user
         password = self.password
         if len(self.user) < 4:
