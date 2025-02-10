@@ -58,6 +58,7 @@ class FroniusWR(InverterBaseclass):
 
     def __init__(self, config: dict) -> None:
         super().__init__(config)
+        self.subsequent_login = False
         self.login_attempts = 0
         self.address = config['address']
         self.capacity = -1
@@ -72,7 +73,6 @@ class FroniusWR(InverterBaseclass):
         self.max_soc = 100
         self.min_soc = 5
         self.set_solar_api_active(True)
-        self.subsequent_login = False
 
         if not self.previous_battery_config:
             raise RuntimeError(
