@@ -51,11 +51,14 @@ class MqttApi:
     def __init__(self, config:dict):
         self.config=config
         self.base_topic = config['topic']
-        self.auto_discover_enable = config['auto_discover_enable']
-        if self.auto_discover_enable is None:
+        if config.get('auto_discover_enable'):
+            self.auto_discover_enable = config['auto_discover_enable']
+        else:
             self.auto_discover_enable = False
-        self.auto_discover_topic = config['auto_discover_topic']
-        if self.auto_discover_topic is None:
+
+        if config.get('auto_discover_topic'):
+            self.auto_discover_topic = config['auto_discover_topic']
+        else:
             self.auto_discover_topic = "homeassistant"
 
         self.callbacks = {}
