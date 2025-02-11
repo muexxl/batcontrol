@@ -468,7 +468,7 @@ class FroniusWR(InverterBaseclass):
                 return response
             # 401 - unauthorized , relogin
             # 403 - is forbidden, what happens at 01.00 in the night
-            if response.status_code == 401 or response.status_code == 403:
+            if response.status_code in( 401, 403 ):
                 self.nonce = self.get_nonce(response)
                 self.login()
             else:
