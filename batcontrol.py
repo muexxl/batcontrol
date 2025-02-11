@@ -154,25 +154,25 @@ class Batcontrol:
         self.soften_price_difference_on_charging_factor = 5
         self.round_price_digits = 4
 
-        if self.__is_config_key_valid(config, 'a1_tuning'):
-            a1_tuning = self.config['a1_tuning']
+        if self.__is_config_key_valid(config, 'battery_control_expert'):
+            battery_control_expert = self.config['battery_control_expert']
             self.soften_price_difference_on_charging = self.__get_config_with_defaults(
-                  a1_tuning,
+                  battery_control_expert,
                   'soften_price_difference_on_charging',
                   False
                 )
             self.soften_price_difference_on_charging_factor = self.__get_config_with_defaults(
-                  a1_tuning,
+                  battery_control_expert,
                   'soften_price_difference_on_charging_factor',
                   5
                 )
             self.round_price_digits = self.__get_config_with_defaults(
-                  a1_tuning,
+                  battery_control_expert,
                   'round_price_digits',
                   4
                 )
             self.charge_rate_multiplier = self.__get_config_with_defaults(
-                  a1_tuning,
+                  battery_control_expert,
                   'charge_rate_multiplier',
                   1.1
                 )
@@ -182,25 +182,25 @@ class Batcontrol:
         self.soften_price_difference_on_charging_factor = 5
         self.round_price_digits = 4
 
-        if self.__is_config_key_valid(config, 'a1_tuning'):
-            a1_tuning = self.config['a1_tuning']
+        if self.__is_config_key_valid(config, 'battery_control_expert'):
+            battery_control_expert = self.config['battery_control_expert']
             self.soften_price_difference_on_charging = self.__get_config_with_defaults(
-                  a1_tuning,
+                  battery_control_expert,
                   'soften_price_difference_on_charging',
                   False
                 )
             self.soften_price_difference_on_charging_factor = self.__get_config_with_defaults(
-                  a1_tuning,
+                  battery_control_expert,
                   'soften_price_difference_on_charging_factor',
                   5
                 )
             self.round_price_digits = self.__get_config_with_defaults(
-                  a1_tuning,
+                  battery_control_expert,
                   'round_price_digits',
                   4
                 )
             self.charge_rate_multiplier = self.__get_config_with_defaults(
-                  a1_tuning,
+                  battery_control_expert,
                   'charge_rate_multiplier',
                   1.1
                 )
