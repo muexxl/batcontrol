@@ -609,9 +609,9 @@ class FroniusWR(InverterBaseclass):
         elif 'Authentication-Info' in response.headers:
             auth_string = response.headers['Authentication-Info']
         else:
-            logger.error(
+            # Return an empty dict to work with Fronius below 1.35.4-1
+            logger.debug(
                 '[Inverter] No authentication header found in response')
-            # Return an empty header to work with Fronius below 1.35.4-1
             return auth_dict
 
         auth_list = auth_string.replace(" ", "").replace('"', '').split(',')
