@@ -600,6 +600,7 @@ class FroniusWR(InverterBaseclass):
 
     def __split_response_auth_header(self, response):
         """ Split the response header into a dictionary."""
+        auth_dict = {}
         # stupid API bug: nonce headers with different capitalization at different end points
         if 'X-WWW-Authenticate' in response.headers:
             auth_string = response.headers['X-WWW-Authenticate']
@@ -608,9 +609,10 @@ class FroniusWR(InverterBaseclass):
         elif 'Authentication-Info' in response.headers:
             auth_string = response.headers['Authentication-Info']
         else:
-            logger.error(
+            # Return an empty dict to work with Fronius below 1.35.4-1
+            logger.debug(
                 '[Inverter] No authentication header found in response')
-            return None
+            return auth_dict
 
         auth_list = auth_string.replace(" ", "").replace('"', '').split(',')
         logger.debug("[Inverter] Authentication header: %s", auth_list)
