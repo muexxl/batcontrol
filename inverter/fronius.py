@@ -79,11 +79,11 @@ class FroniusWR(InverterBaseclass):
         # Energy Management (EM)
         #  0 - Off
         #  1 - On   (default, do not adjust )
-        self.em_mode = self.previous_backup_power_config['HYB_EM_MODE']
+        self.em_mode = self.previous_battery_config['HYB_EM_MODE']
         # Power in W  on in em_mode = 0
         #   negative = Feed-In (to grid)
         #   positive = Get from grid
-        self.em_power = self.previous_backup_power_config['HYB_EM_POWER']
+        self.em_power = self.previous_battery_config['HYB_EM_POWER']
 
         self.set_solar_api_active(True)
 
