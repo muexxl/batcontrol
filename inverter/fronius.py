@@ -679,6 +679,11 @@ class FroniusWR(InverterBaseclass):
             path, method='POST', payload=payload, auth=True)
         if not response:
             raise RuntimeError('Failed to set EM')
+        if self.mqtt_api:
+            self.mqtt_api.generic_publish(
+                self.__get_mqtt_topic() + 'em_mode', self.em_mode)
+            self.mqtt_api.generic_publish(
+                self.__get_mqtt_topic() + 'em_power', self.em_power)
 
     def set_em_power(self, power):
         """ Change Energy Manangement Power
@@ -802,7 +807,7 @@ class FroniusWR(InverterBaseclass):
             '[Inverter] API: Setting em_mode: %s',
             em_mode
         )
-        self.em_mode = int(em_mode)
+        self.set_em_mode(em_mode)
 
     def api_set_em_power(self, em_power: int):
         """ Change EnergeManagement Offset
@@ -819,7 +824,7 @@ class FroniusWR(InverterBaseclass):
             '[Inverter] API: Setting em_power: %s',
             em_power
         )
-        self.em_power = int(em_power)
+        self.set_em_power(em_power)
 
     def __get_mqtt_topic(self) -> str:
         """ Used to implement the mqtt basic topic."""
