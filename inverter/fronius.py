@@ -723,6 +723,10 @@ class FroniusWR(InverterBaseclass):
         ) + 'max_grid_charge_rate', self.api_set_max_grid_charge_rate, int)
         self.mqtt_api.register_set_callback(self.__get_mqtt_topic(
         ) + 'max_pv_charge_rate', self.api_set_max_pv_charge_rate, int)
+        self.mqtt_api.register_set_callback(self.__get_mqtt_topic(
+        ) + 'em_mode', self.api_set_em_mode, int)
+        self.mqtt_api.register_set_callback(self.__get_mqtt_topic(
+        ) + 'em_power', self.api_set_em_power, int)
 
     def refresh_api_values(self):
         """ Publishes all values to mqtt."""
