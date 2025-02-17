@@ -77,8 +77,8 @@ class FroniusWR(InverterBaseclass):
         self.max_soc = 100
         self.min_soc = 5
         # Energy Management (EM)
-        #  0 - Off
-        #  1 - On   (default, do not adjust )
+        #  0 - On  (Automatic , Default)
+        #  1 - Off (Adjustable)
         self.em_mode = self.previous_battery_config['HYB_EM_MODE']
         # Power in W  on in em_mode = 0
         #   negative = Feed-In (to grid)
