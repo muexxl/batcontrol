@@ -679,11 +679,6 @@ class FroniusWR(InverterBaseclass):
             path, method='POST', payload=payload, auth=True)
         if not response:
             raise RuntimeError('Failed to set EM')
-        if self.mqtt_api:
-            self.mqtt_api.generic_publish(
-                self.__get_mqtt_topic() + 'em_mode', self.em_mode)
-            self.mqtt_api.generic_publish(
-                self.__get_mqtt_topic() + 'em_power', self.em_power)
 
     def set_em_power(self, power):
         """ Change Energy Manangement Power
@@ -692,11 +687,17 @@ class FroniusWR(InverterBaseclass):
         """
         self.__set_em(power=power)
         self.em_power = power
+        if self.mqtt_api:
+            self.mqtt_api.generic_publish(
+                self.__get_mqtt_topic() + 'em_power', power)
 
     def set_em_mode(self, mode):
         """ Change Energy Manangement mode."""
         self.__set_em(mode=mode)
         self.em_mode = mode
+        if self.mqtt_api:
+            self.mqtt_api.generic_publish(
+                self.__get_mqtt_topic() + 'em_mode', mode)
 
     def shutdown(self):
         """Change back batcontrol changes."""
