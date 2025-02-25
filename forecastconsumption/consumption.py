@@ -35,7 +35,7 @@ class Consumption:
                 csv_config['load_profile'] = DEFAULT_CSV_FILE
 
             consumption = ForecastConsumptionCsv(
-                                'config/' + config['load_profile'],
+                                'config/' + csv_config['load_profile'],
                                 tz,
                                 csv_config.get('annual_consumption', 0)
                             )
