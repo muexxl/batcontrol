@@ -10,12 +10,13 @@ import yaml
 import pytz
 import numpy as np
 
-from forecastconsumption import forecastconsumption
 from dynamictariff import dynamictariff as tariff_factory
 from inverter import inverter as inverter_factory
 from logfilelimiter import logfilelimiter
 
 from forecastsolar import solar as solar_factory
+
+from forecastconsumption import consumption as consumption_factory
 
 
 LOGFILE_ENABLED_DEFAULT = True
@@ -161,15 +162,10 @@ class Batcontrol:
             DELAY_EVALUATION_BY_SECONDS
         )
 
-        self.load_profile = config['consumption_forecast']['load_profile']
-        try:
-            annual_consumption = config['consumption_forecast']['annual_consumption']
-        except KeyError:
-            # default setting
-            annual_consumption = 0
-
-        self.fc_consumption = forecastconsumption.ForecastConsumption(
-            self.load_profile, self.timezone, annual_consumption)
+        self.fc_consumption = consumption_factory.Consumption.create_consumption(
+            self.timezone,
+            config['consumption_forecast']
+        )
 
         self.batconfig = config['battery_control']
         self.time_at_forecast_error = -1
@@ -359,22 +355,6 @@ class Batcontrol:
             pass
         else:
             raise RuntimeError('No PV Installation found')
-
-        try:
-            config['consumption_forecast']['load_profile'] = 'config/' + \
-                config['consumption_forecast']['load_profile']
-        except:
-            logger.info(
-                "[Config] No load profile provided. "
-                "Proceeding with default profile from default_load_profile.csv"
-            )
-            config['consumption_forecast']['load_profile'] = 'default_load_profile.csv'
-
-        if not os.path.isfile(config['consumption_forecast']['load_profile']):
-            raise RuntimeError(
-                "[Config] Specified Load Profile file " +
-                f"'{config['consumption_forecast']['load_profile']}' not found"
-            )
 
         global loglevel
         loglevel = self.__get_config_with_defaults(config, 'loglevel', 'info' )

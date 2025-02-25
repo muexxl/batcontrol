@@ -2,15 +2,16 @@
 import datetime
 import math
 import logging
-import pytz
 import pandas as pd
 import numpy as np
+import os
+from .forecastconsumption_interface import ForecastConsumptionInterface
 
 
-logger = logging.getLogger("__main__")
+logger = logging.getLogger("__main__").getChild("FCConsumptionCSV")
 logger.info('[FCConsumption] loading module')
 
-class ForecastConsumption:
+class ForecastConsumptionCsv(ForecastConsumptionInterface):
     """Forecasts Consumption based on load profiles
 
         Loadprofile:
@@ -25,6 +26,12 @@ class ForecastConsumption:
     """
 
     def __init__(self, loadprofile, timezone, annual_consumption=0 , datafile=None, ) -> None:
+        if not os.path.isfile(loadprofile):
+            raise RuntimeError(
+                "[ForecastCSV] Specified Load Profile file " +
+                f"'{loadprofile}' not found"
+            )
+
         self.path_to_load_profile=loadprofile
         if datafile:
             self.create_loadprofile(datafile,self.path_to_load_profile)
@@ -108,10 +115,3 @@ class ForecastConsumption:
 
     def load_loadprofile(self):
         self.dataframe=pd.read_csv(self.path_to_load_profile)
-# %%
-if __name__ == '__main__':
-    tz=pytz.timezone('Europe/Berlin')
-    fc=ForecastConsumption('../config/load_profile.csv',tz)
-    print(fc.get_forecast(25))
-
-# %%
