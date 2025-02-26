@@ -18,18 +18,18 @@ class EvccApi():
         config (dict): Configuration dictionary containing MQTT broker details, topics.
         evcc_is_online (bool): Internal state indicating if evcc is online.
         evcc_is_charging (bool): Internal state indicating if evcc is charging.
-        evcc_batterSoc_threshold (int): BufferSOC value from evcc.
+        evcc_batterSoc (int): BufferSOC value from evcc.
         block_function (function): Function to be called to block/unblock Battery.
         set_always_allow_discharge_limit_function (function): Function to set the discharge limit.
         get_always_allow_discharge_limit_function (function): Function to get the discharge limit.
         evcc_loadpoint_status (dict): Internal state to store the loadpoint status.
         topic_status (str): MQTT topic for evcc status messages.
         topic_loadpoint (str): MQTT topic for evcc loadpoint messages.
-        topic_battery_soc_threshold (str): MQTT topic for evcc battery SOC threshold.
+        topic_battery_soc (str): MQTT topic for evcc battery SOC threshold.
         client (mqtt.Client): MQTT client instance.
         align_battery_load_thresshold (bool): If set, use evcc/site/bufferSoc as
                                               discharge_allow_threshold while charging.
-        old_discharge_allow_threshold (int): Old discharge_allow_threshold value.
+        old_allow_discharge_limit (int): Old discharge_allow_threshold value.
 
     Methods:
         __init__(config: dict):
@@ -56,7 +56,7 @@ class EvccApi():
         handle_charging_message(message):
             Handles incoming charging messages from the MQTT broker.
 
-        handle_battery_soc_threshold(message):
+        handle_battery_soc(message):
             Handles incoming bufferSOC messages from the MQTT broker.
 
         _handle_message(client, userdata, message):
@@ -78,10 +78,10 @@ class EvccApi():
 
         self.topic_status = config['status_topic']
         self.list_topics_loadpoint = []
-        self.topic_battery_soc_threshold = config.get(
+        self.topic_battery_soc = config.get(
             'battery_soc_topic', None)
-        self.evcc_batterSoc_threshold = None # bufferSOC pylint: disable=invalid-name
-        self.old_discharge_allow_threshold = None
+        self.evcc_batterSoc = None # bufferSOC pylint: disable=invalid-name
+        self.old_allow_discharge_limit = None
 
         if isinstance(config['loadpoint_topic'], str):
             self.list_topics_loadpoint.append(config['loadpoint_topic'])
@@ -112,10 +112,10 @@ class EvccApi():
         # Register callback functions, survives reconnects
         self.client.message_callback_add(
             self.topic_status, self._handle_message)
-        if self.topic_battery_soc_threshold is not None:
+        if self.topic_battery_soc is not None:
             logger.info('[evcc] Enabling bufferSOC threshold management.')
             self.client.message_callback_add(
-                self.topic_battery_soc_threshold, self._handle_message)
+                self.topic_battery_soc, self._handle_message)
         for topic in self.list_topics_loadpoint:
             self.__store_loadpoint_status(topic, False)
             self.client.message_callback_add(topic, self._handle_message)
@@ -132,8 +132,8 @@ class EvccApi():
     def shutdown(self):
         """ Shutdown the evcc mqtt client """
         self.client.unsubscribe(self.topic_status)
-        if self.topic_battery_soc_threshold is not None:
-            self.client.unsubscribe(self.topic_battery_soc_threshold)
+        if self.topic_battery_soc is not None:
+            self.client.unsubscribe(self.topic_battery_soc)
         for topic in self.list_topics_loadpoint:
             self.client.unsubscribe(topic)
         self.client.loop_stop()
@@ -144,8 +144,8 @@ class EvccApi():
         logger.info('[evcc] Connected to MQTT Broker with result code %s', rc)
         # Subscribe to status and loadpoint(s)
         self.client.subscribe(self.topic_status, qos=1)
-        if self.topic_battery_soc_threshold is not None:
-            self.client.subscribe(self.topic_battery_soc_threshold, qos=1)
+        if self.topic_battery_soc is not None:
+            self.client.subscribe(self.topic_battery_soc, qos=1)
         for topic in self.list_topics_loadpoint:
             logger.info('[evcc] Subscribing to %s', topic)
             self.client.subscribe(topic)
@@ -175,26 +175,26 @@ class EvccApi():
 
     def __save_old_allow_discharge_limit(self):
         """ Save old limit, if not already set."""
-        if self.old_discharge_allow_threshold is None:
-            self.old_discharge_allow_threshold = self.get_always_allow_discharge_limit_function()
+        if self.old_allow_discharge_limit is None:
+            self.old_allow_discharge_limit = self.get_always_allow_discharge_limit_function()
 
     def __restore_old_allow_discharge_limit(self):
         """ Restore old limit, if set and set to None """
-        if not self.old_discharge_allow_threshold is None:
-            logger.info("[evcc] Restoring allow_discharge_limit %.2f" , self.old_discharge_allow_threshold)
+        if not self.old_allow_discharge_limit is None:
+            logger.info("[evcc] Restoring allow_discharge_limit %.2f" , self.old_allow_discharge_limit)
             self.set_always_allow_discharge_limit_function (
-                self.old_discharge_allow_threshold
+                self.old_allow_discharge_limit
             )
-            self.old_discharge_allow_threshold = None
+            self.old_allow_discharge_limit = None
 
     def set_evcc_discharge_limit_on_batcontrol(self):
         """ Set allow_discharge_limit on batcontrol"""
-        if self.evcc_batterSoc_threshold is not None:
-            new_threshold = self.evcc_batterSoc_threshold / 100
+        if self.evcc_batterSoc is not None:
+            new_value = self.evcc_batterSoc / 100
             logger.info('[evcc] Setting always_allow_discharge_limit to %.2f',
-                    new_threshold)
+                    new_value)
             self.set_always_allow_discharge_limit_function(
-                new_threshold
+                new_value
             )
         else:
             logger.error('[evcc] No bufferSOC value received')
@@ -225,7 +225,7 @@ class EvccApi():
                 logger.info('[evcc] evcc is charging, set block')
                 self.evcc_is_charging = True
                 self.block_function(True)
-                if self.topic_battery_soc_threshold is not None:
+                if self.topic_battery_soc is not None:
                     self.__save_old_allow_discharge_limit()
                     self.set_evcc_discharge_limit_on_batcontrol()
             else:
@@ -264,7 +264,7 @@ class EvccApi():
         elif message.payload == b'offline':
             self.set_evcc_online(False)
 
-    def handle_battery_soc_threshold(self, message):
+    def handle_battery_soc(self, message):
         """ Handling incoming bufferSOC message, change if needed. """
         #logger.debug('[evcc] Received bufferSOC message: %s', message.payload)
         if message.payload == b'':
@@ -272,9 +272,9 @@ class EvccApi():
             return
         try:
             new_soc = int(message.payload)
-            if self.evcc_batterSoc_threshold is None or \
-               self.evcc_batterSoc_threshold != new_soc:
-                self.evcc_batterSoc_threshold = new_soc
+            if self.evcc_batterSoc is None or \
+               self.evcc_batterSoc != new_soc:
+                self.evcc_batterSoc = new_soc
                 logger.info('[evcc] New bufferSOC value: %s', new_soc)
                 if self.evcc_is_charging is True:
                     self.set_always_allow_discharge_limit_function(new_soc/100)
@@ -306,9 +306,9 @@ class EvccApi():
         #logger.debug('[evcc] Received message on %s', message.topic)
         if message.topic == self.topic_status:
             self.handle_status_messages(message)
-        elif self.topic_battery_soc_threshold is not None and \
-                message.topic == self.topic_battery_soc_threshold:
-            self.handle_battery_soc_threshold(message)
+        elif self.topic_battery_soc is not None and \
+                message.topic == self.topic_battery_soc:
+            self.handle_battery_soc(message)
         # Check if message.topic is in self.list_topics_loadpoint
         elif message.topic in self.list_topics_loadpoint:
             self.handle_charging_message(message)
