@@ -1,5 +1,6 @@
 #! /usr/bin/env python
 # %%
+from dataclasses import dataclass
 import sys
 import datetime
 import time
@@ -52,6 +53,39 @@ logger.setLevel(loglevel)
 
 logger.info('[Main] Starting Batcontrol')
 
+@dataclass
+class InverterControlSettings:
+    """ Result from Calculation what to do on the current intervall"""
+    allow_discharge: bool
+    charge_from_grid: bool
+    charge_rate: int
+
+@dataclass
+class CalculationInput:
+    """ Input for the calculation """
+    net_consumption: np.ndarray
+    prices: dict
+    stored_energy: float
+    stored_usable_energy: float
+    # free_capacity: float (calculate)
+    # soc: float (calculate)
+
+@dataclass
+class CalculationParameters:
+    """ Calculations from Batcontorl configration """
+    always_allow_discharge_limit: float
+    max_charging_from_grid_limit: float
+    charge_rate_multiplier: float
+    min_price_difference: float
+    min_price_difference_rel: float
+    max_capacity: float
+
+@dataclass
+class CalculationOutput:
+    """ Output from the calculation besides the InverterControlSettings """
+    reserved_energy: float
+    required_recharge_energy: float
+    min_dynamic_price_difference: float
 
 class Batcontrol:
     def __init__(self, configfile):
@@ -516,18 +550,55 @@ class Batcontrol:
         net_consumption[0] *= 1 - \
             datetime.datetime.now().astimezone(self.timezone).minute/60
 
-        self.set_wr_parameters(net_consumption, price_dict)
+        # Create input for calculation
+        calc_input = CalculationInput(
+            net_consumption,
+            prices,
+            self.get_stored_energy(),
+            self.get_stored_usable_energy()
+        )
+        calc_parameters = CalculationParameters(
+            self.always_allow_discharge_limit,
+            self.max_charging_from_grid_limit,
+            self.charge_rate_multiplier,
+            self.min_price_difference,
+            self.min_price_difference_rel,
+            self.get_max_capacity()
+        )
+
+        inverter_settings = self.calculate_inverter_mode(calc_input, calc_parameters)
+
+        if inverter_settings.allow_discharge:
+            self.allow_discharging()
+        elif inverter_settings.charge_from_grid:
+            self.force_charge(inverter_settings.charge_rate)
+        else:
+            self.avoid_discharging()
 
         # %%
-    def set_wr_parameters(self, net_consumption: np.ndarray, prices: dict):
+    def calculate_inverter_mode(self, calc_input: CalculationInput, calc_parameters: CalculationParameters, calc_timestamp:datetime = None) -> InverterControlSettings:
         """ Main control logic for battery control """
+        # default settings
+        inverter_control_settings = InverterControlSettings(
+            allow_discharge=False,
+            charge_from_grid=False,
+            charge_rate=0
+        )
+        net_consumption = calc_input.net_consumption
+        prices = calc_input.prices
+
+        if calc_timestamp is None:
+            calc_timestamp = datetime.datetime.now().astimezone(self.timezone)
+
         # ensure availability of data
         max_hour = min(len(net_consumption), len(prices))
 
-        if self.is_discharge_allowed(net_consumption, prices):
-            self.allow_discharging()
+        if self.is_discharge_allowed(net_consumption, prices, calc_timestamp):
+            inverter_control_settings.allow_discharge = True
+            return inverter_control_settings
         else:  # discharge not allowed
             logger.debug('[Rule] Discharging is NOT allowed')
+            inverter_control_settings.allow_discharge = False
             charging_limit_percent = self.max_charging_from_grid_limit * 100
             required_recharge_energy = self.get_required_required_recharge_energy(
                 net_consumption[:max_hour],
@@ -558,7 +629,7 @@ class Batcontrol:
             # charge if battery capacity available and more stored energy is required
             if is_charging_possible and required_recharge_energy > 0:
                 remaining_time = (
-                    60-datetime.datetime.now().astimezone(self.timezone).minute)/60
+                    60-calc_timestamp.minute)/60
                 charge_rate = required_recharge_energy/remaining_time
                 # apply multiplier for charge inefficiency
                 charge_rate *= self.charge_rate_multiplier
@@ -570,10 +641,14 @@ class Batcontrol:
                                  )
                     charge_rate = MIN_CHARGE_RATE
 
-                self.force_charge(charge_rate)
-
-            else:  # keep current charge level. recharge if solar surplus available
-                self.avoid_discharging()
+                #self.force_charge(charge_rate)
+                inverter_control_settings.charge_from_grid = True
+                inverter_control_settings.charge_rate = charge_rate
+            else:
+                # keep current charge level. recharge if solar surplus available
+                inverter_control_settings.allow_discharge = False
+        #
+        return inverter_control_settings
 
     # %%
     def get_required_required_recharge_energy(self, net_consumption: list, prices: dict) -> float:
@@ -680,7 +755,7 @@ class Batcontrol:
         return False
 # %%
 
-    def is_discharge_allowed(self, net_consumption: np.ndarray, prices: dict) -> bool:
+    def is_discharge_allowed(self, net_consumption: np.ndarray, prices: dict, calc_timestamp:datetime = None) -> bool:
         """ Evaluate if the battery is allowed to discharge
 
             - Check if battery is above always_allow_discharge_limit
@@ -689,6 +764,9 @@ class Batcontrol:
 
             return: bool
         """
+        if calc_timestamp is None:
+            calc_timestamp = datetime.datetime.now().astimezone(self.timezone)
+
         self.get_stored_energy()
         stored_usable_energy = self.get_stored_usable_energy()
 
@@ -720,7 +798,7 @@ class Batcontrol:
                     )
                 break
         dt = datetime.timedelta(hours=max_hour-1)
-        t0 = datetime.datetime.now()
+        t0 = calc_timestamp
         t1 = t0+dt
         last_hour = t1.astimezone(self.timezone).strftime("%H:59")
 
