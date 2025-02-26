@@ -260,6 +260,10 @@ class Batcontrol:
                     self.set_always_allow_discharge_limit,
                     self.get_always_allow_discharge_limit
                 )
+                self.evcc_api.register_max_charge_limit(
+                    self.set_max_charging_from_grid_limit,
+                    self.get_max_charging_from_grid_limit
+                )
                 self.evcc_api.start()
                 self.evcc_api.wait_ready()
                 logger.info('[Main] evcc Connection ready')
@@ -988,6 +992,25 @@ class Batcontrol:
         """ Get the always allow discharge limit for battery control """
         return self.always_allow_discharge_limit
 
+    def set_max_charging_from_grid_limit(self, limit: float) -> None:
+        """ Set the max charging from grid limit for battery control """
+        # tbh , we should raise an exception here.
+        if limit > self.get_always_allow_discharge_limit():
+            logger.error(
+                '[BatCtrl] Max charging from grid limit %.2f is '
+                'above always_allow_discharge_limit %.2f',
+                limit,
+                self.get_always_allow_discharge_limit()
+            )
+            return
+        self.max_charging_from_grid_limit = limit
+        if self.mqtt_api is not None:
+            self.mqtt_api.publish_max_charging_from_grid_limit(limit)
+
+    def get_max_charging_from_grid_limit(self) -> float:
+        """ Get the max charging from grid limit for battery control """
+        return self.max_charging_from_grid_limit
+
     def set_discharge_blocked(self, discharge_blocked) -> None:
         """ Avoid discharging if an external block is received,
             but take care of the always_allow_discharge_limit.
@@ -1083,7 +1106,7 @@ class Batcontrol:
             return
         logger.info(
             '[BatCtrl] API: Setting max charging from grid limit to %.2f', limit)
-        self.max_charging_from_grid_limit = limit
+        self.set_max_charging_from_grid_limit(limit)
 
     def api_set_min_price_difference(self, min_price_difference: float):
         """ Set min price difference for battery control via external API request.

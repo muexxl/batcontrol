@@ -10,6 +10,7 @@ import paho.mqtt.client as mqtt
 logger = logging.getLogger('__main__').getChild("evcc")
 logger.info('[evcc] loading module')
 
+
 class EvccApi():
     """
     A class to interact with the evcc (Electric Vehicle Charging Controller) via MQTT.
@@ -75,13 +76,16 @@ class EvccApi():
         self.block_function = None
         self.set_always_allow_discharge_limit_function = None
         self.get_always_allow_discharge_limit_function = None
+        self.set_max_charge_limit_function = None
+        self.get_max_charge_limit_function = None
 
         self.topic_status = config['status_topic']
         self.list_topics_loadpoint = []
         self.topic_battery_soc = config.get(
             'battery_soc_topic', None)
-        self.evcc_batterSoc = None # bufferSOC pylint: disable=invalid-name
+        self.evcc_batterSoc = None  # bufferSOC pylint: disable=invalid-name
         self.old_allow_discharge_limit = None
+        self.old_max_charge_limit = None
 
         if isinstance(config['loadpoint_topic'], str):
             self.list_topics_loadpoint.append(config['loadpoint_topic'])
@@ -128,7 +132,6 @@ class EvccApi():
         self.client.connect(self.config['broker'], self.config['port'], 60)
         self.wait_ready()
 
-
     def shutdown(self):
         """ Shutdown the evcc mqtt client """
         self.client.unsubscribe(self.topic_status)
@@ -172,27 +175,45 @@ class EvccApi():
         self.set_always_allow_discharge_limit_function = setter
         self.get_always_allow_discharge_limit_function = getter
 
+    def register_max_charge_limit(self, setter, getter):
+        """ Register a function to set and get the max charge limit while charging """
+        self.set_max_charge_limit_function = setter
+        self.get_max_charge_limit_function = getter
 
     def __save_old_allow_discharge_limit(self):
         """ Save old limit, if not already set."""
         if self.old_allow_discharge_limit is None:
             self.old_allow_discharge_limit = self.get_always_allow_discharge_limit_function()
+        if self.old_max_charge_limit is None:
+            self.old_max_charge_limit = self.get_max_charge_limit_function
+            if self.old_max_charge_limit > self.evcc_batterSoc:
+                # Only store if the old value is higher than the new one,
+                # which will may be altered by batcontrol to a lower value.
+                self.old_max_charge_limit = None
 
     def __restore_old_allow_discharge_limit(self):
         """ Restore old limit, if set and set to None """
         if not self.old_allow_discharge_limit is None:
-            logger.info("[evcc] Restoring allow_discharge_limit %.2f" , self.old_allow_discharge_limit)
-            self.set_always_allow_discharge_limit_function (
-                self.old_allow_discharge_limit
-            )
+            logger.info("[evcc] Restoring allow_discharge_limit %.2f",
+                            self.old_allow_discharge_limit)
+            self.set_always_allow_discharge_limit_function(
+                            self.old_allow_discharge_limit)
             self.old_allow_discharge_limit = None
+        # This value may be changed, too, so we restore it
+        if not self.old_max_charge_limit is None:
+            logger.info("[evcc] Restoring max_charge_limit %.2f",
+                            self.old_max_charge_limit)
+            self.set_max_charge_limit_function(
+                self.old_max_charge_limit
+            )
+            self.old_max_charge_limit = None
 
     def set_evcc_discharge_limit_on_batcontrol(self):
         """ Set allow_discharge_limit on batcontrol"""
         if self.evcc_batterSoc is not None:
             new_value = self.evcc_batterSoc / 100
             logger.info('[evcc] Setting always_allow_discharge_limit to %.2f',
-                    new_value)
+                        new_value)
             self.set_always_allow_discharge_limit_function(
                 new_value
             )
@@ -258,7 +279,7 @@ class EvccApi():
 
     def handle_status_messages(self, message):
         """ Handle incoming status messages from the MQTT broker """
-        #logger.debug('[evcc] Received status message: %s', message.payload)
+        # logger.debug('[evcc] Received status message: %s', message.payload)
         if message.payload == b'online':
             self.set_evcc_online(True)
         elif message.payload == b'offline':
@@ -266,7 +287,7 @@ class EvccApi():
 
     def handle_battery_soc(self, message):
         """ Handling incoming bufferSOC message, change if needed. """
-        #logger.debug('[evcc] Received bufferSOC message: %s', message.payload)
+        # logger.debug('[evcc] Received bufferSOC message: %s', message.payload)
         if message.payload == b'':
             # Initial Messages from evcc on restart.
             return
@@ -303,7 +324,7 @@ class EvccApi():
 
     def _handle_message(self, client, userdata, message):  # pylint: disable=unused-argument
         """ Message dispatching function """
-        #logger.debug('[evcc] Received message on %s', message.topic)
+        # logger.debug('[evcc] Received message on %s', message.topic)
         if message.topic == self.topic_status:
             self.handle_status_messages(message)
         elif self.topic_battery_soc is not None and \
