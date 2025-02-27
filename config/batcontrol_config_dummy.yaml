@@ -91,3 +91,10 @@ evcc:
   certfile: /etc/ssl/certs/client.crt
   keyfile: /etc/ssl/certs/client.key
   tls_version: tlsv1.2
+  # Optional:
+  # Choose which topic should deliver the limit for the battery
+  # below this limit the battery will be locked
+  #  https://docs.evcc.io/docs/integrations/mqtt-api#site
+  # Active if following message appears:
+  #                  'Enabling battery threshold management.
+  battery_halt_topic: evcc/site/bufferSoc
