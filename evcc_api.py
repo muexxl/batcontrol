@@ -191,7 +191,7 @@ class EvccApi():
             self.old_allow_discharge_limit = self.get_always_allow_discharge_limit_function()
         if self.old_max_charge_limit is None:
             self.old_max_charge_limit = self.get_max_charge_limit_function()
-            if self.old_max_charge_limit > self.battery_halt_soc_float:
+            if self.old_max_charge_limit >= self.battery_halt_soc_float:
                 # Only store if the old value is higher than the new one,
                 # which will may be altered by batcontrol to a lower value.
                 self.old_max_charge_limit = None
