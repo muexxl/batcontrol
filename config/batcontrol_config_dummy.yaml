@@ -68,8 +68,10 @@ pvinstallations:
     horizon: 30,30,30,0,0,0 # leave empty for default PVGIS horizon, only modify if solar array is shaded by trees or houses
     api: #fcsolarapi
 consumption_forecast:
-  annual_consumption: 4500 # total consumption in kWh p.a. the load profile
-  load_profile: load_profile.csv #name of the load profile file within the config folder
+  type: csv
+  csv:
+    annual_consumption: 4500 # total consumption in kWh p.a. the load profile
+    load_profile: load_profile.csv #name of the load profile file within the config folder
 
 # evcc connection
 #   listen to evcc mqtt messages to lock the battery if the car is charging
