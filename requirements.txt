@@ -1,5 +1,0 @@
-numpy
-pandas
-PyYAML
-requests
-paho-mqtt
