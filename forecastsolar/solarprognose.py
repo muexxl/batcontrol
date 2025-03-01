@@ -116,7 +116,7 @@ class SolarPrognose(ForecastSolarInterface):
                 rel_hour = int(diff / 3600)
                 if rel_hour >= 0:
                     # API delivers values in kW, we need W
-                    if rel_hour in prediction.keys():
+                    if rel_hour in prediction:
                         prediction[rel_hour] += value * 1000
                     else:
                         prediction[rel_hour] = value * 1000
@@ -129,7 +129,7 @@ class SolarPrognose(ForecastSolarInterface):
                 '[Solarprognose] Less than 18 hours of forecast data.')
         # complete hours without production with 0 values
         for h in range(max_hour+1):
-            if h not in prediction.keys():
+            if h not in prediction:
                 prediction[h] = 0
         # sort output
         output = dict(sorted(prediction.items()))
@@ -143,9 +143,9 @@ class SolarPrognose(ForecastSolarInterface):
             apikey = unit.get('apikey', None)
             if apikey is None:
                 logger.error(
-                    "[Solarprognose] No API key provided for installation %s", unit['name'])
+                    "[Solarprognose] No API key provided for installation %s", name)
                 raise ValueError(
-                    f'[Solarprognose] No API key provided for installation {unit['name']}')
+                    f'[Solarprognose] No API key provided for installation {name}')
 
             algorithm = unit.get('algorithm', 'mosmix')
             # Optional
