@@ -164,15 +164,15 @@ class SolarPrognose(ForecastSolarInterface):
                 else:
                     logger.error(
                         "[Solarprognose] No item id or token provided for installation %s",
-                        unit['name'])
+                        name)
                     raise ValueError(
                         '[Solarprognose] No item id or token provided for installation ',
-                        f'{unit['name']}')
+                        f'{name}')
 
             url = "https://www.solarprognose.de/web/solarprediction/api/v1"
             url += f"?access-token={apikey}"
             if unit.get('project', None) is not None:
-                url += f"&project={unit['name']}"
+                url += f"&project={name}"
             url += f'&algorithm={algorithm}'
             url += f'{item_querymod}'
             url += '&type=hourly'
