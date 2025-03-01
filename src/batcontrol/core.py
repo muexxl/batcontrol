@@ -12,13 +12,13 @@ import numpy as np
 from .mqtt_api import MqttApi
 from .evcc_api import EvccApi
 
-from dynamictariff import dynamictariff as tariff_factory
-from inverter import inverter as inverter_factory
-from logfilelimiter import logfilelimiter
+from .dynamictariff import DynamicTariff as tariff_factory
+from .inverter import Inverter as inverter_factory
+from .logfilelimiter import LogFileLimiter
 
-from forecastsolar import solar as solar_factory
+from .forecastsolar import ForecastSolar as solar_factory
 
-from forecastconsumption import consumption as consumption_factory
+from .forecastconsumption import Consumption as consumption_factory
 
 
 LOGFILE_ENABLED_DEFAULT = True
@@ -113,18 +113,18 @@ class Batcontrol:
             os.environ['TZ'] = config['timezone']
         time.tzset()
 
-        self.dynamic_tariff = tariff_factory.DynamicTariff.create_tarif_provider(
+        self.dynamic_tariff = tariff_factory.create_tarif_provider(
             config['utility'],
             self.timezone,
             TIME_BETWEEN_UTILITY_API_CALLS,
             DELAY_EVALUATION_BY_SECONDS
         )
 
-        self.inverter = inverter_factory.Inverter.create_inverter(
+        self.inverter = inverter_factory.create_inverter(
             config['inverter'])
 
         self.pvsettings = config['pvinstallations']
-        self.fc_solar = solar_factory.ForecastSolar.create_solar_provider(
+        self.fc_solar = solar_factory.create_solar_provider(
             self.pvsettings,
             self.timezone,
             DELAY_EVALUATION_BY_SECONDS
@@ -390,7 +390,7 @@ class Batcontrol:
             )
 
         if config['max_logfile_size'] > 0:
-            self.logfilelimiter = logfilelimiter.LogFileLimiter(
+            self.logfilelimiter = LogFileLimiter(
                 self.logfile, config['max_logfile_size'])
 
         # is the path valid and writable?
