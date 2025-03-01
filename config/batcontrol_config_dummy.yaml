@@ -85,16 +85,8 @@ pvinstallations:
     declination: 32 #inclination toward horizon 0..90 0=flat 90=vertical (e.g. wallmounted)
     azimuth: -90 # -90:East, 0:South, 90:West -180..180
     kWp: 15.695 # power in kWp
-    horizon: # leave empty for default PVGIS horizon, only modify if solar array is shaded by trees or houses
-    api: #fcsolarapi
-  - name: Garage  #... further installations
-    lat: 48.4334480
-    lon: 8.7654968
-    declination: 32
-    azimuth: 87
-    kWp: 6.030
-    horizon: 30,30,30,0,0,0 # leave empty for default PVGIS horizon, only modify if solar array is shaded by trees or houses
-    api: #fcsolarapi
+    #horizon: # leave empty for default PVGIS horizon, only modify if solar array is shaded by trees or houses
+    #api: #fcsolarapi
 
 #--------------------------
 #  Forecast Consumption
