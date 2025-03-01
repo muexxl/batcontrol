@@ -8,6 +8,7 @@ import logging
 import yaml
 import pytz
 import numpy as np
+import platform
 
 from .mqtt_api import MqttApi
 from .evcc_api import EvccApi
@@ -111,7 +112,10 @@ class Batcontrol:
                 config['timezone']
             )
             os.environ['TZ'] = config['timezone']
-        time.tzset()
+        
+        # time.tzset() is not available on Windows. When handling timezones exclusively using pytz this is fine
+        if platform.system() != 'Windows':
+            time.tzset()
 
         self.dynamic_tariff = tariff_factory.create_tarif_provider(
             config['utility'],
