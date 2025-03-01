@@ -1,3 +1,7 @@
+#--------------------------
+#  Batcontrol Configuration
+#  See more Details in: https://github.com/muexxl/batcontrol/wiki/Batcontrol-Configuration
+#--------------------------
 timezone: Europe/Berlin #your time zone. not optional.
 loglevel: debug
 logfile_enabled: true
@@ -11,12 +15,22 @@ battery_control:
                                  #    _rel helps to avoid charging at high prices with less efficiency
   always_allow_discharge_limit: 0.90 # 0.00 to 1.00 above this SOC limit using energy from the battery is always allowed
   max_charging_from_grid_limit: 0.90 # 0.00 to 1.00 charging from the grid is only allowed until this SOC limit
+
+#--------------------------
+#  Battery Control Expert Tuning Parameters
+#  See more Details in: https://github.com/muexxl/batcontrol/wiki/battery_control_expert
+#--------------------------
 battery_control_expert:
   charge_rate_multiplier: 1.1 # Increase (>1) calculated charge rate to compensate charge inefficencies.
   soften_price_difference_on_charging: False # enable earlier charging based on a more relaxed calculation
                                              # future_price <= current_price-min_price_difference/soften_price_difference_on_charging_factor
   soften_price_difference_on_charging_factor: 5
   round_price_digits: 4 # round price to n digits after the comma
+
+#--------------------------
+#  Inverter
+#  See more Details in: https://github.com/muexxl/batcontrol/wiki/Inverter-Configuration
+#--------------------------
 inverter:
   type: fronius_gen24 #currently only fronius_gen24 supported
   address: 192.168.0.XX # the local IP of your inverter. needs to be reachable from the machine that runs batcontrol
@@ -24,6 +38,11 @@ inverter:
   password: YOUR-PASSWORD #
   max_grid_charge_rate: 5000 # Watt
   max_pv_charge_rate : 3000 # Watt
+
+#--------------------------
+#  Dynamic Tariff Provider
+#  See more Details in: https://github.com/muexxl/batcontrol/wiki/Dynamic-tariff-provider
+#--------------------------
 utility:
   type: tibber # [tibber, awattar_at, awattar_de, evcc]
   apikey: YOUR-PASSWORD # only required for tibber get one from https://developer.tibber.com/ Zz-XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXx
@@ -31,6 +50,11 @@ utility:
   fees: 0.015 # only required for awattar
   markup: 0.03 # only required for awattar
   url: http://evcc.local:7070/api/tariff/grid # only required for evcc
+
+#--------------------------
+#  MQTT API
+#  See more Details in: https://github.com/muexxl/batcontrol/wiki/MQTT-API
+#--------------------------
 mqtt:
   enabled: false
   logger: false
@@ -49,7 +73,11 @@ mqtt:
   auto_discover_enable: true # enables mqtt auto discover => https://www.home-assistant.io/integrations/mqtt/#mqtt-discovery
   auto_discover_topic: homeassistant # base topic path for auto discover config messages - default 'homeassistant' -> https://www.home-assistant.io/integrations/mqtt/#discovery-options
 
-
+#--------------------------
+#  Forecast Solar
+#  See more Details in:  https://github.com/muexxl/batcontrol/wiki/Solar-Forecast
+#--------------------------
+solar_forecast_provider: fcsolarapi
 pvinstallations:
   - name: Haus #name
     lat: 48.4334480
@@ -67,14 +95,22 @@ pvinstallations:
     kWp: 6.030
     horizon: 30,30,30,0,0,0 # leave empty for default PVGIS horizon, only modify if solar array is shaded by trees or houses
     api: #fcsolarapi
+
+#--------------------------
+#  Forecast Consumption
+#  See more Details in: https://github.com/muexxl/batcontrol/wiki/Consumption-forecast
+#--------------------------
 consumption_forecast:
   type: csv
   csv:
     annual_consumption: 4500 # total consumption in kWh p.a. the load profile
     load_profile: load_profile.csv #name of the load profile file within the config folder
 
+#--------------------------
 # evcc connection
 #   listen to evcc mqtt messages to lock the battery if the car is charging
+#   See more Details in: https://github.com/muexxl/batcontrol/wiki/evcc-connection
+#--------------------------
 evcc:
   enabled: false
   broker: localhost
