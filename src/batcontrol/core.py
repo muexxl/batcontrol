@@ -134,7 +134,7 @@ class Batcontrol:
             DELAY_EVALUATION_BY_SECONDS
         )
 
-        self.fc_consumption = consumption_factory.Consumption.create_consumption(
+        self.fc_consumption = consumption_factory.create_consumption(
             self.timezone,
             config['consumption_forecast']
         )
