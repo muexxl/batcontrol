@@ -1,0 +1,26 @@
+[project]
+name = "batcontrol"
+dynamic = ["version"]
+description = "Optimize electricity costs by recharging your PV battery when electricity is cheap and solar power is insufficient"
+authors = [{name = "Stephan Mükusch", email = "muexxl@gmx.net"}]
+license = {file = "LICENSE"}
+readme = "README.md"
+requires-python = ">=3.10, <3.14"
+dependencies = [
+    "numpy>=2.0",
+    "pandas>=2.0",
+    "PyYAML>=6.0", 
+    "requests>=2.28",
+    "paho-mqtt>=2.0"
+]
+
+# Config for the build system
+[build-system]
+requires = ["setuptools>=66.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["./src"]
+
+[tool.setuptools.dynamic]
+version = {attr = "batcontrol.__pkginfo__.__version__"}
