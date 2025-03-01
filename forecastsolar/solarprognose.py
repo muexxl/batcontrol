@@ -109,10 +109,11 @@ class SolarPrognose(ForecastSolarInterface):
                 diff = timestamp - now_ts
                 rel_hour = int(diff / 3600)
                 if rel_hour >= 0:
+                    # API delivers values in kW, we need W
                     if rel_hour in prediction.keys():
-                        prediction[rel_hour] += value
+                        prediction[rel_hour] += value * 1000
                     else:
-                        prediction[rel_hour] = value
+                        prediction[rel_hour] = value * 1000
 
         max_hour=max(prediction.keys())
         if max_hour < 18 and got_error:
