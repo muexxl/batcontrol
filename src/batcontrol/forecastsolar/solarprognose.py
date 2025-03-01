@@ -7,7 +7,6 @@ https://www.solarprognose.de/web/de/solarprediction/page/api
 import datetime
 import random
 import time
-import math
 import json
 import logging
 import requests
@@ -46,17 +45,19 @@ STATUS_ERROR_MISSING_INPUT_ID_AND_TOKEN = -27
 STATUS_ERROR_INVALID_ALGORITHM = -28
 STATUS_ERROR_FAILED_TO_LOAD_WEATHER_LOCATION_ITEM = -29
 
+
 class SolarPrognose(ForecastSolarInterface):
     """ Provider to get data from solarprognose API """
+
     def __init__(self, pvinstallations, timezone,
                  delay_evaluation_by_seconds) -> None:
         self.pvinstallations = pvinstallations
         self.results = {}
         self.last_update = 0
         self.seconds_between_updates = 900
-        self.timezone=timezone
+        self.timezone = timezone
         self.rate_limit_blackout_window = 0
-        self.delay_evaluation_by_seconds=delay_evaluation_by_seconds
+        self.delay_evaluation_by_seconds = delay_evaluation_by_seconds
 
     def get_forecast(self) -> dict:
         """ Get hourly forecast from provider """
@@ -67,7 +68,8 @@ class SolarPrognose(ForecastSolarInterface):
             if self.rate_limit_blackout_window < t0:
                 try:
                     if self.last_update > 0 and self.delay_evaluation_by_seconds > 0:
-                        sleeptime = random.randrange(0, self.delay_evaluation_by_seconds, 1)
+                        sleeptime = random.randrange(
+                            0, self.delay_evaluation_by_seconds, 1)
                         logger.debug(
                             '[Solarprognose] Waiting for %d seconds before requesting new data',
                             sleeptime)
@@ -77,15 +79,17 @@ class SolarPrognose(ForecastSolarInterface):
                 except Exception as e:
                     # Catch error here.
                     # Check cached values below
-                    logger.error('[Solarprognose] Error getting forecast: %s', e)
+                    logger.error(
+                        '[Solarprognose] Error getting forecast: %s', e)
                     logger.warning('[Solarprognose] Using cached values')
                     got_error = True
             else:
                 remaining_time = self.rate_limit_blackout_window - t0
                 logger.info(
-                    '[Solarprognose] Rate limit blackout window in place until %s (another %d seconds)',
-                      self.rate_limit_blackout_window,
-                      remaining_time
+                    '[Solarprognose] Rate limit blackout window in place  until %s '
+                    '(another %d seconds)',
+                    self.rate_limit_blackout_window,
+                    remaining_time
                 )
         prediction = {}
         for hour in range(48+1):
@@ -93,10 +97,12 @@ class SolarPrognose(ForecastSolarInterface):
 
         # return empty prediction if results have not been obtained
         if not self.results:
-            logger.warning('[Solarprognose] No results from FC Solar API available')
-            raise RuntimeWarning('[Solarprognose] No results from FC Solar API available')
+            logger.warning(
+                '[Solarprognose] No results from FC Solar API available')
+            raise RuntimeWarning(
+                '[Solarprognose] No results from FC Solar API available')
 
-        prediction={}
+        prediction = {}
 
         now = datetime.datetime.now().astimezone(self.timezone)
         now_ts = now.timestamp()
@@ -115,16 +121,18 @@ class SolarPrognose(ForecastSolarInterface):
                     else:
                         prediction[rel_hour] = value * 1000
 
-        max_hour=max(prediction.keys())
+        max_hour = max(prediction.keys())
         if max_hour < 18 and got_error:
-            logger.error('[Solarprognose] Less than 18 hours of forecast data. Stopping.')
-            raise RuntimeError('[Solarprognose] Less than 18 hours of forecast data.')
-        #complete hours without production with 0 values
+            logger.error(
+                '[Solarprognose] Less than 18 hours of forecast data. Stopping.')
+            raise RuntimeError(
+                '[Solarprognose] Less than 18 hours of forecast data.')
+        # complete hours without production with 0 values
         for h in range(max_hour+1):
             if h not in prediction.keys():
-                prediction[h]=0
-        #sort output
-        output=dict(sorted(prediction.items()))
+                prediction[h] = 0
+        # sort output
+        output = dict(sorted(prediction.items()))
 
         return output
 
@@ -141,23 +149,25 @@ class SolarPrognose(ForecastSolarInterface):
 
             algorithm = unit.get('algorithm', 'mosmix')
             # Optional
-            item_querymod =""
+            item_querymod = ""
             if unit.get('item'):
-                item = unit['item'] # inverter, plant, location
-                                    # id is from the web interface
-                                    # token is from the web interface
-                item_id =  unit.get('id', None)
+                item = unit['item']  # inverter, plant, location
+                # id is from the web interface
+                # token is from the web interface
+                item_id = unit.get('id', None)
                 item_token = unit.get('token', None)
-                item_querymod= f"&item={item}"
+                item_querymod = f"&item={item}"
                 if item_id is not None:
                     item_querymod += f"&id={item_id}"
                 elif item_token is not None:
                     item_querymod += f"&token={item_token}"
                 else:
                     logger.error(
-                        "[Solarprognose] No item id or token provided for installation %s", unit['name'])
+                        "[Solarprognose] No item id or token provided for installation %s",
+                        unit['name'])
                     raise ValueError(
-                        f'[Solarprognose] No item id or token provided for installation {unit['name']}')
+                        f'[Solarprognose] No item id or token provided for installation '
+                        f'{unit['name']}')
 
             url = "https://www.solarprognose.de/web/solarprediction/api/v1"
             url += f"?access-token={apikey}"
@@ -165,13 +175,12 @@ class SolarPrognose(ForecastSolarInterface):
                 url += f"&project={unit['name']}"
             url += f'&algorithm={algorithm}'
             url += f'{item_querymod}'
-            url +=  '&type=hourly'
-            #url += '&start_day=0&end_day=+2'
-            url +=  '&_format=json'
+            url += '&type=hourly'
+            # url += '&start_day=0&end_day=+2'
+            url += '&_format=json'
 
             logger.info(
                 '[Solarprognose] Requesting Information for PV Installation %s', name)
-
 
             response = requests.get(url, timeout=60)
             if response.status_code == 200:
@@ -182,10 +191,10 @@ class SolarPrognose(ForecastSolarInterface):
                     self.results[name] = json.loads(response.text)
                     self.__get_and_store_retry(response)
                 elif status_code == STATUS_ERROR_DAILY_QUOTA_EXCEEDED or \
-                     status_code == STATUS_ERROR_ACCESS_DENIED_TO_ITEM_DUE_TO_LIMIT:
+                        status_code == STATUS_ERROR_ACCESS_DENIED_TO_ITEM_DUE_TO_LIMIT:
                     logger.error(
                         '[Solarprognose] Limit exceeded for installation %s - %s',
-                          name, status_code)
+                        name, status_code)
                     self.__get_and_store_retry(response)
                 else:
                     logger.error(
@@ -203,8 +212,7 @@ class SolarPrognose(ForecastSolarInterface):
             else:
                 logger.warning(
                     '[Solarprognose] forecast solar API returned %s - %s',
-                      response.status_code, response.text)
-
+                    response.status_code, response.text)
 
     def __get_and_store_retry(self, response):
         retry_after_timestamp = 0
