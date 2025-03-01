@@ -44,12 +44,10 @@ inverter:
 #  See more Details in: https://github.com/muexxl/batcontrol/wiki/Dynamic-tariff-provider
 #--------------------------
 utility:
-  type: tibber # [tibber, awattar_at, awattar_de, evcc]
-  apikey: YOUR-PASSWORD # only required for tibber get one from https://developer.tibber.com/ Zz-XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXx
+  type: awattar_at # [tibber, awattar_at, awattar_de, evcc]
   vat: 0.20 # only required for awattar
   fees: 0.015 # only required for awattar
   markup: 0.03 # only required for awattar
-  url: http://evcc.local:7070/api/tariff/grid # only required for evcc
 
 #--------------------------
 #  MQTT API
