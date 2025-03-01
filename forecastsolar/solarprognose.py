@@ -166,7 +166,7 @@ class SolarPrognose(ForecastSolarInterface):
                         "[Solarprognose] No item id or token provided for installation %s",
                         unit['name'])
                     raise ValueError(
-                        f'[Solarprognose] No item id or token provided for installation '
+                        '[Solarprognose] No item id or token provided for installation ',
                         f'{unit['name']}')
 
             url = "https://www.solarprognose.de/web/solarprediction/api/v1"
