@@ -41,4 +41,4 @@ fi
 ln -sf $LOG_FILE /app/logs/batcontrol.log
 
 # Start batcontrol.py
-exec python batcontrol.py
+exec python -m batcontrol
