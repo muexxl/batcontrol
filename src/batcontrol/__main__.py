@@ -4,11 +4,10 @@ import datetime
 import sys
 
 CONFIGFILE = "config/batcontrol_config.yaml"
-LOGFILE = "logs/batcontrol.log"
 EVALUATIONS_EVERY_MINUTES = 3  # Every x minutes on the clock
 
 def main() -> int:
-    bc = Batcontrol(CONFIGFILE, LOGFILE)
+    bc = Batcontrol(CONFIGFILE)
     try:
         while True:
             bc.run()

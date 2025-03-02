@@ -23,6 +23,7 @@ from .forecastconsumption import Consumption as consumption_factory
 
 
 LOGFILE_ENABLED_DEFAULT = True
+LOGFILE = "logs/batcontrol.log"
 
 VALID_UTILITIES = ['tibber', 'awattar_at', 'awattar_de', 'evcc']
 VALID_INVERTERS = ['fronius_gen24', 'testdriver']
@@ -58,7 +59,7 @@ logger.info('[Main] Starting Batcontrol')
 
 
 class Batcontrol:
-    def __init__(self, configfile:str, logfile:str):
+    def __init__(self, configfile:str):
         # For API
         self.api_overwrite = False
         # -1 = charge from grid , 0 = avoid discharge , 10 = discharge allowed
@@ -87,7 +88,7 @@ class Batcontrol:
 
         self.last_run_time = 0
 
-        self.logfile = logfile
+        self.logfile = LOGFILE
         self.logfile_enabled = True
         self.logfilelimiter = None
 
