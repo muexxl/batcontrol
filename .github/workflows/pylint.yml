@@ -43,7 +43,7 @@ jobs:
           # Alle Python-Dateien im Repository sammeln
           FILES=$(find . -type f -name "*.py")
           echo "Found files: $FILES"
-          pylint --fail-under 9 $FILES
+          pylint --fail-under 9 --source-roots ./src $FILES
 
       # Für alle anderen Branches: Geänderte Dateien ermitteln und gesammelt an pylint übergeben
       - name: Determine base branch (for non-main branches)
