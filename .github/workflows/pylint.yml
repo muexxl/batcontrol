@@ -77,5 +77,5 @@ jobs:
             echo "No changed Python files to lint."
           else
             echo "Linting changed Python files: ${{ env.CHANGED_FILES }}"
-            pylint --fail-under 9 ${{ env.CHANGED_FILES }}
+            pylint --fail-under 9 --source-roots ./src ${{ env.CHANGED_FILES }}
           fi
