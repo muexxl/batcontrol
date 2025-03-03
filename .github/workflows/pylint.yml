@@ -35,47 +35,6 @@ jobs:
           pip install .
           pip install pylint
 
-      # Wenn der Branch main ist: Alle Python-Dateien in einem Aufruf prüfen
-      - name: Lint all Python files on main branch
-        if: github.ref == 'refs/heads/main'
+      - name: Run pylint
         run: |
-          echo "Linting all Python files in the repository..."
-          # Alle Python-Dateien im Repository sammeln
-          FILES=$(find . -type f -name "*.py")
-          echo "Found files: $FILES"
-          pylint --fail-under 9 --source-roots ./src $FILES
-
-      # Für alle anderen Branches: Geänderte Dateien ermitteln und gesammelt an pylint übergeben
-      - name: Determine base branch (for non-main branches)
-        if: github.ref != 'refs/heads/main'
-        run: |
-          # Prüfen, ob es sich um einen PR aus dem gleichen Repo handelt
-          if [ "${{ github.event.pull_request.head.repo.full_name }}" == "${{ github.repository }}" ]; then
-            BASE_BRANCH="origin/main"
-            git fetch origin main
-          else
-            BASE_BRANCH="upstream/main"
-            if ! git remote | grep upstream; then
-              git remote add upstream https://github.com/${{ github.repository_owner }}/${{ github.event.repository.name }}.git
-            fi
-            git fetch upstream main
-          fi
-          echo "BASE_BRANCH=$BASE_BRANCH" >> $GITHUB_ENV
-
-      - name: Get changed Python files (for non-main branches)
-        if: github.ref != 'refs/heads/main'
-        id: changed-files
-        run: |
-          CHANGED_FILES=$(git diff --name-only $BASE_BRANCH...HEAD -- '*.py' | tr '\n' ' ')
-          echo "CHANGED_FILES=$CHANGED_FILES" >> $GITHUB_ENV
-          echo "Changed Python files: $CHANGED_FILES"
-
-      - name: Lint changed Python files (for non-main branches)
-        if: github.ref != 'refs/heads/main'
-        run: |
-          if [ -z "${{ env.CHANGED_FILES }}" ]; then
-            echo "No changed Python files to lint."
-          else
-            echo "Linting changed Python files: ${{ env.CHANGED_FILES }}"
-            pylint --fail-under 9 --source-roots ./src ${{ env.CHANGED_FILES }}
-          fi
+          pylint --fail-under 9 --source-roots ./src batcontrol
