@@ -297,13 +297,13 @@ class EvccApi():
             if self.evcc_battery_halt_soc is None or \
                self.evcc_battery_halt_soc != new_soc:
                 self.evcc_battery_halt_soc = new_soc
-                logger.info('[evcc] New bufferSOC value: %s', new_soc)
+                logger.info('[evcc] New battery_halt value: %s', new_soc)
                 self.battery_halt_soc_float = new_soc / 100
                 if self.evcc_is_charging is True:
                     self.set_always_allow_discharge_limit_function(
                         self.battery_halt_soc_float)
         except ValueError:
-            logger.error('[evcc] Could not convert bufferSOC to int')
+            logger.error('[evcc] Could not convert battery_halt to int')
 
     def handle_charging_message(self, message):
         """ Handle incoming charging messages from the MQTT broker """
