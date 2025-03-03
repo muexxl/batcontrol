@@ -2,6 +2,7 @@
 
 from .forecastsolar_interface import ForecastSolarInterface
 from .fcsolar import FCSolar
+from .solarprognose import SolarPrognose
 
 class ForecastSolar:
     """ Factory for solar forecast providers """
@@ -15,6 +16,8 @@ class ForecastSolar:
         provider = None
         if requested_provider.lower() == 'fcsolarapi':
             provider = FCSolar(config, timezone, api_delay)
+        elif requested_provider.lower() == 'solarprognose':
+            provider = SolarPrognose(config, timezone, api_delay)
         else:
             raise RuntimeError(f'[ForecastSolar] Unkown provider {requested_provider}')
         return provider
