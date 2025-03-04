@@ -9,22 +9,23 @@ import logging
 import yaml
 import pytz
 import numpy as np
+import platform
 
-import mqtt_api
-import evcc_api
+from .mqtt_api import MqttApi
+from .evcc_api import EvccApi
 
-from dynamictariff import dynamictariff as tariff_factory
-from inverter import inverter as inverter_factory
-from logfilelimiter import logfilelimiter
+from .dynamictariff import DynamicTariff as tariff_factory
+from .inverter import Inverter as inverter_factory
+from .logfilelimiter import LogFileLimiter
 
-from forecastsolar import solar as solar_factory
+from .forecastsolar import ForecastSolar as solar_factory
 
-from forecastconsumption import consumption as consumption_factory
+from .forecastconsumption import Consumption as consumption_factory
 
 
 LOGFILE_ENABLED_DEFAULT = True
 LOGFILE = "logs/batcontrol.log"
-CONFIGFILE = "config/batcontrol_config.yaml"
+
 VALID_UTILITIES = ['tibber', 'awattar_at', 'awattar_de', 'evcc']
 VALID_INVERTERS = ['fronius_gen24', 'testdriver']
 ERROR_IGNORE_TIME = 600  # 10 Minutes
@@ -92,7 +93,7 @@ class CalculationOutput:
     min_dynamic_price_difference: float
 
 class Batcontrol:
-    def __init__(self, configfile):
+    def __init__(self, configfile:str):
         # For API
         self.api_overwrite = False
         # -1 = charge from grid , 0 = avoid discharge , 10 = discharge allowed
@@ -146,26 +147,29 @@ class Batcontrol:
                 config['timezone']
             )
             os.environ['TZ'] = config['timezone']
-        time.tzset()
+        
+        # time.tzset() is not available on Windows. When handling timezones exclusively using pytz this is fine
+        if platform.system() != 'Windows':
+            time.tzset()
 
-        self.dynamic_tariff = tariff_factory.DynamicTariff.create_tarif_provider(
+        self.dynamic_tariff = tariff_factory.create_tarif_provider(
             config['utility'],
             self.timezone,
             TIME_BETWEEN_UTILITY_API_CALLS,
             DELAY_EVALUATION_BY_SECONDS
         )
 
-        self.inverter = inverter_factory.Inverter.create_inverter(
+        self.inverter = inverter_factory.create_inverter(
             config['inverter'])
 
         self.pvsettings = config['pvinstallations']
-        self.fc_solar = solar_factory.ForecastSolar.create_solar_provider(
+        self.fc_solar = solar_factory.create_solar_provider(
             self.pvsettings,
             self.timezone,
             DELAY_EVALUATION_BY_SECONDS
         )
 
-        self.fc_consumption = consumption_factory.Consumption.create_consumption(
+        self.fc_consumption = consumption_factory.create_consumption(
             self.timezone,
             config['consumption_forecast']
         )
@@ -243,7 +247,7 @@ class Batcontrol:
 
             if config['mqtt']['enabled']:
                 logger.info('[Main] MQTT Connection enabled')
-                self.mqtt_api = mqtt_api.MqttApi(config['mqtt'])
+                self.mqtt_api = MqttApi(config['mqtt'])
                 self.mqtt_api.wait_ready()
                 # Register for callbacks
                 self.mqtt_api.register_set_callback(
@@ -283,7 +287,7 @@ class Batcontrol:
         if 'evcc' in config.keys():
             if config['evcc']['enabled']:
                 logger.info('[Main] evcc Connection enabled')
-                self.evcc_api = evcc_api.EvccApi(config['evcc'])
+                self.evcc_api = EvccApi(config['evcc'])
                 self.evcc_api.register_block_function(
                     self.set_discharge_blocked)
                 self.evcc_api.register_always_allow_discharge_limit(
@@ -421,11 +425,11 @@ class Batcontrol:
         else:
             logger.info(
                 "[Main] No logfile path provided. Proceeding with default logfile path: %s",
-                LOGFILE
+                self.logfile
             )
 
         if config['max_logfile_size'] > 0:
-            self.logfilelimiter = logfilelimiter.LogFileLimiter(
+            self.logfilelimiter = LogFileLimiter(
                 self.logfile, config['max_logfile_size'])
 
         # is the path valid and writable?
@@ -1187,28 +1191,3 @@ class Batcontrol:
         logger.info(
             '[BatCtrl] API: Setting min price rel difference to %.3f', min_price_difference_rel)
         self.min_price_difference_rel = min_price_difference_rel
-
-
-if __name__ == '__main__':
-    bc = Batcontrol(CONFIGFILE)
-    try:
-        while True:
-            bc.run()
-            loop_now = datetime.datetime.now().astimezone(bc.timezone)
-            # reset base to full minutes on the clock
-            next_eval = loop_now - datetime.timedelta(
-                minutes=loop_now.minute % EVALUATIONS_EVERY_MINUTES,
-                seconds=loop_now.second,
-                microseconds=loop_now.microsecond
-            )
-            # add time increments to trigger next evaluation
-            next_eval += datetime.timedelta(minutes=EVALUATIONS_EVERY_MINUTES,
-                                            seconds=0,
-                                            microseconds=0)
-            sleeptime = (next_eval - loop_now).total_seconds()
-            logger.info("[Main] Next evaluation at %s. Sleeping for %.0f seconds",
-                        next_eval.strftime("%H:%M:%S"), sleeptime)
-            time.sleep(sleeptime)
-    finally:
-        bc.shutdown()
-        del bc

@@ -30,14 +30,12 @@ git clone https://github.com/muexxl/batcontrol.git
 cd batcontrol
 virtualenv venv
 source venv/bin/activate
-pip install -r requirements.txt
+pip install .
 ```
 
 ## run
 ```sh
-cd /PATH/TO/batcontrol
-source venv/bin/activate
-python batcontrol.py
+python -m batcontrol # When venv is activated
 ```
 
 # Docker usage

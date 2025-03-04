@@ -23,7 +23,6 @@ import logging
 import json
 import hashlib
 import requests
-import mqtt_api
 from .baseclass import InverterBaseclass
 
 logger = logging.getLogger('__main__').getChild('Fronius')

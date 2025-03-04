@@ -1,5 +1,5 @@
 """ Parent Class for implementing common functions for all inverters """
-from inverter.inverter_interface import InverterInterface
+from .inverter_interface import InverterInterface
 
 class InverterBaseclass(InverterInterface):
     def __init__(self, config):
