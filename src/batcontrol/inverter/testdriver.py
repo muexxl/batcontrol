@@ -1,6 +1,7 @@
 import logging
 from .baseclass import InverterBaseclass
 from .inverter_interface import InverterInterface
+from ..mqtt_api import MqttApi
 
 logger = logging.getLogger('__main__')
 logger.info('[Testdriver] loading module')
@@ -47,8 +48,7 @@ class Testdriver(InverterBaseclass):
         logger.info(f'[BatCtrl] testdriver API: Setting SOC: {SOC}%')
         self.SOC = SOC
 
-    def activate_mqtt(self, api_mqtt_api):  # no type here to prevent the need of loading mqtt_api
-        import mqtt_api
+    def activate_mqtt(self, api_mqtt_api):
         self.mqtt_api = api_mqtt_api
         # /set is appended to the topic
         self.mqtt_api.register_set_callback(self.__get_mqtt_topic() + 'SOC', self.api_set_SOC, int)
