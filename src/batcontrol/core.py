@@ -43,7 +43,7 @@ MODE_AVOID_DISCHARGING = 0
 MODE_FORCE_CHARGING = -1
 
 loglevel = logging.DEBUG
-logger = logging.getLogger(__name__)
+logger = logging.getLogger('__main__')
 formatter = logging.Formatter("%(asctime)s %(levelname)s %(message)s",
                               "%Y-%m-%d %H:%M:%S")
 

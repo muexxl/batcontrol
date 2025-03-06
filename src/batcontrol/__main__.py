@@ -2,11 +2,18 @@ from .core import Batcontrol
 import time
 import datetime
 import sys
+import logging
+
 
 CONFIGFILE = "config/batcontrol_config.yaml"
 EVALUATIONS_EVERY_MINUTES = 3  # Every x minutes on the clock
 
 def main() -> int:
+    loglevel = logging.DEBUG
+    logger = logging.getLogger(__name__)
+    formatter = logging.Formatter("%(asctime)s %(levelname)s %(message)s",
+                              "%Y-%m-%d %H:%M:%S")
+
     bc = Batcontrol(CONFIGFILE)
     try:
         while True:
@@ -21,7 +28,7 @@ def main() -> int:
             # add time increments to trigger next evaluation
             next_eval += datetime.timedelta(minutes=EVALUATIONS_EVERY_MINUTES)
             sleeptime = (next_eval - loop_now).total_seconds()
-            print(f"Next evaluation at {next_eval.strftime('%H:%M:%S')}. Sleeping for {sleeptime:.0f} seconds")
+            logger.info("Next evaluation at %s. Sleeping for %d seconds", next_eval.strftime('%H:%M:%S'), int(sleeptime))
             time.sleep(sleeptime)
     except KeyboardInterrupt:
         print("Shutting down")
