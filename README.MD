@@ -152,7 +152,7 @@ To uninstall batcontrol and restore the inverter settings follow these steps:
 
 For running batcontrol off the repository for development puroposes, it is required to uses pip with [Developermode](https://setuptools.pypa.io/en/latest/userguide/development_mode.html)
 
-ˋˋˋsh
+```sh
 git clone https://github.com/muexxl/batcontrol.git
 cd batcontrol
 python -m venv .venv
@@ -165,4 +165,4 @@ pip install --editable .
 # Now you have access to your package
 # as if it was installed in .venv
 python -c batcontrol
-ˋˋˋ 
+```
