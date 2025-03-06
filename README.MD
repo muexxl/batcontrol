@@ -148,3 +148,21 @@ To uninstall batcontrol and restore the inverter settings follow these steps:
 5. Remove the software from wherever it was running from or delete the docker container.
 6. Disable the Solar API in your inverters web UI, if it is not needed by any other third party software or wallboxes. For example the Fronius Wattpilot will NOT work with the solar API disabled.
 
+# Local development
+
+For running batcontrol off the repository for development puroposes, it is required to uses pip with [Developermode](https://setuptools.pypa.io/en/latest/userguide/development_mode.html)
+
+ˋˋˋsh
+git clone https://github.com/muexxl/batcontrol.git
+cd batcontrol
+python -m venv .venv
+# Activate your environment with:
+#      `source .venv/bin/activate` on Unix/macOS
+# or   `.venv\Scripts\activate` on Windows
+
+pip install --editable . 
+
+# Now you have access to your package
+# as if it was installed in .venv
+python -c batcontrol
+ˋˋˋ 
