@@ -164,5 +164,5 @@ pip install --editable .
 
 # Now you have access to your package
 # as if it was installed in .venv
-python -c batcontrol
+python -m batcontrol
 ```
