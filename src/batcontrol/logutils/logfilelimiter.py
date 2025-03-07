@@ -10,8 +10,8 @@ Classes:
 """
 import os
 import logging
-logger = logging.getLogger('__main__')
-logger.info('[LogFileLimiter] loading module')
+logger = logging.getLogger(__name__)
+logger.info('Loading module')
 
 
 class LogFileLimiter:
