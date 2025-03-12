@@ -1,5 +1,5 @@
 # Stage 1: Build Stage
-FROM python:3.10-alpine AS builder
+FROM python:3.12-alpine AS builder
 
 # Install build dependencies (using Alpine's package manager)
 RUN apk add --no-cache gcc g++ musl-dev python3-dev
@@ -12,7 +12,7 @@ COPY ./pyproject.toml .
 RUN pip wheel --no-cache-dir --wheel-dir=/wheels .
 
 # Stage 2: Build the final image
-FROM python:3.10-alpine
+FROM python:3.12-alpine
 
 ARG VERSION
 ARG GIT_SHA
