@@ -1,5 +1,5 @@
 # Stage 1: Build Stage
-FROM python:3.10-alpine AS builder
+FROM python:3.11-alpine AS builder
 
 # Copy all necessary files for the build
 COPY ./src ./src
@@ -9,7 +9,7 @@ COPY ./pyproject.toml .
 RUN pip wheel --no-cache-dir --no-deps --wheel-dir=/wheels .
 
 # Stage 2: Build the final image
-FROM python:3.10-alpine
+FROM python:3.11-alpine
 
 ARG VERSION
 ARG GIT_SHA
@@ -21,7 +21,7 @@ LABEL maintainer="matthias.strubel@aod-rpg.de"
 
 # Copy the built wheel from the builder stage and install it
 COPY --from=builder /wheels /wheels
-RUN pip install --no-cache-dir /wheels/*.whl && rm -rf /wheels
+RUN pip install --no-cache-dir --extra-index-url https://piwheels.org/simple /wheels/*.whl && rm -rf /wheels
 
 ENV BATCONTROL_VERSION=${VERSION}
 ENV BATCONTROL_GIT_SHA=${GIT_SHA}
