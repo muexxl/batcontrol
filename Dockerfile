@@ -1,9 +1,14 @@
 # Stage 1: Build Stage
 FROM python:3.11-alpine AS builder
 
-# Copy all necessary files for the build
-COPY ./src ./src
+# Copy only whats needed for dependencies first
 COPY ./pyproject.toml .
+
+# Install build dependencies
+RUN pip install setuptools>=66.0
+
+# Copy the rest of the source files
+COPY ./src ./src
 
 # Build a wheel from the public Git repo
 RUN pip wheel --no-cache-dir --no-deps --wheel-dir=/wheels .
