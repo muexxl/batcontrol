@@ -1,12 +1,15 @@
 # Stage 1: Build Stage
 FROM python:3.10-alpine AS builder
 
+# Install build dependencies (using Alpine's package manager)
+RUN apk add --no-cache gcc g++ musl-dev python3-dev
+
 # Copy all necessary files for the build
 COPY ./src ./src
 COPY ./pyproject.toml .
 
 # Build a wheel from the public Git repo
-RUN pip wheel --no-cache-dir --no-deps --wheel-dir=/wheels .
+RUN pip wheel --no-cache-dir --wheel-dir=/wheels .
 
 # Stage 2: Build the final image
 FROM python:3.10-alpine
@@ -19,9 +22,9 @@ LABEL git-sha="${GIT_SHA}"
 LABEL description="This is a Docker image for the BatControl project."
 LABEL maintainer="matthias.strubel@aod-rpg.de"
 
-# Copy the built wheel from the builder stage and install it
+# Copy the built wheels from the builder stage and install them
 COPY --from=builder /wheels /wheels
-RUN pip install --no-cache-dir /wheels/*.whl && rm -rf /wheels
+RUN pip install --no-cache-dir --find-links=/wheels/ --no-index batcontrol && rm -rf /wheels
 
 ENV BATCONTROL_VERSION=${VERSION}
 ENV BATCONTROL_GIT_SHA=${GIT_SHA}
