@@ -39,15 +39,16 @@ ENV TZ=UTC
 RUN mkdir -p /app /app/logs /app/config
 WORKDIR /app
 
-# Copy other necessary runtime files (like config templates or entrypoint scripts)
-COPY LICENSE ./
+# The load profiles to all locations where it is needed
 COPY config/load_profile_default.csv ./config/load_profile.csv
 COPY config/load_profile_default.csv ./default_load_profile.csv
+
+# Copy all the other necessary runtime files
+COPY LICENSE entrypoint.sh ./
 COPY config ./config_template
-COPY entrypoint.sh ./
 
 # Set the scripts as executable
-RUN chmod +x entrypoint.sh entrypoint_ha.sh
+RUN chmod +x entrypoint.sh
 
 VOLUME ["/app/logs", "/app/config"]
 
