@@ -45,7 +45,6 @@ COPY config/load_profile_default.csv ./config/load_profile.csv
 COPY config/load_profile_default.csv ./default_load_profile.csv
 COPY config ./config_template
 COPY entrypoint.sh ./
-COPY entrypoint_ha.sh ./
 
 # Set the scripts as executable
 RUN chmod +x entrypoint.sh entrypoint_ha.sh
