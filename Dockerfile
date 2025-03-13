@@ -2,7 +2,7 @@
 FROM python:3.11-alpine AS builder
 
 # Copy only whats needed for dependencies first
-COPY ./pyproject.toml .
+COPY pyproject.toml LICENSE README.MD ./
 
 # Install build dependencies
 RUN pip install setuptools>=66.0
