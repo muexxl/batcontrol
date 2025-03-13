@@ -7,8 +7,8 @@ import re
 import logging
 import paho.mqtt.client as mqtt
 
-logger = logging.getLogger('__main__').getChild("evcc")
-logger.info('[evcc] loading module')
+logger = logging.getLogger(__name__)
+logger.info('Loading module')
 
 
 class EvccApi():
@@ -97,7 +97,7 @@ class EvccApi():
         elif isinstance(config['loadpoint_topic'], list):
             self.list_topics_loadpoint = config['loadpoint_topic']
         else:
-            logger.error('[evcc] Invalid loadpoint_topic type')
+            logger.error('Invalid loadpoint_topic type')
 
         self.client = mqtt.Client(clean_session=True)
 
@@ -122,7 +122,7 @@ class EvccApi():
         self.client.message_callback_add(
             self.topic_status, self._handle_message)
         if self.topic_battery_halt_soc is not None:
-            logger.info('[evcc] Enabling battery threshold management.')
+            logger.info('Enabling battery threshold management.')
             self.client.message_callback_add(
                 self.topic_battery_halt_soc, self._handle_message)
         for topic in self.list_topics_loadpoint:
@@ -149,13 +149,13 @@ class EvccApi():
 
     def on_connect(self, client, userdata, flags, rc):  # pylint: disable=unused-argument
         """ Callback function for MQTT on_connect """
-        logger.info('[evcc] Connected to MQTT Broker with result code %s', rc)
+        logger.info('Connected to MQTT Broker with result code %s', rc)
         # Subscribe to status and loadpoint(s)
         self.client.subscribe(self.topic_status, qos=1)
         if self.topic_battery_halt_soc is not None:
             self.client.subscribe(self.topic_battery_halt_soc, qos=1)
         for topic in self.list_topics_loadpoint:
-            logger.info('[evcc] Subscribing to %s', topic)
+            logger.info('Subscribing to %s', topic)
             self.client.subscribe(topic)
 
     def wait_ready(self) -> bool:
@@ -165,9 +165,9 @@ class EvccApi():
         while self.client.is_connected() is False:
             retry -= 1
             if retry == 0:
-                logger.error('[evcc] Could not connect to MQTT Broker')
+                logger.error('Could not connect to MQTT Broker')
                 return False
-            logger.info('[evcc] Waiting for connection')
+            logger.info('Waiting for connection')
             time.sleep(1)
         return True
 
@@ -199,14 +199,14 @@ class EvccApi():
     def __restore_old_allow_discharge_limit(self):
         """ Restore old limit, if set and set to None """
         if not self.old_allow_discharge_limit is None:
-            logger.info("[evcc] Restoring allow_discharge_limit %.2f",
+            logger.info("Restoring allow_discharge_limit %.2f",
                         self.old_allow_discharge_limit)
             self.set_always_allow_discharge_limit_function(
                 self.old_allow_discharge_limit)
             self.old_allow_discharge_limit = None
         # This value may be changed, too, so we restore it
         if not self.old_max_charge_limit is None:
-            logger.info("[evcc] Restoring max_charge_limit %.2f",
+            logger.info("Restoring max_charge_limit %.2f",
                         self.old_max_charge_limit)
             self.set_max_charge_limit_function(self.old_max_charge_limit)
             self.old_max_charge_limit = None
@@ -214,13 +214,13 @@ class EvccApi():
     def set_evcc_discharge_limit_on_batcontrol(self):
         """ Set allow_discharge_limit on batcontrol"""
         if self.evcc_battery_halt_soc is not None:
-            logger.info('[evcc] Setting always_allow_discharge_limit to %.2f',
+            logger.info('Setting always_allow_discharge_limit to %.2f',
                         self.battery_halt_soc_float)
             self.set_always_allow_discharge_limit_function(
                 self.battery_halt_soc_float
             )
         else:
-            logger.error('[evcc] No evcc battery hold config value received')
+            logger.error('No evcc battery hold config value received')
 
     def set_evcc_online(self, online: bool):
         """ Set the evcc online status and handle state changes.
@@ -228,16 +228,16 @@ class EvccApi():
         """
         if self.evcc_is_online != online:
             if online is False:
-                logger.error('[evcc] evcc went offline')
+                logger.error('evcc went offline')
                 if self.evcc_is_charging is True:
                     # We remove the block, that we set to not end endless in block mode
-                    logger.error('[evcc] evcc was charging, remove block')
+                    logger.error('evcc was charging, remove block')
                     self.evcc_is_charging = False
                     self.block_function(False)
                     self.__restore_old_allow_discharge_limit()
                     self.__reset_loadpoint_status()
             else:
-                logger.info('[evcc] evcc is online')
+                logger.info('evcc is online')
             self.evcc_is_online = online
 
     def set_evcc_charging(self, charging: bool):
@@ -245,14 +245,14 @@ class EvccApi():
         if self.evcc_is_charging != charging:
             if charging is True:
                 # We set the block, so we do not discharge the battery
-                logger.info('[evcc] evcc is charging, set block')
+                logger.info('evcc is charging, set block')
                 self.evcc_is_charging = True
                 self.block_function(True)
                 if self.topic_battery_halt_soc is not None:
                     self.__save_old_allow_discharge_limit()
                     self.set_evcc_discharge_limit_on_batcontrol()
             else:
-                logger.info('[evcc] evcc is not charging, remove block')
+                logger.info('evcc is not charging, remove block')
                 self.evcc_is_charging = False
                 self.block_function(False)
                 self.__restore_old_allow_discharge_limit()
@@ -270,9 +270,9 @@ class EvccApi():
         # Send info if status changed
         if send_info is True:
             if is_charging is False:
-                logger.info('[evcc] Loadpoint %s is not charging.', topic)
+                logger.info('Loadpoint %s is not charging.', topic)
             else:
-                logger.info('[evcc] Loadpoint %s is charging.', topic)
+                logger.info('Loadpoint %s is charging.', topic)
 
     def __reset_loadpoint_status(self):
         """ Reset the loadpoint status """
@@ -281,7 +281,7 @@ class EvccApi():
 
     def handle_status_messages(self, message):
         """ Handle incoming status messages from the MQTT broker """
-        # logger.debug('[evcc] Received status message: %s', message.payload)
+        # logger.debug('Received status message: %s', message.payload)
         if message.payload == b'online':
             self.set_evcc_online(True)
         elif message.payload == b'offline':
@@ -297,13 +297,13 @@ class EvccApi():
             if self.evcc_battery_halt_soc is None or \
                self.evcc_battery_halt_soc != new_soc:
                 self.evcc_battery_halt_soc = new_soc
-                logger.info('[evcc] New battery_halt value: %s', new_soc)
+                logger.info('New battery_halt value: %s', new_soc)
                 self.battery_halt_soc_float = new_soc / 100
                 if self.evcc_is_charging is True:
                     self.set_always_allow_discharge_limit_function(
                         self.battery_halt_soc_float)
         except ValueError:
-            logger.error('[evcc] Could not convert battery_halt to int')
+            logger.error('Could not convert battery_halt to int')
 
     def handle_charging_message(self, message):
         """ Handle incoming charging messages from the MQTT broker """
@@ -327,7 +327,7 @@ class EvccApi():
 
     def _handle_message(self, client, userdata, message):  # pylint: disable=unused-argument
         """ Message dispatching function """
-        # logger.debug('[evcc] Received message on %s', message.topic)
+        # logger.debug('Received message on %s', message.topic)
         if message.topic == self.topic_status:
             self.handle_status_messages(message)
         elif self.topic_battery_halt_soc is not None and \
@@ -338,4 +338,4 @@ class EvccApi():
             self.handle_charging_message(message)
         else:
             logger.warning(
-                '[evcc] No callback registered for %s', message.topic)
+                'No callback registered for %s', message.topic)
