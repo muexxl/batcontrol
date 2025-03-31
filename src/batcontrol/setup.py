@@ -2,6 +2,7 @@ import logging
 import sys
 import os
 import yaml
+from logging.handlers import RotatingFileHandler
 
 def setup_logging(level=logging.INFO, logfile=None):
     """Configure root logger with consistent formatting.
@@ -35,7 +36,8 @@ def setup_logging(level=logging.INFO, logfile=None):
     if logfile:
         if not os.path.exists(os.path.dirname(logfile)):
             os.makedirs(os.path.dirname(logfile))
-        file_handler = logging.FileHandler(logfile)
+            logging.Rotating
+        file_handler = RotatingFileHandler(logfile, maxBytes=10*1024*1024, backupCount=2)
         file_handler.setFormatter(formatter)
         root_logger.addHandler(file_handler)
 
