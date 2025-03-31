@@ -275,10 +275,6 @@ class Batcontrol:
         )
         self.last_run_time = time.time()
 
-        # prune log file if file is too large
-        if self.logfilelimiter is not None and self.logfile_enabled:
-            self.logfilelimiter.run()
-
         # get forecasts
         try:
             price_dict = self.dynamic_tariff.get_prices()
