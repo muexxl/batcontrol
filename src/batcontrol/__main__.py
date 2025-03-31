@@ -15,7 +15,7 @@ def main() -> int:
     # Configure a basic logger to be able to log even before the configuration is loaded
     setup_logging(level=logging.INFO)
     logger = logging.getLogger(__name__)
-    logger.info('Starting Batcontrol')
+    logger.info('Looking for config file at %s', CONFIGFILE)
 
     # Load the configuration
     config = load_config(CONFIGFILE)
@@ -43,6 +43,7 @@ def main() -> int:
     bc = Batcontrol(config)
     try:
         while True:
+            logger.info("Starting batcontrol")
             bc.run()
             loop_now = datetime.datetime.now().astimezone(bc.timezone)
             # reset base to full minutes on the clock
