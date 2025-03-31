@@ -18,7 +18,7 @@ def main() -> int:
     logger.info('Starting Batcontrol')
 
     # Load the configuration
-    config = load_config(CONFIGFILE, LOGFILE_ENABLED_DEFAULT)
+    config = load_config(CONFIGFILE)
 
     # Load the config for the logger with the loaded configuration
     loglevel = config.get('loglevel', 'info')
