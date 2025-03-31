@@ -39,7 +39,7 @@ def setup_logging(level=logging.INFO, logfile=None):
         file_handler.setFormatter(formatter)
         root_logger.addHandler(file_handler)
 
-def load_config(self, configfile:str) -> dict:
+def load_config(configfile:str) -> dict:
     """ Load the configuration file and check for validity.
 
     This maps some config entries for compatibility reasons.
@@ -67,33 +67,4 @@ def load_config(self, configfile:str) -> dict:
     else:
         raise RuntimeError('No PV Installation found')
     
-    # return config
-
-    global loglevel
-    loglevel = config.get('loglevel', 'info')
-
-    if loglevel == 'debug':
-        logger.setLevel(logging.DEBUG)
-    elif loglevel == 'warning':
-        logger.setLevel(logging.WARNING)
-    elif loglevel == 'error':
-        logger.setLevel(logging.ERROR)
-    elif loglevel == 'info':
-        logger.setLevel(logging.INFO)
-    else:
-        logger.setLevel(logging.INFO)
-        logger.info(
-            '[BATCtrl] Provided loglevel "%s" not valid. Defaulting to loglevel "info"',
-            loglevel
-        )
-
-    log_is_enabled = config.get('logfile_enabled', LOGFILE_ENABLED_DEFAULT)
-    if log_is_enabled:
-        self.setup_logfile(config)
-    else:
-        self.logfile_enabled = False
-        logger.info(
-            "[Main] Logfile disabled in config. Proceeding without logfile"
-        )
-
-    self.config = config
+    return config
