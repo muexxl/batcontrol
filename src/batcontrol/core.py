@@ -37,6 +37,7 @@ MODE_AVOID_DISCHARGING = 0
 MODE_FORCE_CHARGING = -1
 
 logger = logging.getLogger(__name__)
+rules_logger = logging.getLogger(__name__ + '.rules')
 
 class Batcontrol:
     def __init__(self, configdict: dict):
@@ -346,7 +347,7 @@ class Batcontrol:
         if self.is_discharge_allowed(net_consumption, prices):
             self.allow_discharging()
         else:  # discharge not allowed
-            logger.debug('[Rule] Discharging is NOT allowed')
+            rules_logger.debug('Discharging is NOT allowed')
             charging_limit_percent = self.max_charging_from_grid_limit * 100
             required_recharge_energy = self.get_required_required_recharge_energy(
                 net_consumption[:max_hour],
@@ -357,11 +358,11 @@ class Batcontrol:
             logger.debug('Charging allowed: %s',
                          is_charging_possible)
             if is_charging_possible:
-                logger.debug('[Rule] Charging is allowed, because SOC is below %.0f%%',
+                rules_logger.debug('Charging is allowed, because SOC is below %.0f%%',
                              charging_limit_percent
                              )
             else:
-                logger.debug('[Rule] Charging is NOT allowed, because SOC is above %.0f%%',
+                rules_logger.debug('Charging is NOT allowed, because SOC is above %.0f%%',
                              charging_limit_percent
                              )
 
@@ -371,8 +372,8 @@ class Batcontrol:
                     required_recharge_energy
                 )
             else:
-                logger.debug(
-                    '[Rule] No additional energy required or possible price found.')
+                rules_logger.debug(
+                    'No additional energy required or possible price found.')
 
             # charge if battery capacity available and more stored energy is required
             if is_charging_possible and required_recharge_energy > 0:
@@ -547,8 +548,8 @@ class Batcontrol:
         t1 = t0+dt
         last_hour = t1.astimezone(self.timezone).strftime("%H:59")
 
-        logger.debug(
-            '[Rule] Evaluating next %d hours until %s',
+        rules_logger.debug(
+            'Evaluating next %d hours until %s',
             max_hour,
             last_hour
         )
