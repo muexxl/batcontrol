@@ -1,4 +1,5 @@
 from .core import Batcontrol
+from .setup import setup_logging, load_config
 import time
 import datetime
 import sys
@@ -7,12 +8,34 @@ import logging
 
 CONFIGFILE = "config/batcontrol_config.yaml"
 EVALUATIONS_EVERY_MINUTES = 3  # Every x minutes on the clock
+LOGFILE_ENABLED_DEFAULT = True
+LOGFILE = "logs/batcontrol.log"
 
 def main() -> int:
-    loglevel = logging.DEBUG
+    # Configure a basic logger to be able to log even before the configuration is loaded
+    setup_logging(level=logging.INFO)
     logger = logging.getLogger(__name__)
-    formatter = logging.Formatter("%(asctime)s %(levelname)s %(message)s",
-                              "%Y-%m-%d %H:%M:%S")
+    logger.info('Starting Batcontrol')
+
+    # Load the configuration
+    config = load_config(CONFIGFILE, LOGFILE_ENABLED_DEFAULT)
+
+    # Load the config for the logger with the loaded configuration
+    loglevel = config.get('loglevel', 'info')
+    logfile_enabled = config.get('logfile_enabled', LOGFILE_ENABLED_DEFAULT)
+    logfile = LOGFILE if logfile_enabled else None
+
+    # Establish the loglevel mapping
+    loglevel_mapping = {
+        'debug': logging.DEBUG,
+        'warning': logging.WARNING,
+        'error': logging.ERROR,
+        'info': logging.INFO
+    }
+
+    # Setup the logger based on the config
+    setup_logging(level=loglevel_mapping.get(loglevel, logging.INFO), logfile=logfile)
+    logger = logging.getLogger(__name__)
 
     bc = Batcontrol(CONFIGFILE)
     try:

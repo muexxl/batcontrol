@@ -1,7 +1,7 @@
 import logging
 import sys
 import os
-logging.log
+import yaml
 
 def setup_logging(level=logging.INFO, logfile=None):
     """Configure root logger with consistent formatting.
@@ -38,3 +38,62 @@ def setup_logging(level=logging.INFO, logfile=None):
         file_handler = logging.FileHandler(logfile)
         file_handler.setFormatter(formatter)
         root_logger.addHandler(file_handler)
+
+def load_config(self, configfile:str) -> dict:
+    """ Load the configuration file and check for validity.
+
+    This maps some config entries for compatibility reasons.
+
+    Args:
+        configfile (str): Path to the config file
+    
+    Returns:
+        dict: The loaded configuration
+        
+    Raises:
+        RuntimeError: If the config file is not found or no PV installations are found
+
+    """
+    if not os.path.isfile(configfile):
+        raise RuntimeError(f'Configfile {configfile} not found')
+
+    with open(configfile, 'r', encoding='UTF-8') as f:
+        config_str = f.read()
+
+    config = yaml.safe_load(config_str)
+
+    if config['pvinstallations']:
+        pass
+    else:
+        raise RuntimeError('No PV Installation found')
+    
+    # return config
+
+    global loglevel
+    loglevel = config.get('loglevel', 'info')
+
+    if loglevel == 'debug':
+        logger.setLevel(logging.DEBUG)
+    elif loglevel == 'warning':
+        logger.setLevel(logging.WARNING)
+    elif loglevel == 'error':
+        logger.setLevel(logging.ERROR)
+    elif loglevel == 'info':
+        logger.setLevel(logging.INFO)
+    else:
+        logger.setLevel(logging.INFO)
+        logger.info(
+            '[BATCtrl] Provided loglevel "%s" not valid. Defaulting to loglevel "info"',
+            loglevel
+        )
+
+    log_is_enabled = config.get('logfile_enabled', LOGFILE_ENABLED_DEFAULT)
+    if log_is_enabled:
+        self.setup_logfile(config)
+    else:
+        self.logfile_enabled = False
+        logger.info(
+            "[Main] Logfile disabled in config. Proceeding without logfile"
+        )
+
+    self.config = config

@@ -23,9 +23,6 @@ from .forecastsolar import ForecastSolar as solar_factory
 from .forecastconsumption import Consumption as consumption_factory
 
 
-LOGFILE_ENABLED_DEFAULT = True
-LOGFILE = "logs/batcontrol.log"
-
 ERROR_IGNORE_TIME = 600  # 10 Minutes
 EVALUATIONS_EVERY_MINUTES = 3  # Every x minutes on the clock
 DELAY_EVALUATION_BY_SECONDS = 15  # Delay evaluation for x seconds at every trigger
@@ -58,7 +55,7 @@ logger.info('[Main] Starting Batcontrol')
 
 
 class Batcontrol:
-    def __init__(self, configfile: str):
+    def __init__(self, configdict: dict):
         # For API
         self.api_overwrite = False
         # -1 = charge from grid , 0 = avoid discharge , 10 = discharge allowed
@@ -87,12 +84,8 @@ class Batcontrol:
 
         self.last_run_time = 0
 
-        self.logfile = LOGFILE
-        self.logfile_enabled = True
-        self.logfilelimiter = None
-
-        self.load_config(configfile)
-        config = self.config
+        self.config = configdict
+        config = configdict
 
         try:
             tzstring = config['timezone']
@@ -245,52 +238,6 @@ class Batcontrol:
                 del self.evcc_api
         except:
             pass
-
-    def load_config(self, configfile):
-        """ Load the configuration file and check for validity.
-            This maps some config entries for compatibility reasons.
-         """
-        if not os.path.isfile(configfile):
-            raise RuntimeError(f'Configfile {configfile} not found')
-
-        with open(configfile, 'r', encoding='UTF-8') as f:
-            config_str = f.read()
-
-        config = yaml.safe_load(config_str)
-
-        if config['pvinstallations']:
-            pass
-        else:
-            raise RuntimeError('No PV Installation found')
-
-        global loglevel
-        loglevel = config.get('loglevel', 'info')
-
-        if loglevel == 'debug':
-            logger.setLevel(logging.DEBUG)
-        elif loglevel == 'warning':
-            logger.setLevel(logging.WARNING)
-        elif loglevel == 'error':
-            logger.setLevel(logging.ERROR)
-        elif loglevel == 'info':
-            logger.setLevel(logging.INFO)
-        else:
-            logger.setLevel(logging.INFO)
-            logger.info(
-                '[BATCtrl] Provided loglevel "%s" not valid. Defaulting to loglevel "info"',
-                loglevel
-            )
-
-        log_is_enabled = config.get('logfile_enabled', LOGFILE_ENABLED_DEFAULT)
-        if log_is_enabled:
-            self.setup_logfile(config)
-        else:
-            self.logfile_enabled = False
-            logger.info(
-                "[Main] Logfile disabled in config. Proceeding without logfile"
-            )
-
-        self.config = config
 
     def setup_logfile(self, config):
         """ Setup the logfile and correpsonding handlers """
