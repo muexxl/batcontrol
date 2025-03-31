@@ -1,9 +1,18 @@
 import logging
 import sys
 import os
+logging.log
 
-def setup_logging(level=logging.INFO, logfile=None) -> logging.Logger:
-    """Configure root logger with consistent formatting."""
+def setup_logging(level=logging.INFO, logfile=None):
+    """Configure root logger with consistent formatting.
+    
+    Args:
+        level (int): Log level to set for the root logger.
+        logfile (str): If specified, log to this file as well as the console.
+
+    Returns:
+        logging.Logger: Root logger
+    """
     # Create root logger
     root_logger = logging.getLogger()
     root_logger.setLevel(level)
@@ -29,5 +38,3 @@ def setup_logging(level=logging.INFO, logfile=None) -> logging.Logger:
         file_handler = logging.FileHandler(logfile)
         file_handler.setFormatter(formatter)
         root_logger.addHandler(file_handler)
-        
-    return root_logger
