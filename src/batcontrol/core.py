@@ -339,6 +339,7 @@ class Batcontrol:
         # %%
     def set_wr_parameters(self, net_consumption: np.ndarray, prices: dict):
         """ Main control logic for battery control """
+        # TODO: Move control logic to a separate module
         # ensure availability of data
         max_hour = min(len(net_consumption), len(prices))
 
