@@ -559,10 +559,12 @@ class FroniusWR(InverterBaseclass):
                 self.__retrieve_auth_from_response(response)
                 self.login_attempts = 0
                 return
+            elif response.status_code == 401:
+                self.__retrieve_auth_from_response(response)
 
             logger.error(
                 '[Inverter] Login -%d- failed, Response: %s', i, response)
-            logger.error('[Inverter] Response-raw: %s', response.raw)
+            logger.error('[Inverter] Response-raw: %s', response.text)
             if self.subsequent_login:
                 logger.info(
                     "[Inverter] Retrying login in 10 seconds")
