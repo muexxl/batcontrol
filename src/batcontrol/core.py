@@ -16,7 +16,7 @@ from .evcc_api import EvccApi
 
 from .dynamictariff import DynamicTariff as tariff_factory
 from .inverter import Inverter as inverter_factory
-from .logfilelimiter import LogFileLimiter
+from .logs import LogFileLimiter
 
 from .forecastsolar import ForecastSolar as solar_factory
 
