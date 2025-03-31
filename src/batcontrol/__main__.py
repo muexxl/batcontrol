@@ -40,7 +40,7 @@ def main() -> int:
     setup_logging(level=loglevel_mapping.get(loglevel, logging.INFO), logfile=logfile)
     logger = logging.getLogger(__name__)
 
-    bc = Batcontrol(CONFIGFILE)
+    bc = Batcontrol(config)
     try:
         while True:
             bc.run()
