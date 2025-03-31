@@ -25,6 +25,9 @@ def main() -> int:
     logfile_enabled = config.get('logfile_enabled', LOGFILE_ENABLED_DEFAULT)
     logfile = LOGFILE if logfile_enabled else None
 
+    if not logfile_enabled:
+        logger.info("Logfile disabled in config. Proceeding without logfile")
+
     # Establish the loglevel mapping
     loglevel_mapping = {
         'debug': logging.DEBUG,
