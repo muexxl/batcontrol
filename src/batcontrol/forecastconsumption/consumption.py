@@ -3,8 +3,8 @@ import logging
 from .forecastconsumption_interface import ForecastConsumptionInterface
 from .forecast_csv import ForecastConsumptionCsv
 
-logger = logging.getLogger('__main__').getChild('ConsumptionFactory')
-logger.info('[Consumption] loading module ')
+logger = logging.getLogger(__name__)
+logger.info('Loading module')
 
 DEFAULT_CSV_FILE = 'default_load_profile.csv'
 
@@ -29,7 +29,7 @@ class Consumption:
 
             if csv_config.get('load_profile', None) is None:
                 logger.error(
-                    "[Consumption] No load profile specified, using default: %s",
+                    "No load profile specified, using default: %s",
                     DEFAULT_CSV_FILE
                 )
                 csv_config['load_profile'] = DEFAULT_CSV_FILE

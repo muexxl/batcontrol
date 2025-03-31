@@ -25,9 +25,8 @@ import hashlib
 import requests
 from .baseclass import InverterBaseclass
 
-logger = logging.getLogger('__main__').getChild('Fronius')
-logger.setLevel(logging.INFO)
-logger.info('[Inverter] loading module ')
+logger = logging.getLogger(__name__)
+logger.info('Loading module ')
 
 
 
@@ -88,12 +87,12 @@ class FroniusWR(InverterBaseclass):
 
         if not self.previous_battery_config:
             raise RuntimeError(
-                f'[Inverter] failed to load Battery config from Inverter at {self.address}')
+                f'Failed to load Battery config from Inverter at {self.address}')
         try:
             self.previous_backup_power_config = self.get_powerunit_config()
         except RuntimeError:
             logger.error(
-                '[Inverter] failed to load Power Unit config from Inverter (latest).'
+                'Failed to load Power Unit config from Inverter (latest).'
             )
 
         if not self.previous_backup_power_config:
@@ -102,11 +101,11 @@ class FroniusWR(InverterBaseclass):
                     '1.2'
                     )
                 logger.info(
-                    '[Inverter] loaded Power Unit config from Inverter (1.2).'
+                    'Loaded Power Unit config from Inverter (1.2).'
                     )
             except RuntimeError:
                 logger.error(
-                    '[Inverter] failed to load Power Unit config from Inverter (1.2).'
+                    'Failed to load Power Unit config from Inverter (1.2).'
                 )
 
         if self.previous_backup_power_config:
@@ -114,7 +113,7 @@ class FroniusWR(InverterBaseclass):
                 'backuppower']['DEVICE_MODE_BACKUPMODE_TYPE_U16']
         else:
             logger.error(
-                "[Inverter] Setting backup power mode to 0 as a fallback."
+                "Setting backup power mode to 0 as a fallback."
                 )
             self.backup_power_mode = 0
             self.previous_backup_power_config = None
@@ -137,7 +136,7 @@ class FroniusWR(InverterBaseclass):
         response = self.send_request(path)
         if not response:
             logger.error(
-                '[Inverter] Failed to get SOC. Returning default value of 99.0'
+                'Failed to get SOC. Returning default value of 99.0'
                 )
             return 99.0
         result = json.loads(response.text)
@@ -150,7 +149,7 @@ class FroniusWR(InverterBaseclass):
         response = self.send_request(path, auth=True)
         if not response:
             logger.error(
-                '[Inverter] Failed to get battery configuration. Returning empty dict'
+                'Failed to get battery configuration. Returning empty dict'
             )
             return {}
 
@@ -161,7 +160,7 @@ class FroniusWR(InverterBaseclass):
                 f.write(response.text)
         else:
             logger.warning(
-                '[Inverter] Battery config file already exists. Not writing to %s',
+                'Battery config file already exists. Not writing to %s',
                 BATTERY_CONFIG_FILENAME
             )
 
@@ -185,7 +184,7 @@ class FroniusWR(InverterBaseclass):
         response = self.send_request(path, auth=True)
         if not response:
             logger.error(
-                '[Inverter] Failed to get power unit configuration. Returning empty dict'
+                'Failed to get power unit configuration. Returning empty dict'
             )
             return {}
         result = json.loads(response.text)
@@ -213,7 +212,7 @@ class FroniusWR(InverterBaseclass):
         path = '/config/batteries'
         payload = json.dumps(settings)
         logger.info(
-            '[Inverter] Restoring previous battery configuration: %s ',
+            'Restoring previous battery configuration: %s ',
             payload
         )
         response = self.send_request(
@@ -231,7 +230,7 @@ class FroniusWR(InverterBaseclass):
             os.remove(BATTERY_CONFIG_FILENAME)
         except OSError:
             logger.error(
-                '[Inverter] could not remove battery config file %s', BATTERY_CONFIG_FILENAME)
+                'Could not remove battery config file %s', BATTERY_CONFIG_FILENAME)
         return response
 
     def set_allow_grid_charging(self, value: bool):
@@ -298,13 +297,13 @@ class FroniusWR(InverterBaseclass):
                       }
 
         payload = json.dumps(parameters)
-        logger.info('[Inverter] Setting battery parameters: %s', payload)
+        logger.info('Setting battery parameters: %s', payload)
 
         response = self.send_request(
             path, method='POST', payload=payload, auth=True)
         if not response:
             logger.error(
-                '[Inverter] Failed to set parameters. No response from server'
+                'Failed to set parameters. No response from server'
                 )
             return response
         response_dict = json.loads(response.text)
@@ -326,7 +325,7 @@ class FroniusWR(InverterBaseclass):
                 f.write(json.dumps(result))
         else:
             logger.warning(
-                '[Inverter] Time of use config file already exists. Not writing to %s',
+                'Time of use config file already exists. Not writing to %s',
                 TIMEOFUSE_CONFIG_FILENAME
             )
 
@@ -395,14 +394,14 @@ class FroniusWR(InverterBaseclass):
             with open(TIMEOFUSE_CONFIG_FILENAME, 'r', encoding="utf-8") as f:
                 time_of_use_config_json = f.read()
         except OSError:
-            logger.error('[Inverter] could not restore timeofuse config')
+            logger.error('Could not restore timeofuse config')
             return
 
         try:
             time_of_use_config = json.loads(time_of_use_config_json)
         except:  # pylint: disable=bare-except
             logger.error(
-                '[Inverter] could not parse timeofuse config from %s',
+                'Could not parse timeofuse config from %s',
                 TIMEOFUSE_CONFIG_FILENAME
             )
             return
@@ -429,7 +428,7 @@ class FroniusWR(InverterBaseclass):
             os.remove(TIMEOFUSE_CONFIG_FILENAME)
         except OSError:
             logger.error(
-                '[Inverter] could not remove timeofuse config file %s', TIMEOFUSE_CONFIG_FILENAME
+                'Could not remove timeofuse config file %s', TIMEOFUSE_CONFIG_FILENAME
                 )
 
     def set_time_of_use(self, timeofuselist):
@@ -457,7 +456,7 @@ class FroniusWR(InverterBaseclass):
             '/solar_api/v1/GetStorageRealtimeData.cgi')
         if not response:
             logger.warning(
-                '[Inverter] capacity request failed. Returning default value'
+                'Capacity request failed. Returning default value'
             )
             return 1000
         result = json.loads(response.text)
@@ -471,7 +470,7 @@ class FroniusWR(InverterBaseclass):
             auth = This request needs to be run with authentication.
             is_login = This request is a login request. Do not retry on 401.
         """
-        logger.debug("[Inverter] Sending request to %s", path)
+        logger.debug("Sending request to %s", path)
         if not headers:
             headers = {}
         for i in range(2):
@@ -527,7 +526,7 @@ class FroniusWR(InverterBaseclass):
                 return response
             except requests.exceptions.ConnectionError as err:
                 logger.error(
-                    "[Inverter] Connection to Inverter failed on %s. (%d) "
+                    "Connection to Inverter failed on %s. (%d) "
                     "Retrying in 60 seconds, Error %s",
                     self.address,
                     i,
@@ -535,7 +534,7 @@ class FroniusWR(InverterBaseclass):
                     )
                 time.sleep(60)
 
-        logger.error( '[Inverter] Request failed without response.')
+        logger.error( 'Request failed without response.')
         raise RuntimeError(
                 f"\turl:{url}, \n\tparams:{params} \n\theaders {headers} \n"
                 f"\tnonce {self.nonce} \n"
@@ -544,7 +543,7 @@ class FroniusWR(InverterBaseclass):
 
     def login(self):
         """Login to Fronius API"""
-        logger.debug("[Inverter] Logging in")
+        logger.debug("Logging in")
         path = '/commands/Login'
         self.cnonce = "NaN"
         self.ncvalue_num = 1
@@ -554,8 +553,8 @@ class FroniusWR(InverterBaseclass):
             response = self.__send_one_http_request(path, auth=True)
             if response.status_code == 200:
                 self.subsequent_login = True
-                logger.info('[Inverter] Login successful %s', response)
-                logger.debug("[Inverter] Response: %s", response.headers)
+                logger.info('Login successful %s', response)
+                logger.debug("Response: %s", response.headers)
                 self.__retrieve_auth_from_response(response)
                 self.login_attempts = 0
                 return
@@ -563,18 +562,18 @@ class FroniusWR(InverterBaseclass):
                 self.__retrieve_auth_from_response(response)
 
             logger.error(
-                '[Inverter] Login -%d- failed, Response: %s', i, response)
-            logger.error('[Inverter] Response-raw: %s', response.text)
+                'Login -%d- failed, Response: %s', i, response)
+            logger.error('Response-raw: %s', response.raw)
             if self.subsequent_login:
                 logger.info(
-                    "[Inverter] Retrying login in 10 seconds")
+                    "Retrying login in 10 seconds")
                 time.sleep(10)
         if self.login_attempts  >= 3:
             logger.info(
-                '[Inverter] Login failed 3 times .. aborting'
+                'Login failed 3 times .. aborting'
                 )
             raise RuntimeError(
-                '[Inverter] Login failed repeatedly .. wrong credentials?'
+                'Login failed repeatedly .. wrong credentials?'
                 )
 
     def logout(self):
@@ -582,11 +581,11 @@ class FroniusWR(InverterBaseclass):
         path = '/commands/Logout'
         response = self.send_request(path, auth=True)
         if not response:
-            logger.warning('[Inverter] Logout failed. No response from server')
+            logger.warning('Logout failed. No response from server')
         if response.status_code == 200:
-            logger.info('[Inverter] Logout successful')
+            logger.info('Logout successful')
         else:
-            logger.info('[Inverter] Logout failed')
+            logger.info('Logout failed')
         return response
 
     def __retrieve_auth_from_response(self, response):
@@ -620,16 +619,16 @@ class FroniusWR(InverterBaseclass):
         else:
             # Return an empty dict to work with Fronius below 1.35.4-1
             logger.debug(
-                '[Inverter] No authentication header found in response')
+                'No authentication header found in response')
             return auth_dict
 
         auth_list = auth_string.replace(" ", "").replace('"', '').split(',')
-        logger.debug("[Inverter] Authentication header: %s", auth_list)
+        logger.debug("Authentication header: %s", auth_list)
         auth_dict = {}
         for item in auth_list:
             key, value = item.split("=")
             auth_dict[key] = value
-            logger.debug("[Inverter] %s: %s", key, value)
+            logger.debug("Authentication header key-value pair - %s: %s", key, value)
         return auth_dict
 
     def get_auth_header(self, method, path) -> str:
@@ -672,7 +671,7 @@ class FroniusWR(InverterBaseclass):
         path = '/config/batteries'
         payload = json.dumps(settings)
         logger.info(
-            '[Inverter] Setting EM mode %s , power %s',
+            'Setting EM mode %s , power %s',
             mode,
             power
         )
@@ -702,7 +701,7 @@ class FroniusWR(InverterBaseclass):
 
     def shutdown(self):
         """Change back batcontrol changes."""
-        logger.info('[Inverter] Reverting batcontrol created config changes')
+        logger.info('Reverting batcontrol created config changes')
         self.restore_battery_config()
         self.restore_time_of_use_config()
         self.logout()
@@ -767,12 +766,12 @@ class FroniusWR(InverterBaseclass):
         """ Set the maximum power in W that can be used to load the battery from the grid."""
         if max_grid_charge_rate < 0:
             logger.warning(
-                '[Inverter] API: Invalid max_grid_charge_rate %sW',
+                'API: Invalid max_grid_charge_rate %sW',
                 max_grid_charge_rate
             )
             return
         logger.info(
-            '[Inverter] API: Setting max_grid_charge_rate: %.1fW',
+            'API: Setting max_grid_charge_rate: %.1fW',
             max_grid_charge_rate
         )
         self.max_grid_charge_rate = max_grid_charge_rate
@@ -781,12 +780,12 @@ class FroniusWR(InverterBaseclass):
         """ Set the maximum power in W that can be used to load the battery from the PV."""
         if max_pv_charge_rate < 0:
             logger.warning(
-                '[Inverter] API: Invalid max_pv_charge_rate %s',
+                'API: Invalid max_pv_charge_rate %s',
                 max_pv_charge_rate
             )
             return
         logger.info(
-            '[Inverter] API: Setting max_pv_charge_rate: %.1fW',
+            'API: Setting max_pv_charge_rate: %.1fW',
             max_pv_charge_rate
         )
         self.max_pv_charge_rate = max_pv_charge_rate
@@ -795,18 +794,18 @@ class FroniusWR(InverterBaseclass):
         """ Set the Energy Management Mode."""
         if not isinstance(em_mode , int):
             logger.warning(
-                '[Inverter] API: Invalid type em_mode %s',
+                'API: Invalid type em_mode %s',
                 em_mode
             )
             return
         if em_mode < 0 or em_mode > 2:
             logger.warning(
-                '[Inverter] API: Invalid em_mode %s',
+                'API: Invalid em_mode %s',
                 em_mode
             )
             return
         logger.info(
-            '[Inverter] API: Setting em_mode: %s',
+            'API: Setting em_mode: %s',
             em_mode
         )
         self.set_em_mode(em_mode)
@@ -818,12 +817,12 @@ class FroniusWR(InverterBaseclass):
         """
         if not isinstance(em_power , int):
             logger.warning(
-                '[Inverter] API: Invalid type em_power %s',
+                'API: Invalid type em_power %s',
                 em_power
             )
             return
         logger.info(
-            '[Inverter] API: Setting em_power: %s',
+            'API: Setting em_power: %s',
             em_power
         )
         self.set_em_power(em_power)
