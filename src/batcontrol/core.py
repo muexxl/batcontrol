@@ -1,13 +1,11 @@
 #! /usr/bin/env python
 # %%
-import sys
 import datetime
 import time
 import os
 import logging
 import platform
 
-import yaml
 import pytz
 import numpy as np
 
@@ -16,7 +14,6 @@ from .evcc_api import EvccApi
 
 from .dynamictariff import DynamicTariff as tariff_factory
 from .inverter import Inverter as inverter_factory
-from .logutils import LogFileLimiter
 
 from .forecastsolar import ForecastSolar as solar_factory
 
@@ -39,20 +36,7 @@ MODE_ALLOW_DISCHARGING = 10
 MODE_AVOID_DISCHARGING = 0
 MODE_FORCE_CHARGING = -1
 
-loglevel = logging.DEBUG
-logger = logging.getLogger('__main__')
-formatter = logging.Formatter("%(asctime)s %(levelname)s %(message)s",
-                              "%Y-%m-%d %H:%M:%S")
-
-streamhandler = logging.StreamHandler(sys.stdout)
-streamhandler.setFormatter(formatter)
-
-logger.addHandler(streamhandler)
-
-logger.setLevel(loglevel)
-
-logger.info('[Main] Starting Batcontrol')
-
+logger = logging.getLogger(__name__)
 
 class Batcontrol:
     def __init__(self, configdict: dict):
@@ -238,47 +222,6 @@ class Batcontrol:
                 del self.evcc_api
         except:
             pass
-
-    def setup_logfile(self, config):
-        """ Setup the logfile and correpsonding handlers """
-
-        if config.get('max_logfile_size', None) is not None:
-            if isinstance(config['max_logfile_size'], int):
-                pass
-            else:
-                raise RuntimeError(
-                    f"Config Entry in general: max_logfile_size {config['max_logfile_size']}" +
-                    " not valid. Only integer values allowed"
-                )
-        # default to unlimited filesize
-        else:
-            config['max_logfile_size'] = -1
-
-        if 'logfile_path' in config.keys():
-            self.logfile = config.get('logfile_path')
-        else:
-            logger.info(
-                "[Main] No logfile path provided. Proceeding with default logfile path: %s",
-                self.logfile
-            )
-
-        if config.get('max_logfile_size') > 0:
-            self.logfilelimiter = LogFileLimiter(
-                self.logfile, config.get('max_logfile_size'))
-
-        # is the path valid and writable?
-        if not os.path.isdir(os.path.dirname(self.logfile)):
-            raise RuntimeError(
-                f"Logfile path {os.path.dirname(self.logfile)} not found"
-            )
-        if not os.access(os.path.dirname(self.logfile), os.W_OK):
-            raise RuntimeError(
-                f"Logfile path {os.path.dirname(self.logfile)} not writable"
-            )
-
-        filehandler = logging.FileHandler(self.logfile)
-        filehandler.setFormatter(formatter)
-        logger.addHandler(filehandler)
 
     def reset_forecast_error(self):
         """ Reset the forecast error timer """
