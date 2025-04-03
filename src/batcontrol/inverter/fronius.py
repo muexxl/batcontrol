@@ -474,7 +474,7 @@ class FroniusWR(InverterBaseclass):
         logger.debug("[Inverter] Sending request to %s", path)
         if not headers:
             headers = {}
-        for i in range(2):
+        for i in range(3):
             # Try tp send the request, if it fails, try to login and resend
             response = self.__send_one_http_request(path, method, payload, params, headers, auth)
             if response.status_code == 200:
