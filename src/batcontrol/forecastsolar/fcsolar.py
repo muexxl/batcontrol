@@ -13,8 +13,8 @@ import logging
 import requests
 from .forecastsolar_interface import ForecastSolarInterface
 
-logger = logging.getLogger('__main__')
-logger.info('[FCSolar] loading module')
+logger = logging.getLogger(__name__)
+logger.info('Loading module')
 
 class FCSolar(ForecastSolarInterface):
     """ Provider to get data from https://forecast.solar/ """
@@ -39,7 +39,7 @@ class FCSolar(ForecastSolarInterface):
                     if self.last_update > 0 and self.delay_evaluation_by_seconds > 0:
                         sleeptime = random.randrange(0, self.delay_evaluation_by_seconds, 1)
                         logger.debug(
-                            '[FCSolar] Waiting for %d seconds before requesting new data',
+                            'Waiting for %d seconds before requesting new data',
                             sleeptime)
                         time.sleep(sleeptime)
                     self.__get_raw_forecast()
@@ -47,13 +47,13 @@ class FCSolar(ForecastSolarInterface):
                 except Exception as e:
                     # Catch error here.
                     # Check cached values below
-                    logger.error('[FCSolar] Error getting forecast: %s', e)
-                    logger.warning('[FCSolar] Using cached values')
+                    logger.error('Error getting forecast: %s', e)
+                    logger.warning('Using cached values')
                     got_error = True
             else:
                 remaining_time = self.rate_limit_blackout_window - t0
                 logger.info(
-                    '[FCSolar] Rate limit blackout window in place until %s (another %d seconds)',
+                    'Rate limit blackout window in place until %s (another %d seconds)',
                       self.rate_limit_blackout_window,
                       remaining_time
                 )
@@ -63,8 +63,8 @@ class FCSolar(ForecastSolarInterface):
 
         # return empty prediction if results have not been obtained
         if not self.results:
-            logger.warning('[FCSolar] No results from FC Solar API available')
-            raise RuntimeWarning('[FCSolar] No results from FC Solar API available')
+            logger.warning('No results from FC Solar API available')
+            raise RuntimeWarning('No results from FC Solar API available')
 
         prediction={}
         now = datetime.datetime.now().astimezone(self.timezone)
@@ -88,8 +88,8 @@ class FCSolar(ForecastSolarInterface):
 
         max_hour=max(prediction.keys())
         if max_hour < 18 and got_error:
-            logger.error('[FCSolar] Less than 18 hours of forecast data. Stopping.')
-            raise RuntimeError('[FCSolar] Less than 18 hours of forecast data.')
+            logger.error('Less than 18 hours of forecast data. Stopping.')
+            raise RuntimeError('Less than 18 hours of forecast data.')
         #complete hours without production with 0 values
         for h in range(max_hour+1):
             if h not in prediction.keys():
@@ -123,7 +123,7 @@ class FCSolar(ForecastSolarInterface):
             url = (f"https://api.forecast.solar/{apikey_urlmod}estimate/"
                    f"watthours/period/{lat}/{lon}/{dec}/{az}/{kwp}{horizon_querymod}")
             logger.info(
-                '[FCSolar] Requesting Information for PV Installation %s', name)
+                'Requesting Information for PV Installation %s', name)
 
 
             response = requests.get(url, timeout=60)
@@ -137,7 +137,7 @@ class FCSolar(ForecastSolarInterface):
                     retry_seconds = (retry_after_timestamp - now).total_seconds()
                     self.rate_limit_blackout_window = retry_after_timestamp.timestamp()
                     logger.warning(
-                      '[ForecastSolar] forecast solar API rate limit exceeded [%s]. '
+                      'Forecast solar API rate limit exceeded [%s]. '
                       'Retry after %d seconds at %s',
                       response.text,
                       retry_seconds,
@@ -145,16 +145,16 @@ class FCSolar(ForecastSolarInterface):
                     )
                 else:
                     logger.warning(
-                        '[ForecastSolar] forecast solar API rate limit exceeded [%s]. '
+                        'Forecast solar API rate limit exceeded [%s]. '
                         'No retry after information available, dumping headers',
                         response.text
                     )
                     for header, value in response.headers.items():
-                        logger.debug('[ForecastSolar 429] Header: %s = %s', header, value)
+                        logger.debug('Header: %s = %s', header, value)
 
             else:
                 logger.warning(
-                    '[ForecastSolar] forecast solar API returned %s - %s',
+                    'Forecast solar API returned %s - %s',
                       response.status_code, response.text)
 
 if __name__ == '__main__':

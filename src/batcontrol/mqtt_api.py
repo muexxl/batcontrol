@@ -42,8 +42,8 @@ import logging
 import paho.mqtt.client as mqtt
 import numpy as np
 
-logger = logging.getLogger('__main__')
-logger.info('[MQTT] loading module ')
+logger = logging.getLogger(__name__)
+logger.info('Loading module')
 
 class MqttApi:
     """ MQTT API to publish data from batcontrol to MQTT for further processing+visualization"""
@@ -92,18 +92,18 @@ class MqttApi:
                 self.client.connect(config['broker'], config['port'], 60)
                 break
             except (ValueError, TypeError) as e:
-                logger.error('[MQTT] Connection failed: %s, retrying[%d]x in [%d] seconds',
+                logger.error('Connection failed: %s, retrying[%d]x in [%d] seconds',
                                 e, retry_attempts, retry_delay)
                 retry_attempts -= 1
                 if retry_attempts == 0:
-                    logger.error('[MQTT] All retry attempts failed')
+                    logger.error('All retry attempts failed')
                     raise
-                logger.info('[MQTT] Retrying connection in %d seconds...', retry_delay)
+                logger.info('Retrying connection in %d seconds...', retry_delay)
                 time.sleep(retry_delay)
 
     def on_connect(self, client, userdata, flags, rc):
         """ Callback for MQTT connection to serve /status"""
-        logger.info('[MQTT] Connected with result code %s', rc)
+        logger.info('Connected with result code %s', rc)
         # Make public, that we are running.
         client.publish(self.base_topic + '/status', 'online', retain=True)
         # publish HA mqtt AutoDiscovery messages at startup
@@ -111,7 +111,7 @@ class MqttApi:
             self.send_mqtt_discovery_messages()
         # Handle reconnect case
         for topic in self.callbacks:
-            logger.debug('[MQTT] Subscribing topic: %s', topic)
+            logger.debug('Subscribing topic: %s', topic)
             for topic in self.callbacks:
                 client.subscribe(topic)
 
@@ -122,32 +122,32 @@ class MqttApi:
         while self.client.is_connected() is False:
             retry -= 1
             if retry == 0:
-                logger.error('[MQTT] Could not connect to MQTT Broker')
+                logger.error('Could not connect to MQTT Broker')
                 return False
-            logger.info('[MQTT] Waiting for connection')
+            logger.info('Waiting for connection')
             time.sleep(1)
 
         return True
 
     def _handle_message(self, client, userdata, message):  # pylint: disable=unused-argument
         """ Handle and dispatch incoming messages"""
-        logger.debug('[MQTT] Received message on %s', message.topic)
+        logger.debug('Received message on %s', message.topic)
         if message.topic in self.callbacks:
             try:
                 self.callbacks[message.topic]['function'](
                     self.callbacks[message.topic]['convert'](message.payload)
                 )
             except (ValueError, TypeError) as e:
-                logger.error('[MQTT] Error in callback %s : %s', message.topic, e)
+                logger.error('Error in callback %s : %s', message.topic, e)
         else:
-            logger.warning('[MQTT] No callback registered for %s', message.topic)
+            logger.warning('No callback registered for %s', message.topic)
 
     def register_set_callback(self, topic:str,  callback:callable, convert: callable) -> None:
         """ Generic- register a callback for changing values inside batcontrol via
             MQTT set topics
         """
         topic_string = self.base_topic + "/" + topic + MqttApi.SET_SUFFIX
-        logger.debug('[MQTT] Registering callback for %s', topic_string)
+        logger.debug('Registering callback for %s', topic_string)
                 # set api endpoints, generic subscription
         self.callbacks[topic_string] = { 'function' : callback , 'convert' : convert }
         self.client.subscribe(topic_string)
@@ -549,7 +549,7 @@ class MqttApi:
             }
             payload["device"] = device
             logger.debug(
-                '[MQTT] sending HA AD config message for %s',
+                'Sending HA AD config message for %s',
                 self.auto_discover_topic + '/' + item_type + '/' + unique_id + '/config')
             self.client.publish(
                 self.auto_discover_topic + '/' + item_type + '/batcontrol/' + unique_id + '/config',

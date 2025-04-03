@@ -5,7 +5,7 @@ import logging
 from .dynamictariff_interface import TariffInterface
 
 
-logger = logging.getLogger('__main__')
+logger = logging.getLogger(__name__)
 
 class DynamicTariffBaseclass(TariffInterface):
     """ Parent Class for implementing different tariffs"""
@@ -25,7 +25,7 @@ class DynamicTariffBaseclass(TariffInterface):
             if self.last_update > 0 and self.delay_evaluation_by_seconds > 0:
                 sleeptime = random.randrange(0, self.delay_evaluation_by_seconds, 1)
                 logger.debug(
-                        '[Tariff] Waiting for %d seconds before requesting new data',
+                        'Waiting for %d seconds before requesting new data',
                         sleeptime)
                 time.sleep(sleeptime)
             self.raw_data=self.get_raw_data_from_provider()

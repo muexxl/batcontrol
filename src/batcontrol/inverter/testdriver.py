@@ -3,8 +3,8 @@ from .baseclass import InverterBaseclass
 from .inverter_interface import InverterInterface
 from ..mqtt_api import MqttApi
 
-logger = logging.getLogger('__main__')
-logger.info('[Testdriver] loading module')
+logger = logging.getLogger(__name__)
+logger.info('Loading module')
 
 #from .fronius import InverterBaseclass
 
@@ -43,9 +43,9 @@ class Testdriver(InverterBaseclass):
 
     def api_set_SOC(self, SOC:int):
         if SOC < 0 or SOC > 100:
-            logger.warning(f'[BatCtrl] testdriver API: Invalid SOC {SOC}')
+            logger.warning(f'Testdriver API: Invalid SOC {SOC}')
             return
-        logger.info(f'[BatCtrl] testdriver API: Setting SOC: {SOC}%')
+        logger.info(f'Testdriver API: Setting SOC: {SOC}%')
         self.SOC = SOC
 
     def activate_mqtt(self, api_mqtt_api):

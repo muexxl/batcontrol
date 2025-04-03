@@ -1,0 +1,71 @@
+import logging
+import sys
+import os
+import yaml
+from logging.handlers import RotatingFileHandler
+
+def setup_logging(level=logging.INFO, logfile=None):
+    """Configure root logger with consistent formatting.
+    
+    Args:
+        level (int): Log level to set for the root logger.
+        logfile (str): If specified, log to this file as well as the console.
+
+    Returns:
+        logging.Logger: Root logger
+    """
+    # Create root logger
+    root_logger = logging.getLogger()
+    root_logger.setLevel(level)
+    
+    # Clear existing handlers to avoid duplicates
+    root_logger.handlers = []
+    
+    # Create formatter with module name included
+    formatter = logging.Formatter(
+        "%(asctime)s %(levelname)s [%(name)s] %(message)s",
+        "%Y-%m-%d %H:%M:%S"
+    )
+    
+    # Console handler
+    console_handler = logging.StreamHandler(sys.stdout)
+    console_handler.setFormatter(formatter)
+    root_logger.addHandler(console_handler)
+    
+    # File handler if specified
+    if logfile:
+        if not os.path.exists(os.path.dirname(logfile)):
+            os.makedirs(os.path.dirname(logfile))
+        file_handler = RotatingFileHandler(logfile, maxBytes=10*1024*1024, backupCount=2)
+        file_handler.setFormatter(formatter)
+        root_logger.addHandler(file_handler)
+
+def load_config(configfile:str) -> dict:
+    """ Load the configuration file and check for validity.
+
+    This maps some config entries for compatibility reasons.
+
+    Args:
+        configfile (str): Path to the config file
+    
+    Returns:
+        dict: The loaded configuration
+        
+    Raises:
+        RuntimeError: If the config file is not found or no PV installations are found
+
+    """
+    if not os.path.isfile(configfile):
+        raise RuntimeError(f'Configfile {configfile} not found')
+
+    with open(configfile, 'r', encoding='UTF-8') as f:
+        config_str = f.read()
+
+    config = yaml.safe_load(config_str)
+
+    if config['pvinstallations']:
+        pass
+    else:
+        raise RuntimeError('No PV Installation found')
+    
+    return config
