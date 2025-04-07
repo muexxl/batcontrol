@@ -8,8 +8,8 @@ import os
 from .forecastconsumption_interface import ForecastConsumptionInterface
 
 
-logger = logging.getLogger("__main__").getChild("FCConsumptionCSV")
-logger.info('[FCConsumption] loading module')
+logger = logging.getLogger(__name__)
+logger.info('Loading module')
 
 class ForecastConsumptionCsv(ForecastConsumptionInterface):
     """Forecasts Consumption based on load profiles
@@ -39,7 +39,7 @@ class ForecastConsumptionCsv(ForecastConsumptionInterface):
         if annual_consumption >0:
             self.scaling_factor = self.calculate_scaling_factor(annual_consumption)
             logger.info(
-                    "[FC Cons] the hourly values from the load profile are scaled with a "
+                    "The hourly values from the load profile are scaled with a "
                     "factor of %.2f to match the annual consumption of %d kWh",
                     self.scaling_factor,
                     annual_consumption
@@ -48,11 +48,11 @@ class ForecastConsumptionCsv(ForecastConsumptionInterface):
             self.scaling_factor=1
             annual_consumption_load_profile= self.dataframe['energy'].sum()*8760/2016/1000
             logger.info(
-                "[FC Cons] The annual consumption of the applied load profile is %.2f kWh ",
+                "The annual consumption of the applied load profile is %.2f kWh ",
                  annual_consumption_load_profile
                 )
             logger.info(
-                "[FC Cons] You can specify your estimated annual consumption in the config file "
+                "You can specify your estimated annual consumption in the config file "
                 "under consumption_forecast:  annual_consumption "
                 )
         self.timezone=timezone
@@ -60,7 +60,7 @@ class ForecastConsumptionCsv(ForecastConsumptionInterface):
     def calculate_scaling_factor(self, annual_consumption):
         annual_consumption_load_profile= self.dataframe['energy'].sum()*8760/2016/1000
         logger.info(
-            "[FC Cons] The annual consumption of the applied load profile is %s kWh ",
+            "The annual consumption of the applied load profile is %s kWh ",
             annual_consumption_load_profile
             )
         scaling_factor = annual_consumption/annual_consumption_load_profile
@@ -93,7 +93,7 @@ class ForecastConsumptionCsv(ForecastConsumptionInterface):
             prediction[h]=energy*self.scaling_factor
 
         logger.debug(
-                  '[FC Cons] predicting consumption: %s',
+                  'Predicting consumption: %s',
                    np.array(list(prediction.values())).round(1)
                 )
         return prediction
