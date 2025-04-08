@@ -30,6 +30,7 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
           pyproject-file: "pyproject.toml"
+          prune-cache: false
 
       - name: Install dependencies
         run: |
