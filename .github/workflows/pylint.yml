@@ -33,6 +33,7 @@ jobs:
 
       - name: Install dependencies
         run: |
+          uv pip install .
           uv pip install pylint
 
       - name: Run pylint
