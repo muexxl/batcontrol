@@ -1,12 +1,12 @@
 #! /usr/bin/env python
 # %%
 from dataclasses import dataclass
-import sys
 import datetime
 import time
 import os
 import logging
-import yaml
+import platform
+
 import pytz
 import numpy as np
 import platform
@@ -16,18 +16,10 @@ from .evcc_api import EvccApi
 
 from .dynamictariff import DynamicTariff as tariff_factory
 from .inverter import Inverter as inverter_factory
-from .logfilelimiter import LogFileLimiter
-
 from .forecastsolar import ForecastSolar as solar_factory
 
 from .forecastconsumption import Consumption as consumption_factory
 
-
-LOGFILE_ENABLED_DEFAULT = True
-LOGFILE = "logs/batcontrol.log"
-
-VALID_UTILITIES = ['tibber', 'awattar_at', 'awattar_de', 'evcc']
-VALID_INVERTERS = ['fronius_gen24', 'testdriver']
 ERROR_IGNORE_TIME = 600  # 10 Minutes
 EVALUATIONS_EVERY_MINUTES = 3  # Every x minutes on the clock
 DELAY_EVALUATION_BY_SECONDS = 15  # Delay evaluation for x seconds at every trigger
@@ -44,19 +36,8 @@ MODE_ALLOW_DISCHARGING = 10
 MODE_AVOID_DISCHARGING = 0
 MODE_FORCE_CHARGING = -1
 
-loglevel = logging.DEBUG
 logger = logging.getLogger(__name__)
-formatter = logging.Formatter("%(asctime)s %(levelname)s %(message)s",
-                              "%Y-%m-%d %H:%M:%S")
-
-streamhandler = logging.StreamHandler(sys.stdout)
-streamhandler.setFormatter(formatter)
-
-logger.addHandler(streamhandler)
-
-logger.setLevel(loglevel)
-
-logger.info('[Main] Starting Batcontrol')
+rules_logger = logging.getLogger(__name__ + '.rules')
 
 @dataclass
 class InverterControlSettings:
@@ -93,7 +74,7 @@ class CalculationOutput:
     min_dynamic_price_difference: float
 
 class Batcontrol:
-    def __init__(self, configfile:str):
+    def __init__(self, configdict:dict):
         # For API
         self.api_overwrite = False
         # -1 = charge from grid , 0 = avoid discharge , 10 = discharge allowed
@@ -122,12 +103,8 @@ class Batcontrol:
 
         self.last_run_time = 0
 
-        self.logfile = LOGFILE
-        self.logfile_enabled = True
-        self.logfilelimiter = None
-
-        self.load_config(configfile)
-        config = self.config
+        self.config = configdict
+        config = configdict
 
         try:
             tzstring = config['timezone']
@@ -140,14 +117,14 @@ class Batcontrol:
 
         try:
             tz = os.environ['TZ']
-            logger.info("[Batcontrol] host system time zone is %s", tz)
+            logger.info("Host system time zone is %s", tz)
         except KeyError:
             logger.info(
-                "[Batcontrol] host system time zone was not set. Setting to %s",
+                "Host system time zone was not set. Setting to %s",
                 config['timezone']
             )
             os.environ['TZ'] = config['timezone']
-        
+
         # time.tzset() is not available on Windows. When handling timezones exclusively using pytz this is fine
         if platform.system() != 'Windows':
             time.tzset()
@@ -167,7 +144,8 @@ class Batcontrol:
             self.pvsettings,
             self.timezone,
             DELAY_EVALUATION_BY_SECONDS,
-            requested_provider=config.get('solar_forecast_provider', 'fcsolarapi')
+            requested_provider=config.get(
+                'solar_forecast_provider', 'fcsolarapi')
         )
 
         self.fc_consumption = consumption_factory.create_consumption(
@@ -178,77 +156,42 @@ class Batcontrol:
         self.batconfig = config['battery_control']
         self.time_at_forecast_error = -1
 
-        self.always_allow_discharge_limit = self.batconfig['always_allow_discharge_limit']
-        self.max_charging_from_grid_limit = self.batconfig['max_charging_from_grid_limit']
-        self.min_price_difference = self.batconfig['min_price_difference']
-        self.min_price_difference_rel = self.__get_config_with_defaults(
-            self.batconfig,
-            'min_price_difference_rel',
-            0
-        )
+        self.always_allow_discharge_limit = self.batconfig.get(
+            'always_allow_discharge_limit', 0.9)
+        self.max_charging_from_grid_limit = self.batconfig.get(
+            'max_charging_from_grid_limit', 0.8)
+        self.min_price_difference = self.batconfig.get(
+            'min_price_difference', 0.05)
+        self.min_price_difference_rel = self.batconfig.get(
+            'min_price_difference_rel', 0)
 
         self.charge_rate_multiplier = 1.1
         self.soften_price_difference_on_charging = False
         self.soften_price_difference_on_charging_factor = 5
         self.round_price_digits = 4
 
-        if self.__is_config_key_valid(config, 'battery_control_expert'):
-            battery_control_expert = self.config['battery_control_expert']
-            self.soften_price_difference_on_charging = self.__get_config_with_defaults(
-                battery_control_expert,
+        if self.config.get('battery_control_expert', None) is not None:
+            battery_control_expert = self.config.get(
+                'battery_control_expert', {})
+            self.soften_price_difference_on_charging = battery_control_expert.get(
                 'soften_price_difference_on_charging',
-                False
-            )
-            self.soften_price_difference_on_charging_factor = self.__get_config_with_defaults(
-                battery_control_expert,
-                'soften_price_difference_on_charging_factor',
-                5
-            )
-            self.round_price_digits = self.__get_config_with_defaults(
-                battery_control_expert,
-                'round_price_digits',
-                4
-            )
-            self.charge_rate_multiplier = self.__get_config_with_defaults(
-                battery_control_expert,
-                'charge_rate_multiplier',
-                1.1
-            )
+                self.soften_price_difference_on_charging)
 
-        self.charge_rate_multiplier = 1.1
-        self.soften_price_difference_on_charging = False
-        self.soften_price_difference_on_charging_factor = 5
-        self.round_price_digits = 4
-
-        if self.__is_config_key_valid(config, 'battery_control_expert'):
-            battery_control_expert = self.config['battery_control_expert']
-            self.soften_price_difference_on_charging = self.__get_config_with_defaults(
-                battery_control_expert,
-                'soften_price_difference_on_charging',
-                False
-            )
-            self.soften_price_difference_on_charging_factor = self.__get_config_with_defaults(
-                battery_control_expert,
+            self.soften_price_difference_on_charging_factor = battery_control_expert.get(
                 'soften_price_difference_on_charging_factor',
-                5
-            )
-            self.round_price_digits = self.__get_config_with_defaults(
-                battery_control_expert,
+                self.soften_price_difference_on_charging_factor)
+            self.round_price_digits = battery_control_expert.get(
                 'round_price_digits',
-                4
-            )
-            self.charge_rate_multiplier = self.__get_config_with_defaults(
-                battery_control_expert,
+                self.round_price_digits)
+            self.charge_rate_multiplier = battery_control_expert.get(
                 'charge_rate_multiplier',
-                1.1
-            )
+                self.charge_rate_multiplier)
 
         self.mqtt_api = None
-        if 'mqtt' in config.keys():
-
-            if config['mqtt']['enabled']:
-                logger.info('[Main] MQTT Connection enabled')
-                self.mqtt_api = MqttApi(config['mqtt'])
+        if config.get('mqtt', None) is not None:
+            if config.get('mqtt').get('enabled', False):
+                logger.info('MQTT Connection enabled')
+                self.mqtt_api = MqttApi(config.get('mqtt'))
                 self.mqtt_api.wait_ready()
                 # Register for callbacks
                 self.mqtt_api.register_set_callback(
@@ -285,9 +228,9 @@ class Batcontrol:
                 self.inverter.activate_mqtt(self.mqtt_api)
 
         self.evcc_api = None
-        if 'evcc' in config.keys():
-            if config['evcc']['enabled']:
-                logger.info('[Main] evcc Connection enabled')
+        if config.get('evcc', None) is not None:
+            if config.get('evcc').get('enabled', False):
+                logger.info('evcc Connection enabled')
                 self.evcc_api = EvccApi(config['evcc'])
                 self.evcc_api.register_block_function(
                     self.set_discharge_blocked)
@@ -301,11 +244,11 @@ class Batcontrol:
                 )
                 self.evcc_api.start()
                 self.evcc_api.wait_ready()
-                logger.info('[Main] evcc Connection ready')
+                logger.info('evcc Connection ready')
 
     def shutdown(self):
         """ Shutdown Batcontrol and dependend modules (inverter..) """
-        logger.info('[Main] Shutting down Batcontrol')
+        logger.info('Shutting down Batcontrol')
         try:
             self.inverter.shutdown()
             del self.inverter
@@ -314,138 +257,6 @@ class Batcontrol:
                 del self.evcc_api
         except:
             pass
-
-    def __get_config_with_defaults(self, config: dict, key: str, default):
-        """ Get a key from a config dictionary with a default value """
-        if key in config.keys():
-            return config[key]
-        return default
-
-    def __is_config_key_valid(self, config: dict, key: str):
-        """ Check if a key is in a config dictionary """
-        if key in config.keys():
-            return True
-        return False
-
-    def load_config(self, configfile):
-        """ Load the configuration file and check for validity.
-            This maps some config entries for compatibility reasons.
-         """
-        if not os.path.isfile(configfile):
-            raise RuntimeError(f'Configfile {configfile} not found')
-
-        with open(configfile, 'r', encoding='UTF-8') as f:
-            config_str = f.read()
-
-        config = yaml.safe_load(config_str)
-
-        if config['utility']['type'] in VALID_UTILITIES:
-            pass
-        else:
-            raise RuntimeError('Unkonwn Utility')
-
-        if config['utility']['type'] == 'tibber':
-            if 'apikey' in config['utility'].keys():
-                pass
-            else:
-                raise RuntimeError(
-                    '[BatCtrl] Utility Tibber requires an apikey. '
-                    'Please provide the apikey in your configuration file'
-                )
-        elif config['utility']['type'] in ['evcc']:
-            if 'url' in config['utility'].keys():
-                pass
-            else:
-                raise RuntimeError(
-                    '[BatCtrl] Utility evcc requires an URL. '
-                    'Please provide the URL in your configuration file'
-                )
-        else:
-            config['utility']['apikey'] = None
-
-        if config['inverter']['type'] in VALID_INVERTERS:
-            pass
-        else:
-            raise RuntimeError('Unkown inverter')
-
-        if config['pvinstallations']:
-            pass
-        else:
-            raise RuntimeError('No PV Installation found')
-
-        global loglevel
-        loglevel = self.__get_config_with_defaults(config, 'loglevel', 'info')
-
-        if loglevel == 'debug':
-            logger.setLevel(logging.DEBUG)
-        elif loglevel == 'warning':
-            logger.setLevel(logging.WARNING)
-        elif loglevel == 'error':
-            logger.setLevel(logging.ERROR)
-        elif loglevel == 'info':
-            logger.setLevel(logging.INFO)
-        else:
-            logger.setLevel(logging.INFO)
-            logger.info(
-                '[BATCtrl] Provided loglevel "%s" not valid. Defaulting to loglevel "info"',
-                loglevel
-            )
-
-        log_is_enabled = self.__get_config_with_defaults(
-            config,
-            'logfile_enabled',
-            LOGFILE_ENABLED_DEFAULT
-        )
-        if log_is_enabled:
-            self.setup_logfile(config)
-        else:
-            self.logfile_enabled = False
-            logger.info(
-                "[Main] Logfile disabled in config. Proceeding without logfile"
-            )
-
-        self.config = config
-
-    def setup_logfile(self, config):
-        """ Setup the logfile and correpsonding handlers """
-
-        if self.__is_config_key_valid(config, 'max_logfile_size'):
-            if isinstance(config['max_logfile_size'], int):
-                pass
-            else:
-                raise RuntimeError(
-                    f"Config Entry in general: max_logfile_size {config['max_logfile_size']}" +
-                    " not valid. Only integer values allowed"
-                )
-        # default to unlimited filesize
-        else:
-            config['max_logfile_size'] = -1
-
-        if 'logfile_path' in config.keys():
-            self.logfile = config['logfile_path']
-        else:
-            logger.info(
-                "[Main] No logfile path provided. Proceeding with default logfile path: %s",
-                self.logfile
-            )
-
-        if config['max_logfile_size'] > 0:
-            self.logfilelimiter = LogFileLimiter(
-                self.logfile, config['max_logfile_size'])
-
-        # is the path valid and writable?
-        if not os.path.isdir(os.path.dirname(self.logfile)):
-            raise RuntimeError(
-                f"Logfile path {os.path.dirname(self.logfile)} not found"
-            )
-        if not os.access(os.path.dirname(self.logfile), os.W_OK):
-            raise RuntimeError(
-                f"Logfile path {os.path.dirname(self.logfile)} not writable"
-            )
-
-        filehandler = logging.FileHandler(self.logfile)
-        filehandler.setFormatter(formatter)
-        logger.addHandler(filehandler)
 
     def reset_forecast_error(self):
         """ Reset the forecast error timer """
@@ -464,12 +275,12 @@ class Batcontrol:
 
         if time_passed < ERROR_IGNORE_TIME:
             # keep current mode
-            logger.info("[BatCtrl] An API Error occured %0.fs ago. "
+            logger.info("An API Error occured %0.fs ago. "
                         "Keeping inverter mode unchanged.", time_passed)
         else:
             # set default mode
             logger.warning(
-                "[BatCtrl] An API Error occured %0.fs ago. "
+                "An API Error occured %0.fs ago. "
                 "Setting inverter to default mode (Allow Discharging)",
                 time_passed)
             self.allow_discharging()
@@ -483,14 +294,14 @@ class Batcontrol:
         #   always_allow_discharge needs to be above max_charging from grid.
         #   if not, it will oscillate between discharging and charging.
         if self.always_allow_discharge_limit < self.max_charging_from_grid_limit:
-            logger.warning("[BatCtrl] always_allow_discharge_limit (%.2f) is"
+            logger.warning("Always_allow_discharge_limit (%.2f) is"
                            " below max_charging_from_grid_limit (%.2f)",
-                            self.always_allow_discharge_limit ,
-                            self.max_charging_from_grid_limit
+                           self.always_allow_discharge_limit,
+                           self.max_charging_from_grid_limit
                            )
             self.max_charging_from_grid_limit = self.always_allow_discharge_limit - 0.01
-            logger.warning("[BatCtrl] Lowering max_charging_from_grid_limit to %.2f" ,
-                           self.max_charging_from_grid_limit )
+            logger.warning("Lowering max_charging_from_grid_limit to %.2f",
+                           self.max_charging_from_grid_limit)
 
         # for API
         self.refresh_static_values()
@@ -498,10 +309,6 @@ class Batcontrol:
             self.get_max_capacity() * self.always_allow_discharge_limit
         )
         self.last_run_time = time.time()
-
-        # prune log file if file is too large
-        if self.logfilelimiter is not None and self.logfile_enabled:
-            self.logfilelimiter.run()
 
         # get forecasts
         try:
@@ -514,7 +321,7 @@ class Batcontrol:
                 fc_period+1)
         except Exception as e:
             logger.warning(
-                '[BatCtrl] Following Exception occurred when trying to get forecasts: %s', e,
+                'Following Exception occurred when trying to get forecasts: %s', e,
                 exc_info=True
             )
             self.handle_forecast_error()
@@ -534,13 +341,13 @@ class Batcontrol:
             prices[h] = round(price_dict[h], self.round_price_digits)
 
         net_consumption = consumption-production
-        logger.debug('[BatCTRL] Production FCST: %s',
+        logger.debug('Production Forecast: %s',
                      np.ndarray.round(production, 1))
-        logger.debug('[BatCTRL] Consumption FCST: %s',
+        logger.debug('Consumption Forecast: %s',
                      np.ndarray.round(consumption, 1))
-        logger.debug('[BatCTRL] Net Consumption FCST: %s',
+        logger.debug('Net Consumption Forecast: %s',
                      np.ndarray.round(net_consumption, 1))
-        logger.debug('[BatCTRL] Prices: %s', np.ndarray.round(
+        logger.debug('Prices: %s', np.ndarray.round(
             prices, self.round_price_digits))
         # negative = charging or feed in
         # positive = dis-charging or grid consumption
@@ -551,7 +358,7 @@ class Batcontrol:
         # stop here if api_overwrite is set and reset it
         if self.api_overwrite:
             logger.info(
-                '[BatCTRL] API Overwrite active. Skipping control logic. '
+                'API Overwrite active. Skipping control logic. '
                 'Next evaluation in %.0f seconds',
                 TIME_BETWEEN_EVALUATIONS
             )
@@ -590,6 +397,7 @@ class Batcontrol:
         # %%
     def calculate_inverter_mode(self, calc_input: CalculationInput, calc_parameters: CalculationParameters, calc_timestamp:datetime = None) -> InverterControlSettings:
         """ Main control logic for battery control """
+        # TODO: Move control logic to a separate module
         # default settings
         inverter_control_settings = InverterControlSettings(
             allow_discharge=False,
@@ -609,7 +417,7 @@ class Batcontrol:
             inverter_control_settings.allow_discharge = True
             return inverter_control_settings
         else:  # discharge not allowed
-            logger.debug('[Rule] Discharging is NOT allowed')
+            rules_logger.debug('Discharging is NOT allowed')
             inverter_control_settings.allow_discharge = False
             charging_limit_percent = self.max_charging_from_grid_limit * 100
             required_recharge_energy = self.get_required_required_recharge_energy(
@@ -618,25 +426,25 @@ class Batcontrol:
             )
             is_charging_possible = self.get_SOC() < charging_limit_percent
 
-            logger.debug('[BatCTRL] Charging allowed: %s',
+            logger.debug('Charging allowed: %s',
                          is_charging_possible)
             if is_charging_possible:
-                logger.debug('[Rule] Charging is allowed, because SOC is below %.0f%%',
+                rules_logger.debug('Charging is allowed, because SOC is below %.0f%%',
                              charging_limit_percent
                              )
             else:
-                logger.debug('[Rule] Charging is NOT allowed, because SOC is above %.0f%%',
+                rules_logger.debug('Charging is NOT allowed, because SOC is above %.0f%%',
                              charging_limit_percent
                              )
 
             if required_recharge_energy > 0:
                 logger.debug(
-                    '[BatCTRL] Get additional energy via grid: %0.1f Wh',
+                    'Get additional energy via grid: %0.1f Wh',
                     required_recharge_energy
                 )
             else:
-                logger.debug(
-                    '[Rule] No additional energy required or possible price found.')
+                rules_logger.debug(
+                    'No additional energy required or possible price found.')
 
             # charge if battery capacity available and more stored energy is required
             if is_charging_possible and required_recharge_energy > 0:
@@ -761,7 +569,7 @@ class Batcontrol:
         discharge_limit = self.get_max_capacity() * self.always_allow_discharge_limit
         if stored_energy > discharge_limit:
             logger.debug(
-                '[BatCTRL] Battery with %d Wh above discharge limit %d Wh',
+                'Battery with %d Wh above discharge limit %d Wh',
                 stored_energy,
                 discharge_limit
             )
@@ -818,8 +626,8 @@ class Batcontrol:
         t1 = t0+dt
         last_hour = t1.astimezone(self.timezone).strftime("%H:59")
 
-        logger.debug(
-            '[Rule] Evaluating next %d hours until %s',
+        rules_logger.debug(
+            'Evaluating next %d hours until %s',
             max_hour,
             last_hour
         )
@@ -881,7 +689,7 @@ class Batcontrol:
 
         if self.discharge_blocked:
             logger.debug(
-                '[BatCTRL] Discharge blocked due to external lock'
+                'Discharge blocked due to external lock'
             )
             return False
 
@@ -929,13 +737,13 @@ class Batcontrol:
 
     def allow_discharging(self):
         """ Allow unlimited discharging of the battery """
-        logger.info('[BatCTRL] Mode: Allow Discharging')
+        logger.info('Mode: Allow Discharging')
         self.inverter.set_mode_allow_discharge()
         self.__set_mode(MODE_ALLOW_DISCHARGING)
 
     def avoid_discharging(self):
         """ Avoid discharging the battery """
-        logger.info('[BatCTRL] Mode: Avoid Discharging')
+        logger.info('Mode: Avoid Discharging')
         self.inverter.set_mode_avoid_discharge()
         self.__set_mode(MODE_AVOID_DISCHARGING)
 
@@ -943,7 +751,7 @@ class Batcontrol:
         """ Force the battery to charge with a given rate """
         charge_rate = int(min(charge_rate, self.inverter.max_grid_charge_rate))
         logger.info(
-            '[BatCTRL] Mode: grid charging. Charge rate : %d W', charge_rate)
+            'Mode: grid charging. Charge rate : %d W', charge_rate)
         self.inverter.set_mode_force_charge(charge_rate)
         self.__set_mode(MODE_FORCE_CHARGING)
         self.__set_charge_rate(charge_rate)
@@ -1060,7 +868,7 @@ class Batcontrol:
         # tbh , we should raise an exception here.
         if limit > self.get_always_allow_discharge_limit():
             logger.error(
-                '[BatCtrl] Max charging from grid limit %.2f is '
+                'Max charging from grid limit %.2f is '
                 'above always_allow_discharge_limit %.2f',
                 limit,
                 self.get_always_allow_discharge_limit()
@@ -1083,7 +891,7 @@ class Batcontrol:
         """
         if discharge_blocked == self.discharge_blocked:
             return
-        logger.info('[BatCTRL] Discharge block: %s', {discharge_blocked})
+        logger.info('Discharge block: %s', {discharge_blocked})
         if self.mqtt_api is not None:
             self.mqtt_api.publish_discharge_blocked(discharge_blocked)
         self.discharge_blocked = discharge_blocked
@@ -1122,10 +930,10 @@ class Batcontrol:
         """ Log and change config run mode of inverter(s) from external call """
         # Check if mode is valid
         if mode not in [MODE_FORCE_CHARGING, MODE_AVOID_DISCHARGING, MODE_ALLOW_DISCHARGING]:
-            logger.warning('[BatCtrl] API: Invalid mode %s', mode)
+            logger.warning('API: Invalid mode %s', mode)
             return
 
-        logger.info('[BatCtrl] API: Setting mode to %s', mode)
+        logger.info('API: Setting mode to %s', mode)
         self.api_overwrite = True
 
         if mode != self.last_mode:
@@ -1140,9 +948,9 @@ class Batcontrol:
         """ Log and change config charge_rate and activate charging."""
         if charge_rate < 0:
             logger.warning(
-                '[BatCtrl] API: Invalid charge rate %d W', charge_rate)
+                'API: Invalid charge rate %d W', charge_rate)
             return
-        logger.info('[BatCtrl] API: Setting charge rate to %d W',  charge_rate)
+        logger.info('API: Setting charge rate to %d W',  charge_rate)
         self.api_overwrite = True
         if charge_rate != self.last_charge_rate:
             self.force_charge(charge_rate)
@@ -1153,10 +961,10 @@ class Batcontrol:
         """
         if limit < 0 or limit > 1:
             logger.warning(
-                '[BatCtrl] API: Invalid always allow discharge limit %.2f', limit)
+                'API: Invalid always allow discharge limit %.2f', limit)
             return
         logger.info(
-            '[BatCtrl] API: Setting always allow discharge limit to %.2f', limit)
+            'API: Setting always allow discharge limit to %.2f', limit)
         self.set_always_allow_discharge_limit(limit)
 
     def api_set_max_charging_from_grid_limit(self, limit: float):
@@ -1165,10 +973,10 @@ class Batcontrol:
         """
         if limit < 0 or limit > 1:
             logger.warning(
-                '[BatCtrl] API: Invalid max charging from grid limit %.2f', limit)
+                'API: Invalid max charging from grid limit %.2f', limit)
             return
         logger.info(
-            '[BatCtrl] API: Setting max charging from grid limit to %.2f', limit)
+            'API: Setting max charging from grid limit to %.2f', limit)
         self.set_max_charging_from_grid_limit(limit)
 
     def api_set_min_price_difference(self, min_price_difference: float):
@@ -1177,18 +985,18 @@ class Batcontrol:
         """
         if min_price_difference < 0:
             logger.warning(
-                '[BatCtrl] API: Invalid min price difference %.3f', min_price_difference)
+                'API: Invalid min price difference %.3f', min_price_difference)
             return
         logger.info(
-            '[BatCtrl] API: Setting min price difference to %.3f', min_price_difference)
+            'API: Setting min price difference to %.3f', min_price_difference)
         self.min_price_difference = min_price_difference
 
     def api_set_min_price_difference_rel(self, min_price_difference_rel: float):
         """ Log and change config min_price_difference_rel from external call """
         if min_price_difference_rel < 0:
             logger.warning(
-                '[BatCtrl] API: Invalid min price rel difference %.3f', min_price_difference_rel)
+                'API: Invalid min price rel difference %.3f', min_price_difference_rel)
             return
         logger.info(
-            '[BatCtrl] API: Setting min price rel difference to %.3f', min_price_difference_rel)
+            'API: Setting min price rel difference to %.3f', min_price_difference_rel)
         self.min_price_difference_rel = min_price_difference_rel

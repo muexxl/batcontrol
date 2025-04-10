@@ -28,7 +28,7 @@ class DynamicTariff:
                               ) -> TariffInterface:
         """ Select and configure a dynamic tariff provider based on the given configuration """
         selected_tariff=None
-        provider=config['type']
+        provider=config.get('type')
 
         if provider.lower()=='awattar_at':
             required_fields=['vat', 'markup', 'fees']
@@ -37,9 +37,9 @@ class DynamicTariff:
                     raise RuntimeError(
                         f'[DynTariff] Please include {field} in your configuration file'
                     )
-            vat = float(config['vat'])
-            markup = float(config['markup'])
-            fees = float(config['fees'])
+            vat = float(config.get('vat',0))
+            markup = float(config.get('markup',0))
+            fees = float(config.get('fees',0))
             selected_tariff= Awattar(timezone,'at',
                                      min_time_between_api_calls,
                                      delay_evaluation_by_seconds
@@ -53,9 +53,9 @@ class DynamicTariff:
                     raise RuntimeError(
                         f'[DynTariff] Please include {field} in your configuration file'
                     )
-            vat = float(config['vat'])
-            markup = float(config['markup'])
-            fees = float(config['fees'])
+            vat = float(config.get('vat',0))
+            markup = float(config.get('markup',0))
+            fees = float(config.get('fees',0))
             selected_tariff= Awattar(timezone,'de',
                                      min_time_between_api_calls,
                                      delay_evaluation_by_seconds
@@ -68,7 +68,7 @@ class DynamicTariff:
                     '[Dynamic Tariff] Tibber requires an API token. '
                     'Please provide "apikey :YOURKEY" in your configuration file'
                     )
-            token = config['apikey']
+            token = config.get('apikey')
             selected_tariff=Tibber(timezone,
                                    token,
                                    min_time_between_api_calls,
@@ -82,7 +82,7 @@ class DynamicTariff:
                     'Please provide "url" in your configuration file, '
                     'like http://evcc.local/api/tariff/grid'
                     )
-            selected_tariff= Evcc(timezone,config['url'],min_time_between_api_calls)
+            selected_tariff= Evcc(timezone,config.get('url'),min_time_between_api_calls)
         else:
             raise RuntimeError(f'[DynamicTariff] Unkown provider {provider}')
         return selected_tariff
