@@ -28,6 +28,8 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
           pyproject-file: "pyproject.toml"
+          enable-cache: true
+          cache-local-path: "${{ github.workspace }}/.uv"
           prune-cache: false
           cache-dependency-glob: "**/pyproject.toml"
 
