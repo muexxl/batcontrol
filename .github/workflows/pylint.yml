@@ -21,8 +21,6 @@ jobs:
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0  # Alle Commits holen
 
       - name: Set up uv with Python ${{ matrix.python-version }}
         id: setup-uv
