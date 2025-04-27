@@ -1,0 +1,78 @@
+name: Bump version
+
+on:
+  workflow_call:
+    inputs:
+      bump-type:
+        description: 'The type of bump to perform'
+        required: true
+        type: string
+        default: 'patch'
+    outputs:
+      bumped:
+        description: 'Whether the version was bumped'
+        value: ${{ jobs.bump.outputs.bumped }}
+      previous-version:
+        description: 'The previous version'
+        value: ${{ jobs.bump.outputs.previous-version }}
+      current-version:
+        description: 'The current version'
+        value: ${{ jobs.bump.outputs.current-version }}
+
+  workflow_dispatch:
+    inputs:
+      bump-type:
+        description: 'The type of bump to perform'
+        required: true
+        default: 'patch'
+        type: choice
+        options:
+        - major
+        - minor
+        - patch
+        - release
+
+jobs:
+  bump:
+    runs-on: ubuntu-latest
+    outputs:
+      bumped: ${{ steps.bump.outputs.bumped }}
+      previous-version: ${{ steps.bump.outputs.previous-version }}
+      current-version: ${{ steps.bump.outputs.current-version }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Required for tags history
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.12'
+        
+      - name: Install bump2version
+        run: pip install bump2version
+
+      - name: Setup git user
+        run: |
+          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git config --global user.name "github-actions[bot]"
+
+      - name: Bump version
+        id: bump
+        run: |
+          echo "previous-version=$(bump-my-version show current_version)" >> $GITHUB_OUTPUT
+          bump-my-version bump ${{ inputs.bump-type }} --commit
+          ([[ $? -gt 0 ]] && echo "bumped=false" || echo "bumped=true") >> $GITHUB_OUTPUT
+          echo "current-version=$(bump-my-version show current_version)" >> $GITHUB_OUTPUT
+
+      - name: Check
+        if: steps.bump.outputs.bumped == 'true'
+        run: |
+          echo "Version was bumped from ${{ steps.bump.outputs.previous-version }} to ${{ steps.bump.outputs.current-version }}!"
+
+      - name: Push changes
+        if: steps.bump.outputs.bumped == 'true'
+        run: |
+          git push
+          git push --tags
