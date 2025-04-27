@@ -12,8 +12,24 @@ env:
   REGISTRY_IMAGE: ${{ vars.THIS_REGISTRY_IMAGE }}
 
 jobs:
+  extract-version:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.get-version.outputs.version }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Extract version
+        id: get-version
+        run: |
+          VERSION=$(grep -oP "__version__ = '\K[^']*" src/batcontrol/__pkginfo__.py)
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Detected version: $VERSION"
+
   build:
     #runs-on: ubuntu-latest
+    needs: extract-version
     runs-on: self-hosted
     strategy:
       fail-fast: false
@@ -56,7 +72,7 @@ jobs:
           outputs: type=image,name=${{ env.REGISTRY_IMAGE }},push-by-digest=true,name-canonical=true,push=true
           build-args: |
             GIT_SHA=${{ github.sha }}
-            VERSION=${{ github.ref_name != '' && github.ref_name || 'snapshot' }}
+            VERSION=${{ needs.extract-version.outputs.version }}
 
       - name: Export digest
         run: |
