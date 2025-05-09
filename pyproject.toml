@@ -11,7 +11,8 @@ dependencies = [
     "pandas>=2.0",
     "PyYAML>=6.0",
     "requests>=2.28",
-    "paho-mqtt>=2.0"
+    "paho-mqtt>=2.0",
+    "packaging>=23.0"
 ]
 
 # Config for the build system
