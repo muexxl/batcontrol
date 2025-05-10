@@ -56,6 +56,7 @@ BATTERY_CONFIG_FILENAME = 'config/battery_config.json'
 
 @dataclass
 class FroniusApiConfig:
+    """Configuration for Fronius API endpoints and behavior."""
     from_version: version.Version
     to_version: version.Version
     version_path: str
@@ -112,6 +113,7 @@ API_CONFIGS = [
 ]
 
 def get_api_config(fw_version: version) -> FroniusApiConfig:
+    """Get the API configuration for the given firmware version."""
     for config in API_CONFIGS:
         if config.from_version <= fw_version < config.to_version:
             return config
