@@ -190,9 +190,15 @@ class FroniusWR(InverterBaseclass):
     def get_firmware_version(self) -> version:
         """ Get the firmware version of the inverter."""
         # This stays as a hardcoded path for now
-        path = '/status/version'
+        # since 1.36 /api/status/version
+        path = '/api/status/version'
         response = self.send_request(
             path, method='GET', payload={}, auth=False)
+        if not response:
+            # Support old path
+            path = '/status/version'
+            response = self.send_request(
+                 path, method='GET', payload={}, auth=False)
         if not response:
             raise RuntimeError('Failed to retrieve firmware version')
         version_dict = json.loads(response.text)
