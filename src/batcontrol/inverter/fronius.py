@@ -106,7 +106,7 @@ API_CONFIGS = [
         config_powerunit_path='/api/config/powerunit',
         config_solar_api_path='/api/config/solar_api',
         config_timeofuse_path='/api/config/timeofuse',
-        cmmands_login_path='/commands/Login',
+        commands_login_path='/commands/Login',
         commands_logout_path='/commands/Logout',
     ),
 ]
