@@ -100,15 +100,15 @@ API_CONFIGS = [
     FroniusApiConfig(
         from_version=version.parse("1.36"),
         to_version=version.parse("9999.99.99"),
-        version_path='/status/version',
+        version_path='/api/status/version',
         powerflow_path='/solar_api/v1/GetPowerFlowRealtimeData.fcgi',
         storage_path='/solar_api/v1/GetStorageRealtimeData.cgi',
         config_battery_path='/api/config/batteries',
         config_powerunit_path='/api/config/powerunit',
         config_solar_api_path='/api/config/solar_api',
         config_timeofuse_path='/api/config/timeofuse',
-        commands_login_path='/commands/Login',
-        commands_logout_path='/commands/Logout',
+        commands_login_path='/api/commands/Login',
+        commands_logout_path='/api/commands/Logout',
     ),
 ]
 
