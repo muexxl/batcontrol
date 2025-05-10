@@ -22,7 +22,9 @@ import os
 import logging
 import json
 import hashlib
+from dataclasses import dataclass
 import requests
+from packaging import version
 from .baseclass import InverterBaseclass
 
 logger = logging.getLogger(__name__)
@@ -52,6 +54,71 @@ def strip_dict(original):
 TIMEOFUSE_CONFIG_FILENAME = 'config/timeofuse_config.json'
 BATTERY_CONFIG_FILENAME = 'config/battery_config.json'
 
+@dataclass
+class FroniusApiConfig:
+    """Configuration for Fronius API endpoints and behavior."""
+    from_version: version.Version
+    to_version: version.Version
+    version_path: str
+    powerflow_path: str
+    storage_path: str
+    config_battery_path: str
+    config_powerunit_path: str
+    config_solar_api_path: str
+    config_timeofuse_path: str
+    commands_login_path: str
+    commands_logout_path: str
+
+# Alle Konfigurationen in einer Liste
+API_CONFIGS = [
+    FroniusApiConfig(
+        from_version=version.parse("0.0.0"),
+        to_version=version.parse("1.28.7-1"),
+        version_path='/status/version',
+        powerflow_path='/solar_api/v1/GetPowerFlowRealtimeData.fcgi',
+        storage_path='/solar_api/v1/GetStorageRealtimeData.cgi',
+        config_battery_path='/config/batteries',
+        config_powerunit_path='/config/setup/powerunit',
+        config_solar_api_path='/config/solar_api',
+        config_timeofuse_path='/config/timeofuse',
+        commands_login_path='/commands/Login',
+        commands_logout_path='/commands/Logout',
+    ),
+    FroniusApiConfig(
+        from_version=version.parse("1.28.7-1"),
+        to_version=version.parse("1.36"),
+        version_path='/status/version',
+        powerflow_path='/solar_api/v1/GetPowerFlowRealtimeData.fcgi',
+        storage_path='/solar_api/v1/GetStorageRealtimeData.cgi',
+        config_battery_path='/config/batteries',
+        config_powerunit_path='/config/powerunit',
+        config_solar_api_path='/config/solar_api',
+        config_timeofuse_path='/config/timeofuse',
+        commands_login_path='/commands/Login',
+        commands_logout_path='/commands/Logout',
+    ),
+    FroniusApiConfig(
+        from_version=version.parse("1.36"),
+        to_version=version.parse("9999.99.99"),
+        version_path='/api/status/version',
+        powerflow_path='/solar_api/v1/GetPowerFlowRealtimeData.fcgi',
+        storage_path='/solar_api/v1/GetStorageRealtimeData.cgi',
+        config_battery_path='/api/config/batteries',
+        config_powerunit_path='/api/config/powerunit',
+        config_solar_api_path='/api/config/solar_api',
+        config_timeofuse_path='/api/config/timeofuse',
+        commands_login_path='/api/commands/Login',
+        commands_logout_path='/api/commands/Logout',
+    ),
+]
+
+def get_api_config(fw_version: version) -> FroniusApiConfig:
+    """Get the API configuration for the given firmware version."""
+    for config in API_CONFIGS:
+        if config.from_version <= fw_version < config.to_version:
+            return config
+    raise RuntimeError(f"Keine API Konfiguration für Firmware-Version {fw_version}")
+
 
 class FroniusWR(InverterBaseclass):
     """ Class for Handling Fronius GEN24 Inverters """
@@ -69,6 +136,8 @@ class FroniusWR(InverterBaseclass):
         self.nonce = 0
         self.user = config['user']
         self.password = config['password']
+        self.fronius_version = self.get_firmware_version()
+        self.api_config = get_api_config(self.fronius_version)
         self.previous_battery_config = self.get_battery_config()
         self.previous_backup_power_config = None
         # default values
@@ -92,21 +161,8 @@ class FroniusWR(InverterBaseclass):
             self.previous_backup_power_config = self.get_powerunit_config()
         except RuntimeError:
             logger.error(
-                'Failed to load Power Unit config from Inverter (latest).'
+                'Failed to load Power Unit config from Inverter'
             )
-
-        if not self.previous_backup_power_config:
-            try:
-                self.previous_backup_power_config = self.get_powerunit_config(
-                    '1.2'
-                    )
-                logger.info(
-                    'Loaded Power Unit config from Inverter (1.2).'
-                    )
-            except RuntimeError:
-                logger.error(
-                    'Failed to load Power Unit config from Inverter (1.2).'
-                )
 
         if self.previous_backup_power_config:
             self.backup_power_mode = self.previous_backup_power_config[
@@ -131,8 +187,28 @@ class FroniusWR(InverterBaseclass):
         self.get_time_of_use()  # save timesofuse
         self.set_allow_grid_charging(True)
 
+    def get_firmware_version(self) -> version:
+        """ Get the firmware version of the inverter."""
+        # This stays as a hardcoded path for now
+        # since 1.36 /api/status/version
+        path = '/api/status/version'
+        response = self.send_request(
+            path, method='GET', payload={}, auth=False)
+        if not response:
+            # Support old path
+            path = '/status/version'
+            response = self.send_request(
+                 path, method='GET', payload={}, auth=False)
+        if not response:
+            raise RuntimeError('Failed to retrieve firmware version')
+        version_dict = json.loads(response.text)
+        version_string = version_dict["swrevisions"]["GEN24"]
+        logger.info('Fronius firmware version: %s', version_string)
+        return version.parse(version_string)
+
     def get_SOC(self):
-        path = '/solar_api/v1/GetPowerFlowRealtimeData.fcgi'
+        """ Get the state of charge (SOC) of the battery."""
+        path = self.api_config.powerflow_path
         response = self.send_request(path)
         if not response:
             logger.error(
@@ -145,7 +221,7 @@ class FroniusWR(InverterBaseclass):
 
     def get_battery_config(self):
         """ Get battery configuration from inverter and keep a backup."""
-        path = '/config/batteries'
+        path = self.api_config.config_battery_path
         response = self.send_request(path, auth=True)
         if not response:
             logger.error(
@@ -166,21 +242,11 @@ class FroniusWR(InverterBaseclass):
 
         return result
 
-    def get_powerunit_config(self, path_version='latest'):
+    def get_powerunit_config(self):
         """ Get additional PowerUnit configuration for backup power.
-
-        Parameters:
-            path_version (optional):
-                'latest' (default) - get via '/config/powerunit'
-                '1.2'              - get via '/config/setup/powerunit'
-
         Returns: dict with backup power configuration
         """
-        if path_version == 'latest':
-            path = '/config/powerunit'
-        else:
-            path = '/config/setup/powerunit'
-
+        path = self.api_config.config_powerunit_path
         response = self.send_request(path, auth=True)
         if not response:
             logger.error(
@@ -209,7 +275,7 @@ class FroniusWR(InverterBaseclass):
                 raise RuntimeError(
                     f"Unable to restore settings. Parameter {key} is missing"
                 )
-        path = '/config/batteries'
+        path = self.api_config.config_battery_path
         payload = json.dumps(settings)
         logger.info(
             'Restoring previous battery configuration: %s ',
@@ -239,7 +305,7 @@ class FroniusWR(InverterBaseclass):
             payload = '{"HYB_EVU_CHARGEFROMGRID": true}'
         else:
             payload = '{"HYB_EVU_CHARGEFROMGRID": false}'
-        path = '/config/batteries'
+        path = self.api_config.config_battery_path
         response = self.send_request(
             path, method='POST', payload=payload, auth=True)
         response_dict = json.loads(response.text)
@@ -255,7 +321,7 @@ class FroniusWR(InverterBaseclass):
             payload = '{"SolarAPIv1Enabled": true}'
         else:
             payload = '{"SolarAPIv1Enabled": false}'
-        path = '/config/solar_api'
+        path = self.api_config.config_solar_api_path
         response = self.send_request(
             path, method='POST', payload=payload, auth=True)
         response_dict = json.loads(response.text)
@@ -267,7 +333,7 @@ class FroniusWR(InverterBaseclass):
 
     def set_wr_parameters(self, minsoc, maxsoc, allow_grid_charging, grid_power):
         """set power at grid-connection point negative values for Feed-In"""
-        path = '/config/batteries'
+        path = self.api_config.config_battery_path
         if not isinstance(allow_grid_charging , bool):
             raise RuntimeError(
                 f'Expected type: bool actual type: {type(allow_grid_charging)}')
@@ -314,7 +380,8 @@ class FroniusWR(InverterBaseclass):
 
     def get_time_of_use(self):
         """ Get time of use configuration from inverter and keep a backup."""
-        response = self.send_request('/config/timeofuse', auth=True)
+        path = self.api_config.config_timeofuse_path
+        response = self.send_request(path, auth=True)
         if not response:
             return None
 
@@ -437,8 +504,9 @@ class FroniusWR(InverterBaseclass):
             'timeofuse': timeofuselist
         }
         payload = json.dumps(config)
+        path = self.api_config.config_timeofuse_path
         response = self.send_request(
-            '/config/timeofuse', method='POST', payload=payload, auth=True
+              path, method='POST', payload=payload, auth=True
             )
         response_dict = json.loads(response.text)
         expected_write_successes = ['timeofuse']
@@ -452,8 +520,8 @@ class FroniusWR(InverterBaseclass):
         if self.capacity >= 0:
             return self.capacity
 
-        response = self.send_request(
-            '/solar_api/v1/GetStorageRealtimeData.cgi')
+        path = self.api_config.storage_path
+        response = self.send_request( path )
         if not response:
             logger.warning(
                 'Capacity request failed. Returning default value'
@@ -544,7 +612,7 @@ class FroniusWR(InverterBaseclass):
     def login(self):
         """Login to Fronius API"""
         logger.debug("Logging in")
-        path = '/commands/Login'
+        path = self.api_config.commands_login_path
         self.cnonce = "NaN"
         self.ncvalue_num = 1
         self.login_attempts = 0
@@ -578,7 +646,7 @@ class FroniusWR(InverterBaseclass):
 
     def logout(self):
         """Logout from Fronius API"""
-        path = '/commands/Logout'
+        path = self.api_config.commands_logout_path
         response = self.send_request(path, auth=True)
         if not response:
             logger.warning('Logout failed. No response from server')
@@ -668,7 +736,7 @@ class FroniusWR(InverterBaseclass):
         if power is not None:
             settings['HYB_EM_POWER'] = power
 
-        path = '/config/batteries'
+        path = self.api_config.config_battery_path
         payload = json.dumps(settings)
         logger.info(
             'Setting EM mode %s , power %s',
