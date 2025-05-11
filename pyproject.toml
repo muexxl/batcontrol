@@ -25,3 +25,7 @@ where = ["./src"]
 
 [tool.setuptools.dynamic]
 version = {attr = "batcontrol.__pkginfo__.__version__"}
+
+# Configure additional tools
+[tool.uv]
+required-version = "~=0.6.0" # Pin uv to major version for stability
