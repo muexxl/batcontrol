@@ -26,7 +26,9 @@ LABEL maintainer="matthias.strubel@aod-rpg.de"
 
 # Copy the built wheel from the builder stage and install it
 COPY --from=builder /wheels /wheels
-RUN pip install --no-cache-dir --extra-index-url https://piwheels.org/simple /wheels/*.whl && rm -rf /wheels
+
+# Update pip and install runtime dependencies
+RUN pip install --no-cache-dir --extra-index-url https://piwheels.org/simple --prefer-binary /wheels/*.whl && rm -rf /wheels
 
 ENV BATCONTROL_VERSION=${VERSION}
 ENV BATCONTROL_GIT_SHA=${GIT_SHA}
