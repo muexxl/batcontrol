@@ -45,13 +45,14 @@ jobs:
         with:
           fetch-depth: 0  # Required for tags history
 
-      - name: Setup Python
-        uses: actions/setup-python@v4
+      - name: Setup uv
+        id: setup-uv
+        uses: astral-sh/setup-uv@v6
         with:
           python-version: '3.12'
         
       - name: Install bump2version
-        run: pip install bump2version
+        run: uv pip install bump-my-version
 
       - name: Setup git user
         run: |
