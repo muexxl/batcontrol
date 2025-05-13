@@ -37,7 +37,7 @@ inverter:
   user: customer #customer or technician lowercase only!!
   password: YOUR-PASSWORD #
   max_grid_charge_rate: 5000 # Watt
-  max_pv_charge_rate : 3000 # Watt
+  #max_pv_charge_rate: 3000 # Watt ; This allows to limit the PV to Battery charge rate
 
 #--------------------------
 #  Dynamic Tariff Provider
