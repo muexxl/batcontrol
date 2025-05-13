@@ -28,7 +28,7 @@ version = {attr = "batcontrol.__pkginfo__.__version__"}
 
 # Configure additional tools
 [tool.uv]
-required-version = "~=0.6.0" # Pin uv to major version for stability
+required-version = "~=0.7.0" # Pin uv to major version for stability
 
 # Bump Version
 [tool.bumpversion]
