@@ -64,7 +64,7 @@ jobs:
             ${{ steps.build.outputs.TAR_FILE }}
           draft: true
           name: "Release ${{ steps.bump_version.outputs.current-version }}"
-          tag_name: v${{ steps.bump_version.outputs.current-version }}
+          tag_name: ${{ steps.bump_version.outputs.current-version }}
           body: |
             ## Release ${{ steps.bump_version.outputs.current-version }}
             
