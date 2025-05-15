@@ -1,6 +1,9 @@
 # .github/workflows/prepare-release.yml
 name: Prepare Release
 
+permissions: 
+  contents: write # Grants write access to repository contents (required for creating releases)
+
 on:
   workflow_dispatch:
 
