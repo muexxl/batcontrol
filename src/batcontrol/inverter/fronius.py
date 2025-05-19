@@ -192,14 +192,14 @@ class FroniusWR(InverterBaseclass):
         # This stays as a hardcoded path for now
         # since 1.36 /api/status/version
         path = '/api/status/version'
-        response = self.send_request(
-            path, method='GET', payload={}, auth=False)
-        if not response:
+        response = self.__send_one_http_request(path, payload={})
+        if not response.status_code == 200:
+            logger.debug(
+                'Fronius API version endpoint not found, trying old path')
             # Support old path
             path = '/status/version'
-            response = self.send_request(
-                 path, method='GET', payload={}, auth=False)
-        if not response:
+            response = self.__send_one_http_request(path, payload={})
+        if not response.status_code == 200:
             raise RuntimeError('Failed to retrieve firmware version')
         version_dict = json.loads(response.text)
         version_string = version_dict["swrevisions"]["GEN24"]
