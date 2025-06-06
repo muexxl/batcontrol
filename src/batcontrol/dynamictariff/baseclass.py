@@ -31,7 +31,7 @@ class DynamicTariffBaseclass(TariffInterface):
             try:
                 self.raw_data = self.get_raw_data_from_provider()
                 self.last_update = now
-            except ( RuntimeError, ConnectionError, TimeoutError) as e:
+            except (ConnectionError, TimeoutError) as e:
                 logger.error('Error getting raw tariff data: %s', e)
                 logger.warning('Using cached raw tariff data')
         prices = self.get_prices_from_raw_data()
