@@ -57,7 +57,7 @@ class Awattar(DynamicTariffBaseclass):
             if response.status_code != 200:
                 raise ConnectionError(f'[Awattar] API returned {response}')
         except requests.exceptions.RequestException as e:
-            raise ConnectionError(f'[Awattar] API request failed: {e}')
+            raise ConnectionError(f'[Awattar] API request failed: {e}') from e
 
 
         raw_data = response.json()

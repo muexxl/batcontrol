@@ -45,7 +45,7 @@ class Evcc(DynamicTariffBaseclass):
             if response.status_code != 200:
                 raise ConnectionError(f'[evcc] API returned {response}')
         except requests.exceptions.RequestException as e:
-            raise ConnectionError(f'[evcc] API request failed: {e}')
+            raise ConnectionError(f'[evcc] API request failed: {e}') from e
 
         # {"result":
         #     { "rates": [

@@ -30,7 +30,7 @@ class Tibber(DynamicTariffBaseclass):
             if response.status_code != 200:
                 raise ConnectionError(f'[Tibber] API responded with {response}')
         except requests.exceptions.RequestException as e:
-            raise ConnectionError(f'[Tibber] API request failed: {e}')
+            raise ConnectionError(f'[Tibber] API request failed: {e}') from e
 
         raw_data=response.json()
         return raw_data
