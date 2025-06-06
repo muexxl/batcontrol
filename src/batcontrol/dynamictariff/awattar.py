@@ -51,11 +51,16 @@ class Awattar(DynamicTariffBaseclass):
         self.price_markup=price_markup
 
     def get_raw_data_from_provider(self):
-        response=requests.get(self.url, timeout=30)
-        if response.status_code != 200:
-            raise RuntimeError(f'[Awattar_AT] API returned {response}')
+        try:
+            response = requests.get(self.url, timeout=30)
+            response.raise_for_status()
+            if response.status_code != 200:
+                raise ConnectionError(f'[Awattar] API returned {response}')
+        except requests.exceptions.RequestException as e:
+            raise ConnectionError(f'[Awattar] API request failed: {e}')
 
-        raw_data=response.json()
+
+        raw_data = response.json()
         return raw_data
 
 

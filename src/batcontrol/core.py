@@ -21,11 +21,11 @@ from .forecastconsumption import Consumption as consumption_factory
 
 
 ERROR_IGNORE_TIME = 600  # 10 Minutes
-EVALUATIONS_EVERY_MINUTES = 3  # Every x minutes on the clock
+EVALUATIONS_EVERY_MINUTES = 0  # Every x minutes on the clock
 DELAY_EVALUATION_BY_SECONDS = 15  # Delay evaluation for x seconds at every trigger
 # Interval between evaluations in seconds
 TIME_BETWEEN_EVALUATIONS = EVALUATIONS_EVERY_MINUTES * 60
-TIME_BETWEEN_UTILITY_API_CALLS = 900  # 15 Minutes
+TIME_BETWEEN_UTILITY_API_CALLS = 0  # 15 Minutes
 # Minimum charge rate to controlling loops between charging and
 #   self discharge.
 # 500W is Fronius' internal value for forced recharge.
