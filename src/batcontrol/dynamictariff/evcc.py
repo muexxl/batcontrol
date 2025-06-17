@@ -75,7 +75,11 @@ class Evcc(DynamicTariffBaseclass):
             diff=timestamp-now
             rel_hour=math.ceil(diff.total_seconds()/3600)
             if rel_hour >=0:
-                prices[rel_hour]=item['price']
+                # since evcc 0.203.0 value is the name of the price field.
+                if item.get('value', None) is not None:
+                    prices[rel_hour]=item['value']
+                else:
+                    prices[rel_hour]=item['price']
         return prices
 
 def test():

@@ -3,13 +3,14 @@ set -e
 
 SHARED_FOLDER="/app/addon_config"
 CONFIG_FOLDER="/app/config"
+CONFIG_TEMPLATE_FOLDER="/app/config_template"
 
 CONFIG_FILE="$CONFIG_FOLDER/batcontrol_config.yaml"
 CONFIG_FILE_SHARED="$SHARED_FOLDER/batcontrol_config.yaml"
 CONFIG_FILE_HA="/data/options.json"
 
 LOAD_PROFILE="$CONFIG_FOLDER/load_profile.csv"
-LOAD_PROFILE_DEFAULT="$CONFIG_FOLDER/load_profile_default.csv"
+LOAD_PROFILE_DEFAULT="$CONFIG_TEMPLATE_FOLDER/load_profile_default.csv"
 LOAD_PROFILE_SHARED="$SHARED_FOLDER/load_profile.csv"
 
 LOG_FILE="/data/batcontrol.log"

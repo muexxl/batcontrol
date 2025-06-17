@@ -1,0 +1,100 @@
+# .github/workflows/prepare-release.yml
+name: Prepare Release
+
+permissions: 
+  contents: write # Grants write access to repository contents (required for creating releases)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up uv with Python 3.12
+        id: setup-uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          python-version: 3.12
+          activate-environment: true
+          
+      - name: Install bump-my-version
+        run: uv pip install bump-my-version
+        
+      - name: Setup git user
+        run: |
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+          
+      - name: Create release branch
+        id: create_branch
+        run: |
+          BRANCH="prepare-release"
+          git switch -c $BRANCH
+          echo "branch=$BRANCH" >> $GITHUB_OUTPUT
+          
+      - name: Bump version
+        id: bump_version
+        run: |
+          # Get current version before bump
+          CURRENT_VERSION=$(bump-my-version show current_version)
+          echo "previous-version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
+          
+          # Bump version
+          bump-my-version bump release --commit
+          
+          # Get new version after bump
+          NEW_VERSION=$(bump-my-version show current_version)
+          echo "current-version=$NEW_VERSION" >> $GITHUB_OUTPUT
+          
+      - name: Build package
+        id: build
+        run: |
+          uv build --no-sources .
+          echo "WHEEL_FILE=$(ls dist/*.whl)" >> $GITHUB_OUTPUT
+          echo "TAR_FILE=$(ls dist/*.tar.gz)" >> $GITHUB_OUTPUT
+          
+      - name: Create Draft Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            ${{ steps.build.outputs.WHEEL_FILE }}
+            ${{ steps.build.outputs.TAR_FILE }}
+          draft: true
+          name: "Release ${{ steps.bump_version.outputs.current-version }}"
+          tag_name: ${{ steps.bump_version.outputs.current-version }}
+          body: |
+            ## Release ${{ steps.bump_version.outputs.current-version }}
+            
+            *Release notes will be added here*
+            
+            ### Artifacts
+            - Python wheel package
+            - Source distribution
+          
+      - name: Push branch
+        run: git push -f -u origin ${{ steps.create_branch.outputs.branch }}
+          
+      - name: Create PR
+        id: create-pr
+        uses: peter-evans/create-pull-request@v5
+        with:
+          title: "Release ${{ steps.bump_version.outputs.current-version }}"
+          body: |
+            # Release ${{ steps.bump_version.outputs.current-version }}
+            
+            This PR prepares release ${{ steps.bump_version.outputs.current-version }}.
+            
+            ## Manual steps after review:
+            1. Merge this PR
+            2. Create a tag with the release version on the merged commit
+            3. Finalize the release on GitHub
+            
+            The tag will trigger Docker image build automatically.
+          branch: ${{ steps.create_branch.outputs.branch }}
+          base: main

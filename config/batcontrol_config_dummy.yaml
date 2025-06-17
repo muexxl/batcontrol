@@ -36,8 +36,8 @@ inverter:
   address: 192.168.0.XX # the local IP of your inverter. needs to be reachable from the machine that runs batcontrol
   user: customer #customer or technician lowercase only!!
   password: YOUR-PASSWORD #
-  max_grid_charge_rate: 5000 # Watt
-  max_pv_charge_rate : 3000 # Watt
+  max_grid_charge_rate: 5000 # Watt, Upper limit for Grid to Battery charge rate.
+  max_pv_charge_rate: 0 # Watt, This allows to limit the PV to Battery charge rate. Set to 0 for unlimited charging.
 
 #--------------------------
 #  Dynamic Tariff Provider
