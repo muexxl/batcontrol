@@ -17,7 +17,6 @@ class CalculationParameters:
     """ Calculations from Batcontorl configration """
     always_allow_discharge_limit: float
     max_charging_from_grid_limit: float
-    charge_rate_multiplier: float
     min_price_difference: float
     min_price_difference_rel: float
     max_capacity: float
@@ -44,12 +43,12 @@ class LogicInterface(ABC):
     """ Interface for Logic classes """
 
     @abstractmethod
-    def __init__(self):
+    def __init__(self, timezone):
         """ Initialize the Logic class """
         pass
 
     @abstractmethod
-    def setCalculationParameters(self, parameters: CalculationParameters):
+    def set_calculation_parameters(self, parameters: CalculationParameters):
         """ Set the calculation parameters for the logic """
         pass
 
@@ -59,11 +58,17 @@ class LogicInterface(ABC):
         pass
 
     @abstractmethod
-    def getCalculationOutput(self) -> CalculationOutput:
+    def get_calculation_output(self) -> CalculationOutput:
         """ Get the calculation output from the last calculation """
         pass
 
     @abstractmethod
-    def getInverterControlSettings(self) -> InverterControlSettings:
+    def get_inverter_control_settings(self) -> InverterControlSettings:
         """ Get the inverter control settings from the last calculation """
+        pass
+
+    @abstractmethod
+    def is_discharge_always_allowed(self, current_soc:float,
+                                    always_allow_discharge_limit:float = None) -> bool:
+        """ Check if discharge is always allowed based on the logic """
         pass

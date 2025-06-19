@@ -68,6 +68,8 @@ class Batcontrol:
 
         self.last_run_time = 0
 
+        self.last_logic_instance = None
+
         self.config = configdict
         config = configdict
 
@@ -130,27 +132,14 @@ class Batcontrol:
         self.min_price_difference_rel = self.batconfig.get(
             'min_price_difference_rel', 0)
 
-        self.charge_rate_multiplier = 1.1
-        self.soften_price_difference_on_charging = False
-        self.soften_price_difference_on_charging_factor = 5
         self.round_price_digits = 4
 
         if self.config.get('battery_control_expert', None) is not None:
             battery_control_expert = self.config.get(
                 'battery_control_expert', {})
-            self.soften_price_difference_on_charging = battery_control_expert.get(
-                'soften_price_difference_on_charging',
-                self.soften_price_difference_on_charging)
-
-            self.soften_price_difference_on_charging_factor = battery_control_expert.get(
-                'soften_price_difference_on_charging_factor',
-                self.soften_price_difference_on_charging_factor)
             self.round_price_digits = battery_control_expert.get(
                 'round_price_digits',
                 self.round_price_digits)
-            self.charge_rate_multiplier = battery_control_expert.get(
-                'charge_rate_multiplier',
-                self.charge_rate_multiplier)
 
         self.mqtt_api = None
         if config.get('mqtt', None) is not None:
@@ -334,7 +323,7 @@ class Batcontrol:
         net_consumption[0] *= 1 - \
             datetime.datetime.now().astimezone(self.timezone).minute/60
 
-        this_logic_run = LogicFactory.create_logic({'type': 'default'})
+        this_logic_run = LogicFactory.create_logic(self.config, self.timezone)
 
         # Create input for calculation
         calc_input = CalculationInput(
@@ -348,18 +337,18 @@ class Batcontrol:
         calc_parameters = CalculationParameters(
             self.always_allow_discharge_limit,
             self.max_charging_from_grid_limit,
-            self.charge_rate_multiplier,
             self.min_price_difference,
             self.min_price_difference_rel,
             self.get_max_capacity()
         )
 
-        this_logic_run.setCalculationParameters(calc_parameters)
+        self.last_logic_instance = this_logic_run
+        this_logic_run.set_calculation_parameters(calc_parameters)
         # Calculate inverter mode
         logger.debug('Calculating inverter mode...')
         this_logic_run.calculate(calc_input)
-        calc_output = this_logic_run.getCalculationOutput()
-        inverter_settings = this_logic_run.getInverterControlSettings()
+        calc_output = this_logic_run.get_calculation_output()
+        inverter_settings = this_logic_run.get_inverter_control_settings()
 
         # for API
         self.set_reserved_energy(calc_output.reserved_energy)
@@ -373,7 +362,6 @@ class Batcontrol:
                 'Discharge blocked due to external lock'
             )
             inverter_settings.allow_discharge = False
-                   
 
         if inverter_settings.allow_discharge:
             self.allow_discharging()
@@ -558,7 +546,18 @@ class Batcontrol:
             self.mqtt_api.publish_discharge_blocked(discharge_blocked)
         self.discharge_blocked = discharge_blocked
 
-        if not self.__is_above_always_allow_discharge_limit():
+
+        #if not self.__is_above_always_allow_discharge_limit():
+        #    self.avoid_discharging()
+        if self.last_logic_instance is not None:
+            if not self.last_logic_instance.is_discharge_always_allowed(
+                        self.get_SOC(),  # pylint: disable=invalid-name
+                        self.always_allow_discharge_limit
+                    ):
+                self.avoid_discharging()
+        else:
+            # If no logic instance is available, we can not decide what to do.
+            # So we just avoid discharging.
             self.avoid_discharging()
 
     def refresh_static_values(self) -> None:

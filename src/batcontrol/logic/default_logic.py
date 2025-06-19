@@ -3,7 +3,8 @@ import datetime
 import numpy as np
 
 from .logic_interface import LogicInterface
-from .logic_interface import CalculationParameters, CalculationInput, CalculationOutput, InverterControlSettings
+from .logic_interface import CalculationParameters, CalculationInput
+from .logic_interface import CalculationOutput, InverterControlSettings
 
 logger = logging.getLogger(__name__)
 rules_logger = logging.getLogger(__name__ + '.rules')
@@ -17,47 +18,75 @@ MIN_CHARGE_RATE = 500
 class DefaultLogic(LogicInterface):
     """ Default logic class for Batcontrol. """
 
-    def __init__(self):
+    def __init__(self, timezone: datetime.timezone = datetime.timezone.utc):
         self.calculation_parameters = None
         self.calculation_output = None
         self.inverter_control_settings = None
+        self.round_price_digits = 4  # Default rounding for prices
+        self.soften_price_difference_on_charging = False
+        self.soften_price_difference_on_charging_factor = 5.0  # Default factor
+        self.charge_rate_multiplier = 1.1  # Default multiplier for charge rate
+        self.timezone = timezone
 
-    def setCalculationParameters(self, parameters: CalculationParameters):
+    def set_round_price_digits(self, digits: int):
+        """ Set the number of digits to round prices to """
+        self.round_price_digits = digits
+
+    def set_soften_price_differnce_on_charging(self, soften: bool, factor: float = 5):
+        """ Set if the price difference should be softened on charging """
+        self.soften_price_difference_on_charging = soften
+        self.soften_price_difference_on_charging_factor = factor
+
+    def set_charge_rate_multiplier(self, multiplier: float):
+        """ Set the multiplier for the charge rate """
+        self.charge_rate_multiplier = multiplier
+
+    def set_calculation_parameters(self, parameters: CalculationParameters):
         """ Set the calculation parameters for the logic """
         self.calculation_parameters = parameters
 
-    def calculate(self, input_data: CalculationInput) -> bool:
+    def set_timezone(self, timezone: datetime.timezone):
+        """ Set the timezone for the logic calculations """
+        self.timezone = timezone
+
+    def calculate(self, input_data: CalculationInput, calc_timestamp:datetime = None) -> bool:
         """ Calculate the inverter control settings based on the input data """
         # Placeholder for actual calculation logic
         logger.debug("Calculating inverter control settings...")
+
+        if calc_timestamp is None:
+            calc_timestamp = datetime.datetime.now().astimezone(self.timezone)
+
+
         self.inverter_control_settings = self.calculate_inverter_mode(
-            calc_input=input_data,
-            calc_parameters=self.calculation_parameters
+            input_data,
+            calc_timestamp
         )
         return True
 
-    def getCalculationOutput(self) -> CalculationOutput:
+    def get_calculation_output(self) -> CalculationOutput:
         """ Get the calculation output from the last calculation """
         return self.calculation_output
 
-    def getInverterControlSettings(self) -> InverterControlSettings:
+    def get_inverter_control_settings(self) -> InverterControlSettings:
         """ Get the inverter control settings from the last calculation """
         return self.inverter_control_settings
-    
 
-    def calculate_inverter_mode(self, calc_input: CalculationInput, calc_timestamp:datetime = None) -> InverterControlSettings:
+    def calculate_inverter_mode(self, calc_input: CalculationInput,
+                                calc_timestamp:datetime = None) -> InverterControlSettings:
         """ Main control logic for battery control """
         # default settings
         inverter_control_settings = InverterControlSettings(
             allow_discharge=False,
             charge_from_grid=False,
-            charge_rate=0
+            charge_rate=0,
+            limit_charge_rate=0
         )
         net_consumption = calc_input.net_consumption
         prices = calc_input.prices
 
         if calc_timestamp is None:
-            calc_timestamp = datetime.datetime.now().astimezone(self.timezone) # TODO provide timezone in setup
+            calc_timestamp = datetime.datetime.now().astimezone(self.timezone)
 
         # ensure availability of data
         max_hour = min(len(net_consumption), len(prices))
@@ -70,6 +99,7 @@ class DefaultLogic(LogicInterface):
             inverter_control_settings.allow_discharge = False
             charging_limit_percent = self.calculation_parameters.max_charging_from_grid_limit * 100
             required_recharge_energy = self.get_required_required_recharge_energy(
+                calc_input,
                 net_consumption[:max_hour],
                 prices
             )
@@ -101,7 +131,7 @@ class DefaultLogic(LogicInterface):
                     60-calc_timestamp.minute)/60
                 charge_rate = required_recharge_energy/remaining_time
                 # apply multiplier for charge inefficiency
-                charge_rate *= self.charge_rate_multiplier           # TODO: provide charge_rate_multiplier in setup
+                charge_rate *= self.charge_rate_multiplier
 
                 if charge_rate < MIN_CHARGE_RATE:
                     logger.debug("[Rule] Charge rate increased to minimum %d W from %f.1 W",
@@ -119,7 +149,10 @@ class DefaultLogic(LogicInterface):
         #
         return inverter_control_settings
 
-    def is_discharge_allowed(self, calc_input: CalculationInput, net_consumption: np.ndarray, prices: dict, calc_timestamp:datetime = None) -> bool:
+    def is_discharge_allowed(self, calc_input: CalculationInput,
+                                    net_consumption: np.ndarray,
+                                    prices: dict,
+                                    calc_timestamp:datetime = None) -> bool:
         """ Evaluate if the battery is allowed to discharge
 
             - Check if battery is above always_allow_discharge_limit
@@ -129,12 +162,11 @@ class DefaultLogic(LogicInterface):
             return: bool
         """
         if calc_timestamp is None:
-            calc_timestamp = datetime.datetime.now().astimezone(self.timezone)  #TODO provide timezone in setup
+            calc_timestamp = datetime.datetime.now().astimezone(self.timezone)
 
-        self.cal
         stored_usable_energy = calc_input.stored_usable_energy
 
-        if self.__is_above_always_allow_discharge_limit(calc_input):
+        if self.is_discharge_always_allowed(calc_input.soc):
             logger.info(
                 "[Rule] Discharge allowed due to always_allow_discharge_limit")
             return True
@@ -245,7 +277,8 @@ class DefaultLogic(LogicInterface):
         return False
 
  # %%
-    def get_required_required_recharge_energy(self, calc_input: CalculationInput ,net_consumption: list, prices: dict) -> float:
+    def get_required_required_recharge_energy(self, calc_input: CalculationInput ,
+                                              net_consumption: list, prices: dict) -> float:
         """ Calculate the required energy to shift toward high price hours.
 
             If a recharge price window is detected, the energy required to
@@ -269,9 +302,9 @@ class DefaultLogic(LogicInterface):
             future_price = prices[h]
             found_lower_price = False
             # Soften the price difference to avoid too early charging
-            if self.soften_price_difference_on_charging:    # TODO provide soften_price_difference_on_charging in setup
+            if self.soften_price_difference_on_charging:
                 modified_price = current_price-min_price_difference / \
-                    self.soften_price_difference_on_charging_factor    # TODO provide soften_price_difference_on_charging_factor in setup
+                    self.soften_price_difference_on_charging_factor
                 found_lower_price = future_price <= modified_price
             else:
                 found_lower_price = future_price <= current_price
@@ -340,20 +373,19 @@ class DefaultLogic(LogicInterface):
         return round(
             max(self.calculation_parameters.min_price_difference,
                 self.calculation_parameters.min_price_difference_rel * abs(price)),
-            self.round_price_digits   # TODO provide round_price_digits in setup
+            self.round_price_digits
         )
 
+    def is_discharge_always_allowed(self, current_soc, always_allow_discharge_limit = None):
+        """ Check if the battery is allowed to discharge always """
+        if always_allow_discharge_limit is None:
+            always_allow_discharge_limit = self.calculation_parameters.always_allow_discharge_limit
 
-    def __is_above_always_allow_discharge_limit(self, calc_input: CalculationInput) -> bool:
-        """ Evaluate if the battery is allowed to discharge always
-            return: bool
-        """
-        stored_energy = calc_input.stored_energy
-        discharge_limit = self.calculation_parameters.max_capacity * self.calculation_parameters.always_allow_discharge_limit
-        if stored_energy > discharge_limit:
+        discharge_limit = self.calculation_parameters.max_capacity * always_allow_discharge_limit
+        if current_soc > discharge_limit:
             logger.debug(
                 'Battery with %d Wh above discharge limit %d Wh',
-                stored_energy,
+                current_soc,
                 discharge_limit
             )
             return True
