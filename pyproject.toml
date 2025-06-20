@@ -6,7 +6,7 @@ authors = [{name = "Stephan Mükusch", email = "muexxl@gmx.net"}]
 license = "MIT"
 license-files = ["LICENSE"]
 readme = "README.md"
-requires-python = ">3.8, <3.13"
+requires-python = ">3.8, <3.14"
 dependencies = [
     "numpy>=1.24",
     "pandas>=2.0",
@@ -30,6 +30,21 @@ version = {attr = "batcontrol.__pkginfo__.__version__"}
 # Configure additional tools
 [tool.uv]
 required-version = "~=0.7.0" # Pin uv to major version for stability
+
+# Testing configuration
+[tool.pytest]
+testpaths = ["tests"]
+python_files = "test_*.py"
+python_classes = "Test*"
+python_functions = "test_*"
+pythonpath = ["src"]
+
+# For testing
+[project.optional-dependencies]
+test = [
+    "pytest>=7.0.0",
+    "pytest-cov>=4.0.0",
+]
 
 # Bump Version
 [tool.bumpversion]
