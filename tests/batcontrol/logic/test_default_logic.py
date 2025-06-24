@@ -9,36 +9,36 @@ class TestDefaultLogic(unittest.TestCase):
     def setUp(self):
         """Set up test fixtures"""
         self.logic = DefaultLogic(timezone=datetime.timezone.utc)
-        
+
         # Setup calculation parameters
         self.calculation_parameters = CalculationParameters(
             always_allow_discharge_limit=0.8,  # 80%
             max_charging_from_grid_limit=0.9,  # 90%
             min_price_difference=0.05,  # 5 cents
-            min_price_difference_rel=0.2,  # 20%
+            min_price_difference_rel=0.2,  # 20% distance
             max_capacity=10000  # 10 kWh
         )
         self.logic.set_calculation_parameters(self.calculation_parameters)
-        
+
     def test_init(self):
         """Test initialization of DefaultLogic"""
         self.assertIsNotNone(self.logic)
         self.assertEqual(self.logic.round_price_digits, 4)
         self.assertEqual(self.logic.charge_rate_multiplier, 1.1)
         self.assertEqual(self.logic.timezone, datetime.timezone.utc)
-    
+
     def test_set_calculation_parameters(self):
         """Test setting calculation parameters"""
         self.assertEqual(self.logic.calculation_parameters, self.calculation_parameters)
-    
+
     def test_is_discharge_always_allowed(self):
         """Test discharge always allowed when SOC is above threshold"""
         # SOC above the threshold
         self.assertTrue(self.logic.is_discharge_always_allowed(8500))  # 8.5 kWh, which is > 8 kWh (80% of 10kWh)
-        
+
         # SOC below the threshold
         self.assertFalse(self.logic.is_discharge_always_allowed(7500))  # 7.5 kWh, which is < 8 kWh
-    
+
     def test_calculate_inverter_mode_high_soc(self):
         """Test calculate_inverter_mode with high SOC should allow discharge"""
         calc_input = CalculationInput(
@@ -49,14 +49,15 @@ class TestDefaultLogic(unittest.TestCase):
             free_capacity=1000,  # 1 kWh free
             soc=85  # 85% SOC - above discharge limit
         )
-        
+
         # Call the method under test
         calc_timestamp = datetime.datetime(2025, 6, 20, 12, 0, 0, tzinfo=datetime.timezone.utc)
-        result = self.logic.calculate_inverter_mode(calc_input, calc_timestamp)
-        
+        self.assertTrue(self.logic.calculate(calc_input,calc_timestamp))
+        result = self.logic.get_inverter_control_settings()
+
         # Assert result
         self.assertIsInstance(result, InverterControlSettings)
-        
+
     def test_calculate_inverter_mode_low_soc(self):
         """Test calculate_inverter_mode with low SOC should not allow discharge"""
         calc_input = CalculationInput(
@@ -67,13 +68,14 @@ class TestDefaultLogic(unittest.TestCase):
             free_capacity=5000,  # 5 kWh free
             soc=50  # 50% SOC - below discharge limit
         )
-        
+
         # Call the method under test
         calc_timestamp = datetime.datetime(2025, 6, 20, 12, 0, 0, tzinfo=datetime.timezone.utc)
-        result = self.logic.calculate_inverter_mode(calc_input, calc_timestamp)
-        
+        self.assertTrue(self.logic.calculate(calc_input,calc_timestamp))
+        result = self.logic.get_inverter_control_settings()
+
         # Assert result
         self.assertIsInstance(result, InverterControlSettings)
-        
+
 if __name__ == '__main__':
     unittest.main()
