@@ -14,7 +14,7 @@ class CalculationInput:
 
 @dataclass
 class CalculationParameters:
-    """ Calculations from Batcontorl configration """
+    """ Calculations from Battery control configuration """
     always_allow_discharge_limit: float
     max_charging_from_grid_limit: float
     min_price_difference: float
