@@ -51,11 +51,16 @@ class DefaultLogic(LogicInterface):
 
     def calculate(self, input_data: CalculationInput, calc_timestamp:datetime = None) -> bool:
         """ Calculate the inverter control settings based on the input data """
-        # Placeholder for actual calculation logic
         logger.debug("Calculating inverter control settings...")
 
         if calc_timestamp is None:
             calc_timestamp = datetime.datetime.now().astimezone(self.timezone)
+
+        self.calculation_output = CalculationOutput(
+            reserved_energy=0.0,
+            required_recharge_energy=0.0,
+            min_dynamic_price_difference=0.0
+       )
 
 
         self.inverter_control_settings = self.calculate_inverter_mode(
@@ -176,6 +181,7 @@ class DefaultLogic(LogicInterface):
         min_dynamic_price_difference = self.__calculate_min_dynamic_price_difference(
             current_price)
 
+        self.calculation_output.min_dynamic_price_difference = min_dynamic_price_difference
 
         max_hour = len(net_consumption)
         # relevant time range : until next recharge possibility
@@ -241,6 +247,8 @@ class DefaultLogic(LogicInterface):
                     production[hour] = 0
             # add_remaining required_energy to reserved_storage
             reserved_storage += required_energy
+
+        self.calculation_output.reserved_energy = reserved_storage
 
         if len(higher_price_hours) > 0:
             # This message is somehow confusing, because we are working with an
@@ -365,6 +373,8 @@ class DefaultLogic(LogicInterface):
             recharge_energy = free_capacity
             logger.debug(
                 "[Rule] Recharge limited by free capacity: %0.1f Wh", recharge_energy)
+
+        self.calculation_output.required_recharge_energy = recharge_energy
 
         return recharge_energy
 
