@@ -87,6 +87,11 @@ class DefaultLogic(LogicInterface):
             charge_rate=0,
             limit_charge_rate=0
         )
+
+        if self.calculation_output is None:
+            logger.error("Calculation output is not set. Please call calculate() first.")
+            return None
+
         net_consumption = calc_input.net_consumption
         prices = calc_input.prices
 
