@@ -356,11 +356,9 @@ class Batcontrol:
             self.mqtt_api.publish_min_dynamic_price_diff(
                 calc_output.min_dynamic_price_difference)
 
-
-        if  self.discharge_blocked:
-            logger.debug(
-                'Discharge blocked due to external lock'
-            )
+        if self.discharge_blocked:
+            # We are blocked by a request outside control loop (evcc)
+            logger.debug('Discharge blocked due to external lock')
             inverter_settings.allow_discharge = False
 
         if inverter_settings.allow_discharge:
