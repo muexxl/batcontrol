@@ -1,4 +1,14 @@
 #! /usr/bin/env python
+""" Batcontrol Core Module
+
+This module is the main entry point for Batcontrol.
+
+It handles the logic and control of the battery system, including:
+  - Fetching forecasts for consumption, production, and prices
+  - Calculating the optimal charging/discharging strategy
+  - Interfacing with the inverter and external APIs (MQTT, evcc)
+
+"""
 # %%
 from dataclasses import dataclass
 import datetime
@@ -15,8 +25,8 @@ from .mqtt_api import MqttApi
 from .evcc_api import EvccApi
 
 from .logic import Logic as LogicFactory
-from .logic import CalculationInput, CalculationParameters, InverterControlSettings
-from .logic import CommonLogic as CommonLogic
+from .logic import CalculationInput, CalculationParameters
+from .logic import CommonLogic
 
 from .dynamictariff import DynamicTariff as tariff_factory
 from .inverter import Inverter as inverter_factory
@@ -41,9 +51,8 @@ logger = logging.getLogger(__name__)
 
 class Batcontrol:
     """ Main class for Batcontrol, handles the logic and control of the battery system """
-    
     general_logic = None  # type: CommonLogic
-    
+
     def __init__(self, configdict:dict):
         # For API
         self.api_overwrite = False
@@ -360,7 +369,7 @@ class Batcontrol:
         this_logic_run.set_calculation_parameters(calc_parameters)
         # Calculate inverter mode
         logger.debug('Calculating inverter mode...')
-        if this_logic_run.calculate(calc_input):
+        if not this_logic_run.calculate(calc_input):
             logger.error('Calculation failed. Falling back to discharge')
             self.allow_discharging()
             return

@@ -5,15 +5,19 @@ from .logic_interface import LogicInterface
 from .default import DefaultLogic
 
 logger = logging.getLogger(__name__)
+
 class Logic:
     """ Factory for logic classes. """
+    print_class_message = True
     @staticmethod
     def create_logic(config: dict, timezone) -> LogicInterface:
         """ Select and configure a logic class based on the given configuration """
         request_type = config.get('type', 'default').lower()
         logic = None
         if request_type == 'default':
-            logger.info('Using default logic')
+            if Logic.print_class_message:
+                logger.info('Using default logic')
+                Logic.print_class_message = False
             logic = DefaultLogic(timezone)
             if config.get('battery_control_expert', None) is not None:
                 battery_control_expert = config.get( 'battery_control_expert', {})
