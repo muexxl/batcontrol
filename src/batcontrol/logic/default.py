@@ -94,6 +94,8 @@ class DefaultLogic(LogicInterface):
 
         if self.is_discharge_allowed(calc_input, net_consumption, prices, calc_timestamp):
             inverter_control_settings.allow_discharge = True
+            inverter_control_settings.limit_battery_charge_rate = 0
+
             return inverter_control_settings
         else:  # discharge not allowed
             logger.debug('Discharging is NOT allowed')

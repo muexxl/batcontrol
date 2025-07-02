@@ -35,8 +35,8 @@ class InverterControlSettings:
     # Force charge mode is used to charge the battery from grid
     charge_from_grid: bool
     charge_rate: int
-    # Limit charge rate (via PV) to a certain value
-    limit_charge_rate: int
+    # Limit charge rate (via PV) to a certain value Wh
+    limit_battery_charge_rate: int
 
 
 class LogicInterface(ABC):
