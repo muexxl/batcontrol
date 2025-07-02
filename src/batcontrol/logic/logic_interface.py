@@ -7,8 +7,6 @@ class CalculationInput:
     """ Input for the calculation """
     production: np.ndarray
     consumption: np.ndarray
-    """ Net consumption is production - consumption """
-    net_consumption: np.ndarray
     prices: dict
     stored_energy: float
     stored_usable_energy: float

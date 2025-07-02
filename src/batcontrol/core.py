@@ -333,7 +333,9 @@ class Batcontrol:
             return
 
         # correction for time that has already passed since the start of the current hour
-        net_consumption[0] *= 1 - \
+        production[0] *= 1 - \
+            datetime.datetime.now().astimezone(self.timezone).minute/60
+        consumption[0] *= 1 - \
             datetime.datetime.now().astimezone(self.timezone).minute/60
 
         this_logic_run = LogicFactory.create_logic(self.config, self.timezone)
@@ -342,7 +344,6 @@ class Batcontrol:
         calc_input = CalculationInput(
             production,
             consumption,
-            net_consumption,
             prices,
             self.get_stored_energy(),
             self.get_stored_usable_energy(),

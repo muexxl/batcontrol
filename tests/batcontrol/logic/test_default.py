@@ -57,12 +57,10 @@ class TestDefaultLogic(unittest.TestCase):
 
         consumption = np.array([500, 600, 700])  # Example consumption in W
         production = np.array([0, 0, 0])  # No production for this test
-        net_consumption = consumption - production    # Net consumption
 
         calc_input = CalculationInput(
             consumption=consumption,
             production=production,
-            net_consumption=net_consumption,  # Net consumption in W
             prices={0: 0.25, 1: 0.30, 2: 0.35},  # Example prices in € per kWh
             stored_energy=stored_energy,
             stored_usable_energy=stored_usable_energy,
@@ -77,6 +75,7 @@ class TestDefaultLogic(unittest.TestCase):
 
         # Assert result
         self.assertIsInstance(result, InverterControlSettings)
+        self.assertTrue(result.allow_discharge, "Discharge should be allowed due to high SOC")
 
     def test_calculate_inverter_mode_low_soc(self):
         """Test calculate_inverter_mode with low SOC should not allow discharge"""
@@ -88,12 +87,10 @@ class TestDefaultLogic(unittest.TestCase):
 
         consumption = np.array([500, 600, 700])  # Example consumption in W
         production = np.array([0, 0, 0])  # No production for this test
-        net_consumption = consumption - production    # Net consumption
 
         calc_input = CalculationInput(
             consumption=consumption,
             production=production,
-            net_consumption=net_consumption,  # Net consumption in W
             prices={0: 0.30, 1: 0.25, 2: 0.20},  # Current price higher than future
             stored_energy=stored_energy,
             stored_usable_energy=stored_usable_energy,
@@ -108,6 +105,7 @@ class TestDefaultLogic(unittest.TestCase):
 
         # Assert result
         self.assertIsInstance(result, InverterControlSettings)
+        self.assertFalse(result.allow_discharge, "Discharge should not be allowed due to low SOC")
 
     def test_discharge_not_allowed_because_reserved(self):
         """Test discharge not allowed because reserved energy is below needed energy"""
@@ -119,12 +117,10 @@ class TestDefaultLogic(unittest.TestCase):
 
         consumption = np.array([500, 500, 1000])  # Example consumption in W
         production = np.array([0, 0, 0])  # No production for this test
-        net_consumption = consumption - production    # Net consumption
 
         calc_input = CalculationInput(
             consumption=consumption,
             production=production,
-            net_consumption=net_consumption,  # Net consumption in W
             prices={0: 0.20, 1: 0.25, 2: 0.30},  # Current price higher than future
             stored_energy=stored_energy,
             stored_usable_energy=stored_usable_energy,
@@ -149,11 +145,10 @@ class TestDefaultLogic(unittest.TestCase):
 
         consumption = np.array([500, 500, 500])  # Example consumption in W
         production = np.array([0, 0, 0])  # No production for
-        net_consumption = consumption - production
+
         calc_input = CalculationInput(
             consumption=consumption,
             production=production,
-            net_consumption=net_consumption,  # Net consumption in W
             prices={0: 0.30, 1: 0.25, 2: 0.20},  # Current price higher than future
             stored_energy=stored_energy,
             stored_usable_energy=stored_usable_energy,

@@ -28,7 +28,7 @@ class DefaultLogic(LogicInterface):
         """ Set the number of digits to round prices to """
         self.round_price_digits = digits
 
-    def set_soften_price_differnce_on_charging(self, soften: bool, factor: float = 5):
+    def set_soften_price_difference_on_charging(self, soften: bool, factor: float = 5):
         """ Set if the price difference should be softened on charging """
         self.soften_price_difference_on_charging = soften
         self.soften_price_difference_on_charging_factor = factor
@@ -84,7 +84,7 @@ class DefaultLogic(LogicInterface):
             logger.error("Calculation output is not set. Please call calculate() first.")
             return None
 
-        net_consumption = calc_input.net_consumption
+        net_consumption = calc_input.consumption - calc_input.production
         prices = calc_input.prices
 
         if calc_timestamp is None:
@@ -100,7 +100,7 @@ class DefaultLogic(LogicInterface):
             rules_logger.debug('Discharging is NOT allowed')
             inverter_control_settings.allow_discharge = False
             charging_limit_percent = self.calculation_parameters.max_charging_from_grid_limit * 100
-            required_recharge_energy = self.get_required_required_recharge_energy(
+            required_recharge_energy = self.get_required_recharge_energy(
                 calc_input,
                 net_consumption[:max_hour],
                 prices
@@ -275,7 +275,7 @@ class DefaultLogic(LogicInterface):
         return False
 
  # %%
-    def get_required_required_recharge_energy(self, calc_input: CalculationInput ,
+    def get_required_recharge_energy(self, calc_input: CalculationInput ,
                                               net_consumption: list, prices: dict) -> float:
         """ Calculate the required energy to shift toward high price hours.
 
