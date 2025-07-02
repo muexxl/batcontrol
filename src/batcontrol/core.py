@@ -360,7 +360,11 @@ class Batcontrol:
         this_logic_run.set_calculation_parameters(calc_parameters)
         # Calculate inverter mode
         logger.debug('Calculating inverter mode...')
-        this_logic_run.calculate(calc_input)
+        if this_logic_run.calculate(calc_input):
+            logger.error('Calculation failed. Falling back to discharge')
+            self.allow_discharging()
+            return
+
         calc_output = this_logic_run.get_calculation_output()
         inverter_settings = this_logic_run.get_inverter_control_settings()
 
