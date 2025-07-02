@@ -94,7 +94,7 @@ class CommonLogic:
         return False
 
 
-    def calculate_charge_rate(self, charge_rate: float) -> float:
+    def calculate_charge_rate(self, charge_rate: float) -> int:
         """ Calculate the charge rate based on the charge rate multiplier.
         Args:
             charge_rate (float): The initial charge rate in W.
@@ -109,4 +109,4 @@ class CommonLogic:
             adjusted_charge_rate = MIN_CHARGE_RATE
 
         logger.debug('Adjusted charge rate: %s', adjusted_charge_rate)
-        return adjusted_charge_rate
+        return int(round(adjusted_charge_rate))
