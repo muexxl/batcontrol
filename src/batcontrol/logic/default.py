@@ -22,7 +22,6 @@ class DefaultLogic(LogicInterface):
         self.timezone = timezone
         self.common = CommonLogic.get_instance()
 
-
     def set_round_price_digits(self, digits: int):
         """ Set the number of digits to round prices to """
         self.round_price_digits = digits
@@ -35,6 +34,7 @@ class DefaultLogic(LogicInterface):
     def set_calculation_parameters(self, parameters: CalculationParameters):
         """ Set the calculation parameters for the logic """
         self.calculation_parameters = parameters
+        self.common.max_capacity= parameters.max_capacity
 
     def set_timezone(self, timezone: datetime.timezone):
         """ Set the timezone for the logic calculations """
@@ -42,6 +42,7 @@ class DefaultLogic(LogicInterface):
 
     def calculate(self, input_data: CalculationInput, calc_timestamp:datetime = None) -> bool:
         """ Calculate the inverter control settings based on the input data """
+
         logger.debug("Calculating inverter control settings...")
 
         if calc_timestamp is None:
@@ -52,7 +53,6 @@ class DefaultLogic(LogicInterface):
             required_recharge_energy=0.0,
             min_dynamic_price_difference=0.0
        )
-
 
         self.inverter_control_settings = self.calculate_inverter_mode(
             input_data,
@@ -104,7 +104,9 @@ class DefaultLogic(LogicInterface):
                 net_consumption[:max_hour],
                 prices
             )
-            is_charging_possible = calc_input.soc < charging_limit_percent
+            charge_limit_capacity = self.common.max_capacity * \
+                self.calculation_parameters.max_charging_from_grid_limit
+            is_charging_possible = calc_input.stored_energy < charge_limit_capacity
 
             logger.debug('Charging allowed: %s',
                          is_charging_possible)
@@ -158,9 +160,7 @@ class DefaultLogic(LogicInterface):
         if calc_timestamp is None:
             calc_timestamp = datetime.datetime.now().astimezone(self.timezone)
 
-        stored_usable_energy = calc_input.stored_usable_energy
-
-        if self.common.is_discharge_always_allowed_soc(calc_input.soc):
+        if self.common.is_discharge_always_allowed_capacity(calc_input.stored_energy):
             logger.info(
                 "[Rule] Discharge allowed due to always_allow_discharge_limit")
             return True
@@ -247,19 +247,19 @@ class DefaultLogic(LogicInterface):
             logger.debug(
                 "[Rule] Reserved Energy: %0.1f Wh. Usable in Battery: %0.1f Wh",
                 reserved_storage,
-                stored_usable_energy
+                calc_input.stored_usable_energy
             )
         else:
             logger.debug("[Rule] No reserved energy required, because no "
                          "'high price' hours in evaluation window.")
 
 
-        if stored_usable_energy > reserved_storage:
+        if calc_input.stored_usable_energy > reserved_storage:
             # allow discharging
             logger.debug(
                 "[Rule] Discharge allowed. Stored usable energy %0.1f Wh >"
                 " Reserved energy %0.1f Wh",
-                stored_usable_energy,
+                calc_input.stored_usable_energy,
                 reserved_storage
             )
             return True
@@ -267,7 +267,7 @@ class DefaultLogic(LogicInterface):
         # forbid discharging
         logger.debug(
             "[Rule] Discharge forbidden. Stored usable energy %0.1f Wh <= Reserved energy %0.1f Wh",
-            stored_usable_energy,
+            calc_input.stored_usable_energy,
             reserved_storage
         )
 

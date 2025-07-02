@@ -33,8 +33,7 @@ class TestDefaultLogic(unittest.TestCase):
         # We assume a MIN_SOC of 5% for usable energy
         stored_usable_energy = stored_energy - (max_capacity * 0.05 )
         free_capacity = max_capacity - stored_energy
-        soc = (stored_energy / max_capacity) * 100  # Calculate SOC in percentage
-        return stored_usable_energy, free_capacity, soc
+        return stored_usable_energy, free_capacity
 
 
     def test_init(self):
@@ -51,7 +50,7 @@ class TestDefaultLogic(unittest.TestCase):
         """Test calculate_inverter_mode with high SOC should allow discharge"""
         #max_capacity = 10000  # 10 kWh
         stored_energy = 9500  #  9,5 kWh
-        stored_usable_energy, free_capacity, soc = self._calculate_battery_values(
+        stored_usable_energy, free_capacity = self._calculate_battery_values(
                                                             stored_energy,
                                                             self.max_capacity )
 
@@ -65,7 +64,6 @@ class TestDefaultLogic(unittest.TestCase):
             stored_energy=stored_energy,
             stored_usable_energy=stored_usable_energy,
             free_capacity=free_capacity,
-            soc=soc
         )
 
         # Call the method under test
@@ -81,7 +79,7 @@ class TestDefaultLogic(unittest.TestCase):
         """Test calculate_inverter_mode with low SOC should not allow discharge"""
         #max_capacity = 10000  # 10 kWh
         stored_energy =  800
-        stored_usable_energy, free_capacity, soc = self._calculate_battery_values(
+        stored_usable_energy, free_capacity = self._calculate_battery_values(
                                                             stored_energy,
                                                             self.max_capacity )
 
@@ -95,7 +93,6 @@ class TestDefaultLogic(unittest.TestCase):
             stored_energy=stored_energy,
             stored_usable_energy=stored_usable_energy,
             free_capacity=free_capacity,
-            soc=soc
         )
 
         # Call the method under test
@@ -110,7 +107,7 @@ class TestDefaultLogic(unittest.TestCase):
         """Test discharge not allowed because reserved energy is below needed energy"""
         #max_capacity = 10000
         stored_energy =  900
-        stored_usable_energy, free_capacity, soc = self._calculate_battery_values(
+        stored_usable_energy, free_capacity = self._calculate_battery_values(
                                                             stored_energy,
                                                             self.max_capacity )
 
@@ -124,7 +121,6 @@ class TestDefaultLogic(unittest.TestCase):
             stored_energy=stored_energy,
             stored_usable_energy=stored_usable_energy,
             free_capacity=free_capacity,
-            soc=soc
         )
 
         # Call the method under test
@@ -138,7 +134,7 @@ class TestDefaultLogic(unittest.TestCase):
         """Test discharge allowed because current price is the highest"""
         #max_capacity = 10000
         stored_energy = 2000
-        stored_usable_energy, free_capacity, soc = self._calculate_battery_values(
+        stored_usable_energy, free_capacity = self._calculate_battery_values(
                                                             stored_energy,
                                                             self.max_capacity )
 
@@ -152,7 +148,6 @@ class TestDefaultLogic(unittest.TestCase):
             stored_energy=stored_energy,
             stored_usable_energy=stored_usable_energy,
             free_capacity=free_capacity,
-            soc=soc
         )
 
         # Call the method under test

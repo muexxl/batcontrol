@@ -9,10 +9,9 @@ class CalculationInput:
     production: np.ndarray
     consumption: np.ndarray
     prices: dict
-    stored_energy: float
-    stored_usable_energy: float
-    free_capacity: float
-    soc: float
+    stored_energy: float  # Stored energy in Wh
+    stored_usable_energy: float # Usable energy in Wh (reduced by MIN_SOC)
+    free_capacity: float  # Free capacity in Wh (reduced by MAX_SOC)
 
 @dataclass
 class CalculationParameters:
@@ -20,7 +19,7 @@ class CalculationParameters:
     max_charging_from_grid_limit: float
     min_price_difference: float
     min_price_difference_rel: float
-    max_capacity: float
+    max_capacity: float # Maximum capacity of the battery in Wh (excludes MAX_SOC)
 
 @dataclass
 class CalculationOutput:

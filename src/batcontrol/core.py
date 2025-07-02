@@ -347,8 +347,7 @@ class Batcontrol:
             prices,
             self.get_stored_energy(),
             self.get_stored_usable_energy(),
-            self.get_free_capacity(),
-            self.get_SOC()  # pylint: disable=invalid-name
+            self.get_free_capacity()
         )
         calc_parameters = CalculationParameters(
             self.max_charging_from_grid_limit,
