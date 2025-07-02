@@ -30,7 +30,7 @@ class CalculationOutput:
 
 @dataclass
 class InverterControlSettings:
-    """ Result from Calculation what to do on the current intervall"""
+    """ Result from Calculation what to do on the current interval"""
     allow_discharge: bool
     # Force charge mode is used to charge the battery from grid
     charge_from_grid: bool
