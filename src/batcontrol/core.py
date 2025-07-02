@@ -16,6 +16,7 @@ from .evcc_api import EvccApi
 
 from .logic import Logic as LogicFactory
 from .logic import CalculationInput, CalculationParameters, InverterControlSettings
+from .logic import CommonLogic as CommonLogic
 
 from .dynamictariff import DynamicTariff as tariff_factory
 from .inverter import Inverter as inverter_factory
@@ -39,6 +40,10 @@ logger = logging.getLogger(__name__)
 
 
 class Batcontrol:
+    """ Main class for Batcontrol, handles the logic and control of the battery system """
+    
+    general_logic = None  # type: CommonLogic
+    
     def __init__(self, configdict:dict):
         # For API
         self.api_overwrite = False
@@ -123,8 +128,6 @@ class Batcontrol:
         self.batconfig = config['battery_control']
         self.time_at_forecast_error = -1
 
-        self.always_allow_discharge_limit = self.batconfig.get(
-            'always_allow_discharge_limit', 0.9)
         self.max_charging_from_grid_limit = self.batconfig.get(
             'max_charging_from_grid_limit', 0.8)
         self.min_price_difference = self.batconfig.get(
@@ -140,6 +143,14 @@ class Batcontrol:
             self.round_price_digits = battery_control_expert.get(
                 'round_price_digits',
                 self.round_price_digits)
+
+        self.general_logic = CommonLogic.get_instance(
+            charge_rate_multiplier=self.batconfig.get(
+                'charge_rate_multiplier', 1.1),
+            always_allow_discharge_limit=self.batconfig.get(
+            'always_allow_discharge_limit', 0.9),
+            max_capacity=self.inverter.get_max_capacity()
+        )
 
         self.mqtt_api = None
         if config.get('mqtt', None) is not None:
@@ -247,20 +258,21 @@ class Batcontrol:
         # Verify some constrains:
         #   always_allow_discharge needs to be above max_charging from grid.
         #   if not, it will oscillate between discharging and charging.
-        if self.always_allow_discharge_limit < self.max_charging_from_grid_limit:
+        always_allow_discharge_limit = self.general_logic.get_always_allow_discharge_limit()
+        if  always_allow_discharge_limit < self.max_charging_from_grid_limit:
             logger.warning("Always_allow_discharge_limit (%.2f) is"
                            " below max_charging_from_grid_limit (%.2f)",
-                           self.always_allow_discharge_limit,
+                           always_allow_discharge_limit,
                            self.max_charging_from_grid_limit
                            )
-            self.max_charging_from_grid_limit = self.always_allow_discharge_limit - 0.01
+            self.max_charging_from_grid_limit = always_allow_discharge_limit - 0.01
             logger.warning("Lowering max_charging_from_grid_limit to %.2f",
                            self.max_charging_from_grid_limit)
 
         # for API
         self.refresh_static_values()
         self.set_discharge_limit(
-            self.get_max_capacity() * self.always_allow_discharge_limit
+            self.get_max_capacity() * always_allow_discharge_limit
         )
         self.last_run_time = time.time()
 
@@ -295,6 +307,7 @@ class Batcontrol:
             prices[h] = round(price_dict[h], self.round_price_digits)
 
         net_consumption = consumption-production
+
         logger.debug('Production Forecast: %s',
                      np.ndarray.round(production, 1))
         logger.debug('Consumption Forecast: %s',
@@ -327,6 +340,8 @@ class Batcontrol:
 
         # Create input for calculation
         calc_input = CalculationInput(
+            production,
+            consumption,
             net_consumption,
             prices,
             self.get_stored_energy(),
@@ -335,7 +350,6 @@ class Batcontrol:
             self.get_SOC()  # pylint: disable=invalid-name
         )
         calc_parameters = CalculationParameters(
-            self.always_allow_discharge_limit,
             self.max_charging_from_grid_limit,
             self.min_price_difference,
             self.min_price_difference_rel,
@@ -502,14 +516,15 @@ class Batcontrol:
 
     def set_always_allow_discharge_limit(self, always_allow_discharge_limit: float) -> None:
         """ Set the always allow discharge limit for battery control """
-        self.always_allow_discharge_limit = always_allow_discharge_limit
+        self.general_logic.set_always_allow_discharge_limit(
+            always_allow_discharge_limit)
         if self.mqtt_api is not None:
             self.mqtt_api.publish_always_allow_discharge_limit(
                 always_allow_discharge_limit)
 
     def get_always_allow_discharge_limit(self) -> float:
         """ Get the always allow discharge limit for battery control """
-        return self.always_allow_discharge_limit
+        return self.general_logic.get_always_allow_discharge_limit()
 
     def set_max_charging_from_grid_limit(self, limit: float) -> None:
         """ Set the max charging from grid limit for battery control """
@@ -544,19 +559,11 @@ class Batcontrol:
             self.mqtt_api.publish_discharge_blocked(discharge_blocked)
         self.discharge_blocked = discharge_blocked
 
-
-        #if not self.__is_above_always_allow_discharge_limit():
-        #    self.avoid_discharging()
-        if self.last_logic_instance is not None:
-            if not self.last_logic_instance.is_discharge_always_allowed(
-                        self.get_SOC(),  # pylint: disable=invalid-name
-                        self.always_allow_discharge_limit
-                    ):
+        if not self.general_logic.is_discharge_always_allowed_soc(
+                        self.get_SOC()
+                        ):
                 self.avoid_discharging()
-        else:
-            # If no logic instance is available, we can not decide what to do.
-            # So we just avoid discharging.
-            self.avoid_discharging()
+
 
     def refresh_static_values(self) -> None:
         """ Refresh static and some dynamic values for API.
@@ -568,7 +575,7 @@ class Batcontrol:
                 self.get_stored_energy())
             #
             self.mqtt_api.publish_always_allow_discharge_limit(
-                self.always_allow_discharge_limit)
+                self.get_always_allow_discharge_limit())
             self.mqtt_api.publish_max_charging_from_grid_limit(
                 self.max_charging_from_grid_limit)
             #

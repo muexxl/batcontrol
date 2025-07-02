@@ -5,15 +5,10 @@ import numpy as np
 from .logic_interface import LogicInterface
 from .logic_interface import CalculationParameters, CalculationInput
 from .logic_interface import CalculationOutput, InverterControlSettings
+from .common import CommonLogic
 
 logger = logging.getLogger(__name__)
 rules_logger = logging.getLogger(__name__ + '.rules')
-
-# Minimum charge rate to controlling loops between charging and
-#   self discharge.
-# 500W is Fronius' internal value for forced recharge.
-MIN_CHARGE_RATE = 500
-
 
 class DefaultLogic(LogicInterface):
     """ Default logic class for Batcontrol. """
@@ -25,8 +20,9 @@ class DefaultLogic(LogicInterface):
         self.round_price_digits = 4  # Default rounding for prices
         self.soften_price_difference_on_charging = False
         self.soften_price_difference_on_charging_factor = 5.0  # Default factor
-        self.charge_rate_multiplier = 1.1  # Default multiplier for charge rate
         self.timezone = timezone
+        self.common = CommonLogic.get_instance()
+
 
     def set_round_price_digits(self, digits: int):
         """ Set the number of digits to round prices to """
@@ -36,10 +32,6 @@ class DefaultLogic(LogicInterface):
         """ Set if the price difference should be softened on charging """
         self.soften_price_difference_on_charging = soften
         self.soften_price_difference_on_charging_factor = factor
-
-    def set_charge_rate_multiplier(self, multiplier: float):
-        """ Set the multiplier for the charge rate """
-        self.charge_rate_multiplier = multiplier
 
     def set_calculation_parameters(self, parameters: CalculationParameters):
         """ Set the calculation parameters for the logic """
@@ -140,15 +132,8 @@ class DefaultLogic(LogicInterface):
                 remaining_time = (
                     60-calc_timestamp.minute)/60
                 charge_rate = required_recharge_energy/remaining_time
-                # apply multiplier for charge inefficiency
-                charge_rate *= self.charge_rate_multiplier
 
-                if charge_rate < MIN_CHARGE_RATE:
-                    logger.debug("[Rule] Charge rate increased to minimum %d W from %f.1 W",
-                                 MIN_CHARGE_RATE,
-                                 charge_rate
-                                 )
-                    charge_rate = MIN_CHARGE_RATE
+                charge_rate = self.common.calculate_charge_rate(charge_rate)
 
                 #self.force_charge(charge_rate)
                 inverter_control_settings.charge_from_grid = True
@@ -176,7 +161,7 @@ class DefaultLogic(LogicInterface):
 
         stored_usable_energy = calc_input.stored_usable_energy
 
-        if self.is_discharge_always_allowed(calc_input.soc):
+        if self.common.is_discharge_always_allowed_soc(calc_input.soc):
             logger.info(
                 "[Rule] Discharge allowed due to always_allow_discharge_limit")
             return True
@@ -390,18 +375,3 @@ class DefaultLogic(LogicInterface):
                 self.calculation_parameters.min_price_difference_rel * abs(price)),
             self.round_price_digits
         )
-
-    def is_discharge_always_allowed(self, current_soc, always_allow_discharge_limit = None):
-        """ Check if the battery is allowed to discharge always """
-        if always_allow_discharge_limit is None:
-            always_allow_discharge_limit = self.calculation_parameters.always_allow_discharge_limit
-
-        discharge_limit = self.calculation_parameters.max_capacity * always_allow_discharge_limit
-        if current_soc > discharge_limit:
-            logger.debug(
-                'Battery with %d Wh above discharge limit %d Wh',
-                current_soc,
-                discharge_limit
-            )
-            return True
-        return False

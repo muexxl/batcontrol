@@ -5,6 +5,9 @@ import numpy as np
 @dataclass
 class CalculationInput:
     """ Input for the calculation """
+    production: np.ndarray
+    consumption: np.ndarray
+    """ Net consumption is production - consumption """
     net_consumption: np.ndarray
     prices: dict
     stored_energy: float
@@ -15,7 +18,6 @@ class CalculationInput:
 @dataclass
 class CalculationParameters:
     """ Calculations from Battery control configuration """
-    always_allow_discharge_limit: float
     max_charging_from_grid_limit: float
     min_price_difference: float
     min_price_difference_rel: float
@@ -65,10 +67,4 @@ class LogicInterface(ABC):
     @abstractmethod
     def get_inverter_control_settings(self) -> InverterControlSettings:
         """ Get the inverter control settings from the last calculation """
-        pass
-
-    @abstractmethod
-    def is_discharge_always_allowed(self, current_soc:float,
-                                    always_allow_discharge_limit:float = None) -> bool:
-        """ Check if discharge is always allowed based on the logic """
         pass

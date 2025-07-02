@@ -2,7 +2,7 @@
 import logging
 
 from .logic_interface import LogicInterface
-from .default_logic import DefaultLogic
+from .default import DefaultLogic
 
 logger = logging.getLogger(__name__)
 class Logic:
