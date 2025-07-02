@@ -31,7 +31,7 @@ class CommonLogic:
         """ Get the singleton instance of CommonLogic. """
         if cls._instance is None:
             cls._instance = cls.__new__(cls)
-            cls._instance.__init(charge_rate_multiplier,
+            cls._instance.initialize(charge_rate_multiplier,
                                  always_allow_discharge_limit,
                                  max_capacity)
         return cls._instance
@@ -41,9 +41,9 @@ class CommonLogic:
         if CommonLogic._instance is not None:
             raise RuntimeError(
                 "Use CommonLogic.get_instance() instead of constructor")
-        self.__init(*args, **kwargs)
+        self.initialize(*args, **kwargs)
 
-    def __init(self, charge_rate_multiplier=1.1,
+    def initialize(self, charge_rate_multiplier=1.1,
                always_allow_discharge_limit=0.9,
                max_capacity=10000):
         """ Private initialization method. """
