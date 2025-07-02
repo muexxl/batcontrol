@@ -143,7 +143,7 @@ class TestDefaultLogic(unittest.TestCase):
                                                             self.max_capacity )
 
         consumption = np.array([500, 500, 500])  # Example consumption in W
-        production = np.array([0, 0, 0])  # No production for
+        production = np.array([0, 0, 0])  # No production for this test.
 
         calc_input = CalculationInput(
             consumption=consumption,

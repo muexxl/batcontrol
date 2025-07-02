@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
+import datetime
 import numpy as np
 
 @dataclass
@@ -53,7 +54,7 @@ class LogicInterface(ABC):
         pass
 
     @abstractmethod
-    def calculate(self, input_data: CalculationInput) -> bool:
+    def calculate(self, input_data: CalculationInput, calc_timestamp:datetime) -> bool:
         """ Calculate the inverter control settings based on the input data """
         pass
 

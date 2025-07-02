@@ -104,7 +104,7 @@ class CommonLogic:
         adjusted_charge_rate = charge_rate * self.charge_rate_multiplier
         if adjusted_charge_rate < MIN_CHARGE_RATE:
             logger.debug(
-                'Charge rate increased to minimum %d W from %f.1 W',
+                'Charge rate increased to minimum %d W from %.1f W',
                 MIN_CHARGE_RATE, adjusted_charge_rate)
             adjusted_charge_rate = MIN_CHARGE_RATE
 
