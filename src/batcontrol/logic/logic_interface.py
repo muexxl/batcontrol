@@ -36,6 +36,7 @@ class InverterControlSettings:
     charge_from_grid: bool
     charge_rate: int
     # Limit charge rate (via PV) to a certain value Wh
+    # -1 means no limit, 0 means no charging
     limit_battery_charge_rate: int
 
 

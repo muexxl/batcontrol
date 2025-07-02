@@ -76,7 +76,7 @@ class DefaultLogic(LogicInterface):
             allow_discharge=False,
             charge_from_grid=False,
             charge_rate=0,
-            limit_charge_rate=0
+            limit_battery_charge_rate=-1
         )
 
         if self.calculation_output is None:
@@ -92,16 +92,16 @@ class DefaultLogic(LogicInterface):
         # ensure availability of data
         max_hour = min(len(net_consumption), len(prices))
 
-        if self.is_discharge_allowed(calc_input, net_consumption, prices, calc_timestamp):
+        if self.__is_discharge_allowed(calc_input, net_consumption, prices, calc_timestamp):
             inverter_control_settings.allow_discharge = True
-            inverter_control_settings.limit_battery_charge_rate = 0
+            inverter_control_settings.limit_battery_charge_rate = -1 # no limit
 
             return inverter_control_settings
         else:  # discharge not allowed
             logger.debug('Discharging is NOT allowed')
             inverter_control_settings.allow_discharge = False
             charging_limit_percent = self.calculation_parameters.max_charging_from_grid_limit * 100
-            required_recharge_energy = self.get_required_recharge_energy(
+            required_recharge_energy = self.__get_required_recharge_energy(
                 calc_input,
                 net_consumption[:max_hour],
                 prices
@@ -147,7 +147,7 @@ class DefaultLogic(LogicInterface):
         #
         return inverter_control_settings
 
-    def is_discharge_allowed(self, calc_input: CalculationInput,
+    def __is_discharge_allowed(self, calc_input: CalculationInput,
                                     net_consumption: np.ndarray,
                                     prices: dict,
                                     calc_timestamp:datetime = None) -> bool:
@@ -276,7 +276,7 @@ class DefaultLogic(LogicInterface):
         return False
 
  # %%
-    def get_required_recharge_energy(self, calc_input: CalculationInput ,
+    def __get_required_recharge_energy(self, calc_input: CalculationInput ,
                                               net_consumption: list, prices: dict) -> float:
         """ Calculate the required energy to shift toward high price hours.
 
