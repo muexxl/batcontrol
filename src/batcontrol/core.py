@@ -1,5 +1,16 @@
 #! /usr/bin/env python
+""" Batcontrol Core Module
+
+This module is the main entry point for Batcontrol.
+
+It handles the logic and control of the battery system, including:
+  - Fetching forecasts for consumption, production, and prices
+  - Calculating the optimal charging/discharging strategy
+  - Interfacing with the inverter and external APIs (MQTT, evcc)
+
+"""
 # %%
+from dataclasses import dataclass
 import datetime
 import time
 import os
@@ -8,17 +19,20 @@ import platform
 
 import pytz
 import numpy as np
+import platform
 
 from .mqtt_api import MqttApi
 from .evcc_api import EvccApi
 
+from .logic import Logic as LogicFactory
+from .logic import CalculationInput, CalculationParameters
+from .logic import CommonLogic
+
 from .dynamictariff import DynamicTariff as tariff_factory
 from .inverter import Inverter as inverter_factory
-
 from .forecastsolar import ForecastSolar as solar_factory
 
 from .forecastconsumption import Consumption as consumption_factory
-
 
 ERROR_IGNORE_TIME = 600  # 10 Minutes
 EVALUATIONS_EVERY_MINUTES = 3  # Every x minutes on the clock
@@ -26,10 +40,6 @@ DELAY_EVALUATION_BY_SECONDS = 15  # Delay evaluation for x seconds at every trig
 # Interval between evaluations in seconds
 TIME_BETWEEN_EVALUATIONS = EVALUATIONS_EVERY_MINUTES * 60
 TIME_BETWEEN_UTILITY_API_CALLS = 900  # 15 Minutes
-# Minimum charge rate to controlling loops between charging and
-#   self discharge.
-# 500W is Fronius' internal value for forced recharge.
-MIN_CHARGE_RATE = 500
 
 
 MODE_ALLOW_DISCHARGING = 10
@@ -37,10 +47,13 @@ MODE_AVOID_DISCHARGING = 0
 MODE_FORCE_CHARGING = -1
 
 logger = logging.getLogger(__name__)
-rules_logger = logging.getLogger(__name__ + '.rules')
+
 
 class Batcontrol:
-    def __init__(self, configdict: dict):
+    """ Main class for Batcontrol, handles the logic and control of the battery system """
+    general_logic = None  # type: CommonLogic
+
+    def __init__(self, configdict:dict):
         # For API
         self.api_overwrite = False
         # -1 = charge from grid , 0 = avoid discharge , 10 = discharge allowed
@@ -68,6 +81,8 @@ class Batcontrol:
         self.fetched_stored_usable_energy = False
 
         self.last_run_time = 0
+
+        self.last_logic_instance = None
 
         self.config = configdict
         config = configdict
@@ -122,8 +137,6 @@ class Batcontrol:
         self.batconfig = config['battery_control']
         self.time_at_forecast_error = -1
 
-        self.always_allow_discharge_limit = self.batconfig.get(
-            'always_allow_discharge_limit', 0.9)
         self.max_charging_from_grid_limit = self.batconfig.get(
             'max_charging_from_grid_limit', 0.8)
         self.min_price_difference = self.batconfig.get(
@@ -131,27 +144,22 @@ class Batcontrol:
         self.min_price_difference_rel = self.batconfig.get(
             'min_price_difference_rel', 0)
 
-        self.charge_rate_multiplier = 1.1
-        self.soften_price_difference_on_charging = False
-        self.soften_price_difference_on_charging_factor = 5
         self.round_price_digits = 4
 
         if self.config.get('battery_control_expert', None) is not None:
             battery_control_expert = self.config.get(
                 'battery_control_expert', {})
-            self.soften_price_difference_on_charging = battery_control_expert.get(
-                'soften_price_difference_on_charging',
-                self.soften_price_difference_on_charging)
-
-            self.soften_price_difference_on_charging_factor = battery_control_expert.get(
-                'soften_price_difference_on_charging_factor',
-                self.soften_price_difference_on_charging_factor)
             self.round_price_digits = battery_control_expert.get(
                 'round_price_digits',
                 self.round_price_digits)
-            self.charge_rate_multiplier = battery_control_expert.get(
-                'charge_rate_multiplier',
-                self.charge_rate_multiplier)
+
+        self.general_logic = CommonLogic.get_instance(
+            charge_rate_multiplier=self.batconfig.get(
+                'charge_rate_multiplier', 1.1),
+            always_allow_discharge_limit=self.batconfig.get(
+            'always_allow_discharge_limit', 0.9),
+            max_capacity=self.inverter.get_max_capacity()
+        )
 
         self.mqtt_api = None
         if config.get('mqtt', None) is not None:
@@ -259,20 +267,21 @@ class Batcontrol:
         # Verify some constrains:
         #   always_allow_discharge needs to be above max_charging from grid.
         #   if not, it will oscillate between discharging and charging.
-        if self.always_allow_discharge_limit < self.max_charging_from_grid_limit:
+        always_allow_discharge_limit = self.general_logic.get_always_allow_discharge_limit()
+        if  always_allow_discharge_limit < self.max_charging_from_grid_limit:
             logger.warning("Always_allow_discharge_limit (%.2f) is"
                            " below max_charging_from_grid_limit (%.2f)",
-                           self.always_allow_discharge_limit,
+                           always_allow_discharge_limit,
                            self.max_charging_from_grid_limit
                            )
-            self.max_charging_from_grid_limit = self.always_allow_discharge_limit - 0.01
+            self.max_charging_from_grid_limit = always_allow_discharge_limit - 0.01
             logger.warning("Lowering max_charging_from_grid_limit to %.2f",
                            self.max_charging_from_grid_limit)
 
         # for API
         self.refresh_static_values()
         self.set_discharge_limit(
-            self.get_max_capacity() * self.always_allow_discharge_limit
+            self.get_max_capacity() * always_allow_discharge_limit
         )
         self.last_run_time = time.time()
 
@@ -307,6 +316,7 @@ class Batcontrol:
             prices[h] = round(price_dict[h], self.round_price_digits)
 
         net_consumption = consumption-production
+
         logger.debug('Production Forecast: %s',
                      np.ndarray.round(production, 1))
         logger.debug('Consumption Forecast: %s',
@@ -332,315 +342,58 @@ class Batcontrol:
             return
 
         # correction for time that has already passed since the start of the current hour
-        net_consumption[0] *= 1 - \
+        production[0] *= 1 - \
+            datetime.datetime.now().astimezone(self.timezone).minute/60
+        consumption[0] *= 1 - \
             datetime.datetime.now().astimezone(self.timezone).minute/60
 
-        self.set_wr_parameters(net_consumption, price_dict)
+        this_logic_run = LogicFactory.create_logic(self.config, self.timezone)
 
-        # %%
-    def set_wr_parameters(self, net_consumption: np.ndarray, prices: dict):
-        """ Main control logic for battery control """
-        # TODO: Move control logic to a separate module
-        # ensure availability of data
-        max_hour = min(len(net_consumption), len(prices))
-
-        if self.is_discharge_allowed(net_consumption, prices):
-            self.allow_discharging()
-        else:  # discharge not allowed
-            rules_logger.debug('Discharging is NOT allowed')
-            charging_limit_percent = self.max_charging_from_grid_limit * 100
-            required_recharge_energy = self.get_required_required_recharge_energy(
-                net_consumption[:max_hour],
-                prices
-            )
-            is_charging_possible = self.get_SOC() < charging_limit_percent
-
-            logger.debug('Charging allowed: %s',
-                         is_charging_possible)
-            if is_charging_possible:
-                rules_logger.debug('Charging is allowed, because SOC is below %.0f%%',
-                             charging_limit_percent
-                             )
-            else:
-                rules_logger.debug('Charging is NOT allowed, because SOC is above %.0f%%',
-                             charging_limit_percent
-                             )
-
-            if required_recharge_energy > 0:
-                logger.debug(
-                    'Get additional energy via grid: %0.1f Wh',
-                    required_recharge_energy
-                )
-            else:
-                rules_logger.debug(
-                    'No additional energy required or possible price found.')
-
-            # charge if battery capacity available and more stored energy is required
-            if is_charging_possible and required_recharge_energy > 0:
-                remaining_time = (
-                    60-datetime.datetime.now().astimezone(self.timezone).minute)/60
-                charge_rate = required_recharge_energy/remaining_time
-                # apply multiplier for charge inefficiency
-                charge_rate *= self.charge_rate_multiplier
-
-                if charge_rate < MIN_CHARGE_RATE:
-                    logger.debug("[Rule] Charge rate increased to minimum %d W from %f.1 W",
-                                 MIN_CHARGE_RATE,
-                                 charge_rate
-                                 )
-                    charge_rate = MIN_CHARGE_RATE
-
-                self.force_charge(charge_rate)
-
-            else:  # keep current charge level. recharge if solar surplus available
-                self.avoid_discharging()
-
-    # %%
-    def get_required_required_recharge_energy(self, net_consumption: list, prices: dict) -> float:
-        """ Calculate the required energy to shift toward high price hours.
-
-            If a recharge price window is detected, the energy required to
-            recharge the battery to the next high price hours is calculated.
-
-            return: float (Energy in Wh)
-         """
-        current_price = prices[0]
-        max_hour = len(net_consumption)
-        consumption = np.array(net_consumption)
-        consumption[consumption < 0] = 0
-
-        production = -np.array(net_consumption)
-        production[production < 0] = 0
-        min_price_difference = self.min_price_difference
-        min_dynamic_price_difference = self.__calculate_min_dynamic_price_difference(
-            current_price)
-
-        # evaluation period until price is first time lower then current price
-        for h in range(1, max_hour):
-            future_price = prices[h]
-            found_lower_price = False
-            # Soften the price difference to avoid too early charging
-            if self.soften_price_difference_on_charging:
-                modified_price = current_price-min_price_difference / \
-                    self.soften_price_difference_on_charging_factor
-                found_lower_price = future_price <= modified_price
-            else:
-                found_lower_price = future_price <= current_price
-
-            if found_lower_price:
-                max_hour = h
-                break
-
-        # get high price hours
-        high_price_hours = []
-        for h in range(max_hour):
-            future_price = prices[h]
-            if future_price > current_price+min_dynamic_price_difference:
-                high_price_hours.append(h)
-
-        # start with nearest hour
-        high_price_hours.sort()
-        required_energy = 0
-        for high_price_hour in high_price_hours:
-            energy_to_shift = consumption[high_price_hour]
-
-            # correct energy to shift with potential production
-            # start with nearest hour
-            for hour in range(1, high_price_hour):
-                if production[hour] == 0:
-                    continue
-                if production[hour] >= energy_to_shift:
-                    production[hour] -= energy_to_shift
-                    energy_to_shift = 0
-                else:
-                    energy_to_shift -= production[hour]
-                    production[hour] = 0
-            # add_remaining energy to shift to recharge amount
-            required_energy += energy_to_shift
-
-        if required_energy > 0:
-            logger.debug("[Rule] Required Energy: %0.1f Wh is based on next 'high price' hours %s",
-                         required_energy,
-                         high_price_hours
-                         )
-            recharge_energy = required_energy-self.get_stored_usable_energy()
-            logger.debug("[Rule] Stored usable Energy: %0.1f , Recharge Energy: %0.1f Wh",
-                         self.get_stored_usable_energy(),
-                         recharge_energy
-                         )
-        else:
-            recharge_energy = 0
-
-        free_capacity = self.get_free_capacity()
-
-        if recharge_energy <= 0:
-            logger.debug(
-                "[Rule] No additional energy required, because stored energy is sufficient."
-            )
-            recharge_energy = 0
-
-        if recharge_energy > free_capacity:
-            recharge_energy = free_capacity
-            logger.debug(
-                "[Rule] Recharge limited by free capacity: %0.1f Wh", recharge_energy)
-
-        return recharge_energy
-
-    def __is_above_always_allow_discharge_limit(self) -> bool:
-        """ Evaluate if the battery is allowed to discharge always
-            return: bool
-        """
-        stored_energy = self.get_stored_energy()
-        discharge_limit = self.get_max_capacity() * self.always_allow_discharge_limit
-        if stored_energy > discharge_limit:
-            logger.debug(
-                'Battery with %d Wh above discharge limit %d Wh',
-                stored_energy,
-                discharge_limit
-            )
-            return True
-        return False
-# %%
-
-    def is_discharge_allowed(self, net_consumption: np.ndarray, prices: dict) -> bool:
-        """ Evaluate if the battery is allowed to discharge
-
-            - Check if battery is above always_allow_discharge_limit
-            - Calculate required energy to shift toward high price hours
-            - Check if discharge is blocked by external source
-
-            return: bool
-        """
-        self.get_stored_energy()
-        stored_usable_energy = self.get_stored_usable_energy()
-
-        if self.__is_above_always_allow_discharge_limit():
-            logger.info(
-                "[Rule] Discharge allowed due to always_allow_discharge_limit")
-            return True
-
-        current_price = prices[0]
-
-        min_dynamic_price_difference = self.__calculate_min_dynamic_price_difference(
-            current_price)
-        if self.mqtt_api is not None:
-            self.mqtt_api.publish_min_dynamic_price_diff(
-                min_dynamic_price_difference)
-
-        max_hour = len(net_consumption)
-        # relevant time range : until next recharge possibility
-        for h in range(1, max_hour):
-            future_price = prices[h]
-            if future_price <= current_price-min_dynamic_price_difference:
-                max_hour = h
-                logger.debug(
-                    "[Rule] Recharge possible in %d hours, limiting evaluation window.",
-                    h)
-                logger.debug(
-                    "[Rule] Future price: %.3f < Current price: %.3f - dyn_price_diff. %.3f ",
-                    future_price,
-                    current_price,
-                    min_dynamic_price_difference
-                )
-                break
-        dt = datetime.timedelta(hours=max_hour-1)
-        t0 = datetime.datetime.now()
-        t1 = t0+dt
-        last_hour = t1.astimezone(self.timezone).strftime("%H:59")
-
-        rules_logger.debug(
-            'Evaluating next %d hours until %s',
-            max_hour,
-            last_hour
+        # Create input for calculation
+        calc_input = CalculationInput(
+            production,
+            consumption,
+            prices,
+            self.get_stored_energy(),
+            self.get_stored_usable_energy(),
+            self.get_free_capacity()
         )
-        # distribute remaining energy
-        consumption = np.array(net_consumption)
-        consumption[consumption < 0] = 0
+        calc_parameters = CalculationParameters(
+            self.max_charging_from_grid_limit,
+            self.min_price_difference,
+            self.min_price_difference_rel,
+            self.get_max_capacity()
+        )
 
-        production = -np.array(net_consumption)
-        production[production < 0] = 0
+        self.last_logic_instance = this_logic_run
+        this_logic_run.set_calculation_parameters(calc_parameters)
+        # Calculate inverter mode
+        logger.debug('Calculating inverter mode...')
+        if not this_logic_run.calculate(calc_input):
+            logger.error('Calculation failed. Falling back to discharge')
+            self.allow_discharging()
+            return
 
-        # get hours with higher price
-        higher_price_hours = []
-        for h in range(max_hour):
-            future_price = prices[h]
-            # !!! different formula compared to detect relevant hours
-            if future_price > current_price:
-                higher_price_hours.append(h)
-
-        higher_price_hours.sort()
-        higher_price_hours.reverse()
-
-        reserved_storage = 0
-        for higher_price_hour in higher_price_hours:
-            if consumption[higher_price_hour] == 0:
-                continue
-            required_energy = consumption[higher_price_hour]
-
-            # correct reserved_storage with potential production
-            # start with latest hour
-            for hour in list(range(higher_price_hour))[::-1]:
-                if production[hour] == 0:
-                    continue
-                if production[hour] >= required_energy:
-                    production[hour] -= required_energy
-                    required_energy = 0
-                    break
-                else:
-                    required_energy -= production[hour]
-                    production[hour] = 0
-            # add_remaining required_energy to reserved_storage
-            reserved_storage += required_energy
-
-        if len(higher_price_hours) > 0:
-            # This message is somehow confusing, because we are working with an
-            # hour offset "the next 2 hours", but people may read "2 o'clock".
-            logger.debug("[Rule] Reserved Energy will be used in the next hours: %s",
-                         higher_price_hours[::-1])
-            logger.debug(
-                "[Rule] Reserved Energy: %0.1f Wh. Usable in Battery: %0.1f Wh",
-                reserved_storage,
-                stored_usable_energy
-            )
-        else:
-            logger.debug("[Rule] No reserved energy required, because no "
-                         "'high price' hours in evaluation window.")
+        calc_output = this_logic_run.get_calculation_output()
+        inverter_settings = this_logic_run.get_inverter_control_settings()
 
         # for API
-        self.set_reserved_energy(reserved_storage)
+        self.set_reserved_energy(calc_output.reserved_energy)
+        if self.mqtt_api is not None:
+            self.mqtt_api.publish_min_dynamic_price_diff(
+                calc_output.min_dynamic_price_difference)
 
         if self.discharge_blocked:
-            logger.debug(
-                'Discharge blocked due to external lock'
-            )
-            return False
+            # We are blocked by a request outside control loop (evcc)
+            logger.debug('Discharge blocked due to external lock')
+            inverter_settings.allow_discharge = False
 
-        if stored_usable_energy > reserved_storage:
-            # allow discharging
-            logger.debug(
-                "[Rule] Discharge allowed. Stored usable energy %0.1f Wh >"
-                " Reserved energy %0.1f Wh",
-                stored_usable_energy,
-                reserved_storage
-            )
-            return True
-
-        # forbid discharging
-        logger.debug(
-            "[Rule] Discharge forbidden. Stored usable energy %0.1f Wh <= Reserved energy %0.1f Wh",
-            stored_usable_energy,
-            reserved_storage
-        )
-
-        return False
-
-    def __calculate_min_dynamic_price_difference(self, price: float) -> float:
-        """ Calculate the dynamic limit for the current price """
-        return round(
-            max(self.min_price_difference,
-                self.min_price_difference_rel * abs(price)),
-            self.round_price_digits
-        )
+        if inverter_settings.allow_discharge:
+            self.allow_discharging()
+        elif inverter_settings.charge_from_grid:
+            self.force_charge(inverter_settings.charge_rate)
+        else:
+            self.avoid_discharging()
 
     def __set_charge_rate(self, charge_rate: int):
         """ Set charge rate and publish to mqtt """
@@ -776,14 +529,15 @@ class Batcontrol:
 
     def set_always_allow_discharge_limit(self, always_allow_discharge_limit: float) -> None:
         """ Set the always allow discharge limit for battery control """
-        self.always_allow_discharge_limit = always_allow_discharge_limit
+        self.general_logic.set_always_allow_discharge_limit(
+            always_allow_discharge_limit)
         if self.mqtt_api is not None:
             self.mqtt_api.publish_always_allow_discharge_limit(
                 always_allow_discharge_limit)
 
     def get_always_allow_discharge_limit(self) -> float:
         """ Get the always allow discharge limit for battery control """
-        return self.always_allow_discharge_limit
+        return self.general_logic.get_always_allow_discharge_limit()
 
     def set_max_charging_from_grid_limit(self, limit: float) -> None:
         """ Set the max charging from grid limit for battery control """
@@ -818,8 +572,11 @@ class Batcontrol:
             self.mqtt_api.publish_discharge_blocked(discharge_blocked)
         self.discharge_blocked = discharge_blocked
 
-        if not self.__is_above_always_allow_discharge_limit():
-            self.avoid_discharging()
+        if not self.general_logic.is_discharge_always_allowed_soc(
+                        self.get_SOC()
+                        ):
+                self.avoid_discharging()
+
 
     def refresh_static_values(self) -> None:
         """ Refresh static and some dynamic values for API.
@@ -831,7 +588,7 @@ class Batcontrol:
                 self.get_stored_energy())
             #
             self.mqtt_api.publish_always_allow_discharge_limit(
-                self.always_allow_discharge_limit)
+                self.get_always_allow_discharge_limit())
             self.mqtt_api.publish_max_charging_from_grid_limit(
                 self.max_charging_from_grid_limit)
             #

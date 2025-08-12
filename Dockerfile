@@ -41,7 +41,6 @@ ENV TZ=UTC
 RUN mkdir -p /app /app/logs /app/config
 WORKDIR /app
 
-# The load profiles to all locations where it is needed
 COPY config/load_profile_default.csv ./config/load_profile.csv
 COPY config/load_profile_default.csv ./default_load_profile.csv
 

@@ -28,9 +28,36 @@ To integrate batcontrol with Home Assistant, use the following repository: [ha_a
 ```sh
 git clone https://github.com/muexxl/batcontrol.git
 cd batcontrol
+```
+
+
 virtualenv venv
 source venv/bin/activate
 pip install .
+```
+
+## Testing:
+
+The project uses pytest for running tests. To run the tests:
+
+```sh
+# Install test dependencies
+pip install pytest pytest-cov
+
+# Run tests
+./run_tests.sh
+```
+
+Alternatively, you can run pytest directly:
+
+```sh
+python -m pytest tests/
+```
+
+To run tests with coverage report:
+
+```sh
+python -m pytest tests/ --cov=src/batcontrol
 ```
 
 ## run
