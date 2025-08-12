@@ -185,19 +185,19 @@ class EvccApi():
         self.set_max_charge_limit_function = setter
         self.get_max_charge_limit_function = getter
 
-    def __save_old_allow_discharge_limit(self):
-        """ Save old limit, if not already set."""
+    def __save_old_limits(self):
+        """ Save old limits, if not already set."""
         if self.old_allow_discharge_limit is None:
             self.old_allow_discharge_limit = self.get_always_allow_discharge_limit_function()
         if self.old_max_charge_limit is None:
             self.old_max_charge_limit = self.get_max_charge_limit_function()
-            if self.old_max_charge_limit < self.battery_halt_soc_float:
+            if self.old_max_charge_limit > self.battery_halt_soc_float:
                 # Only store if the old value is higher than the new battery_hold one,
-                # which will may be altered by batcontrol to a lower value.
+                # which may be altered by batcontrol to a lower value.
                 self.old_max_charge_limit = None
 
-    def __restore_old_allow_discharge_limit(self):
-        """ Restore old limit, if set and set to None """
+    def __restore_old_limits(self):
+        """ Restore old limits, if set and set to None """
         if not self.old_allow_discharge_limit is None:
             logger.info("Restoring allow_discharge_limit %.2f",
                         self.old_allow_discharge_limit)
@@ -234,7 +234,7 @@ class EvccApi():
                     logger.error('evcc was charging, remove block')
                     self.evcc_is_charging = False
                     self.block_function(False)
-                    self.__restore_old_allow_discharge_limit()
+                    self.__restore_old_limits()
                     self.__reset_loadpoint_status()
             else:
                 logger.info('evcc is online')
@@ -249,13 +249,13 @@ class EvccApi():
                 self.evcc_is_charging = True
                 self.block_function(True)
                 if self.topic_battery_halt_soc is not None:
-                    self.__save_old_allow_discharge_limit()
+                    self.__save_old_limits()
                     self.set_evcc_discharge_limit_on_batcontrol()
             else:
                 logger.info('evcc is not charging, remove block')
                 self.evcc_is_charging = False
                 self.block_function(False)
-                self.__restore_old_allow_discharge_limit()
+                self.__restore_old_limits()
         self.evcc_is_charging = charging
 
     def __store_loadpoint_status(self, topic: str, is_charging: bool):
@@ -300,6 +300,7 @@ class EvccApi():
                 logger.info('New battery_halt value: %s', new_soc)
                 self.battery_halt_soc_float = new_soc / 100
                 if self.evcc_is_charging is True:
+                    self.__save_old_limits()
                     self.set_always_allow_discharge_limit_function(
                         self.battery_halt_soc_float)
         except ValueError:
