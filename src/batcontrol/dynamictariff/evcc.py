@@ -65,7 +65,15 @@ class Evcc(DynamicTariffBaseclass):
 
 
     def get_prices_from_raw_data(self) -> dict[int, float]:   # pylint: disable=unused-private-member
-        data=self.raw_data['result']['rates']
+        """ Process the raw data from the evcc API and return a dictionary of prices indexed
+            by relative hour.
+            The relative hour is calculated from the current time in the specified timezone.
+        """
+        data=self.raw_data.get('rates', None)
+        if data is None:
+            #prior to evcc 0.207.0 the rates were in the 'result' field
+            data=self.raw_data['result']['rates']
+
         now=datetime.datetime.now().astimezone(self.timezone)
         prices={}
 
