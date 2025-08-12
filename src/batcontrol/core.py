@@ -383,7 +383,7 @@ class Batcontrol:
             self.mqtt_api.publish_min_dynamic_price_diff(
                 calc_output.min_dynamic_price_difference)
 
-        if self.discharge_blocked or \
+        if self.discharge_blocked and not \
                 self.general_logic.is_discharge_always_allowed_soc( self.get_SOC() ):
             # We are blocked by a request outside control loop (evcc)
             # but only if the always_allow_discharge_limit is not reached.
