@@ -197,7 +197,7 @@ class FroniusWR(InverterBaseclass):
                 self.previous_battery_config['HYB_BACKUP_RESERVED']
             )
         self.max_soc = self.previous_battery_config['BAT_M0_SOC_MAX']
-        self.get_time_of_use()  # save timesofuse
+        self.backup_time_of_use()  # save timesofuse
         self.set_allow_grid_charging(True)
 
     def get_firmware_version(self) -> version:
@@ -410,14 +410,10 @@ class FroniusWR(InverterBaseclass):
                 raise RuntimeError(f'failed to set {expected_write_success}')
         return response
 
-    def get_time_of_use(self):
-        """ Get time of use configuration from inverter and keep a backup."""
-        path = self.api_config.config_timeofuse_path
-        response = self.send_request(path, auth=True)
-        if not response:
-            return None
 
-        result = json.loads(response.text)['timeofuse']
+    def backup_time_of_use(self):
+        """ Get time of use configuration from inverter and keep a backup."""
+        result = self.get_time_of_use()
         # only write file if it does not exist
         if not os.path.exists(TIMEOFUSE_CONFIG_FILENAME):
             with open(TIMEOFUSE_CONFIG_FILENAME, 'w', encoding='utf-8') as f:
@@ -428,6 +424,17 @@ class FroniusWR(InverterBaseclass):
                 TIMEOFUSE_CONFIG_FILENAME
             )
 
+        return result
+
+
+    def get_time_of_use(self):
+        """ Get time of use configuration from inverter."""
+        path = self.api_config.config_timeofuse_path
+        response = self.send_request(path, auth=True)
+        if not response:
+            return None
+
+        result = json.loads(response.text)['timeofuse']
         return result
 
     def set_mode_avoid_discharge(self):
