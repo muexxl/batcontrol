@@ -32,7 +32,6 @@ logger = logging.getLogger(__name__)
 logger.info('Loading module ')
 
 
-
 def hash_utf8(x):
     """Hash a string or bytes object."""
     if isinstance(x, str):
@@ -55,6 +54,13 @@ def strip_dict(original):
 TIMEOFUSE_CONFIG_FILENAME = 'config/timeofuse_config.json'
 BATTERY_CONFIG_FILENAME = 'config/battery_config.json'
 
+
+class MockResponse:
+    """ Mock response object to return when no update is needed """
+    def __init__(self):
+        self.text = '{"writeSuccess": ["timeofuse"]}'
+        self.status_code = 200
+
 @dataclass
 class FroniusApiConfig:
     """Configuration for Fronius API endpoints and behavior."""
@@ -69,6 +75,7 @@ class FroniusApiConfig:
     config_timeofuse_path: str
     commands_login_path: str
     commands_logout_path: str
+
 
 # Alle Konfigurationen in einer Liste
 API_CONFIGS = [
@@ -113,12 +120,14 @@ API_CONFIGS = [
     ),
 ]
 
+
 def get_api_config(fw_version: version) -> FroniusApiConfig:
     """Get the API configuration for the given firmware version."""
     for config in API_CONFIGS:
         if config.from_version <= fw_version < config.to_version:
             return config
-    raise RuntimeError(f"Keine API Konfiguration für Firmware-Version {fw_version}")
+    raise RuntimeError(
+        f"Keine API Konfiguration für Firmware-Version {fw_version}")
 
 
 class FroniusWR(InverterBaseclass):
@@ -154,7 +163,7 @@ class FroniusWR(InverterBaseclass):
         self.em_power = self.previous_battery_config['HYB_EM_POWER']
 
         self.set_solar_api_active(True)
-        
+
         # Initialize SOC cache with 30-second TTL (maxsize=1 since we only cache one SOC value)
         self._soc_cache = TTLCache(maxsize=1, ttl=30)
 
@@ -174,7 +183,7 @@ class FroniusWR(InverterBaseclass):
         else:
             logger.error(
                 "Setting backup power mode to 0 as a fallback."
-                )
+            )
             self.backup_power_mode = 0
             self.previous_backup_power_config = None
 
@@ -207,7 +216,7 @@ class FroniusWR(InverterBaseclass):
             # If it fails, try the old path
             path = '/status/version'
             response = self.send_request(
-                 path, method='GET', payload={}, auth=False)
+                path, method='GET', payload={}, auth=False)
 
         if not response:
             raise RuntimeError('Failed to retrieve firmware version')
@@ -223,7 +232,7 @@ class FroniusWR(InverterBaseclass):
         if cache_key in self._soc_cache:
             logger.debug("Returning cached SOC value")
             return self._soc_cache[cache_key]
-        
+
         # Fetch fresh SOC value from inverter
         logger.debug("Fetching fresh SOC value from inverter")
         path = self.api_config.powerflow_path
@@ -231,15 +240,15 @@ class FroniusWR(InverterBaseclass):
         if not response:
             logger.error(
                 'Failed to get SOC. Returning default value of 99.0'
-                )
+            )
             return 99.0
         result = json.loads(response.text)
         soc = result['Body']['Data']['Inverters']['1']['SOC']
-        
+
         # Cache the result
         self._soc_cache[cache_key] = soc
         logger.debug("Cached SOC value: %s", soc)
-        
+
         return soc
 
     def get_battery_config(self):
@@ -357,7 +366,7 @@ class FroniusWR(InverterBaseclass):
     def set_wr_parameters(self, minsoc, maxsoc, allow_grid_charging, grid_power):
         """set power at grid-connection point negative values for Feed-In"""
         path = self.api_config.config_battery_path
-        if not isinstance(allow_grid_charging , bool):
+        if not isinstance(allow_grid_charging, bool):
             raise RuntimeError(
                 f'Expected type: bool actual type: {type(allow_grid_charging)}')
 
@@ -393,7 +402,7 @@ class FroniusWR(InverterBaseclass):
         if not response:
             logger.error(
                 'Failed to set parameters. No response from server'
-                )
+            )
             return response
         response_dict = json.loads(response.text)
         for expected_write_success in parameters.keys():
@@ -428,13 +437,13 @@ class FroniusWR(InverterBaseclass):
                           'ScheduleType': 'DISCHARGE_MAX',
                           "TimeTable": {"Start": "00:00", "End": "23:59"},
                           "Weekdays":
-                               {"Mon": True,
-                                "Tue": True,
-                                "Wed": True,
-                                "Thu": True,
-                                "Fri": True,
-                                "Sat": True,
-                                "Sun": True}
+                          {"Mon": True,
+                           "Tue": True,
+                           "Wed": True,
+                           "Thu": True,
+                           "Fri": True,
+                           "Sat": True,
+                           "Sun": True}
                           }]
         return self.set_time_of_use(timeofuselist)
 
@@ -447,13 +456,13 @@ class FroniusWR(InverterBaseclass):
                               'ScheduleType': 'CHARGE_MAX',
                               "TimeTable": {"Start": "00:00", "End": "23:59"},
                               "Weekdays":
-                                    {"Mon": True,
-                                     "Tue": True,
-                                     "Wed": True,
-                                     "Thu": True,
-                                     "Fri": True,
-                                     "Sat": True,
-                                     "Sun": True}
+                              {"Mon": True,
+                               "Tue": True,
+                               "Wed": True,
+                               "Thu": True,
+                               "Fri": True,
+                               "Sat": True,
+                               "Sun": True}
                               }]
         response = self.set_time_of_use(timeofuselist)
 
@@ -462,19 +471,19 @@ class FroniusWR(InverterBaseclass):
     def set_mode_force_charge(self, chargerate=500):
         """ Set the inverter to charge the battery with a specific power from GRID."""
         # activate timeofuse rules
-        chargerate = min( chargerate, self.max_grid_charge_rate)
+        chargerate = min(chargerate, self.max_grid_charge_rate)
         timeofuselist = [{'Active': True,
                           'Power': int(chargerate),
                           'ScheduleType': 'CHARGE_MIN',
                           "TimeTable": {"Start": "00:00", "End": "23:59"},
                           "Weekdays":
-                                {"Mon": True,
-                                 "Tue": True,
-                                 "Wed": True,
-                                 "Thu": True,
-                                 "Fri": True,
-                                 "Sat": True,
-                                 "Sun": True}
+                          {"Mon": True,
+                           "Tue": True,
+                           "Wed": True,
+                           "Thu": True,
+                           "Fri": True,
+                           "Sat": True,
+                           "Sun": True}
                           }]
         return self.set_time_of_use(timeofuselist)
 
@@ -519,23 +528,40 @@ class FroniusWR(InverterBaseclass):
         except OSError:
             logger.error(
                 'Could not remove timeofuse config file %s', TIMEOFUSE_CONFIG_FILENAME
-                )
+            )
+
+    def _compare_timeofuse_essentials(self, current_timeofuse, new_timeofuse):
+        """Compare only ScheduleType and Power values of timeofuse configurations."""
+        if len(current_timeofuse) != len(new_timeofuse):
+            return False
+
+        for i, (current_item, new_item) in enumerate(zip(current_timeofuse, new_timeofuse)):
+            # Compare only ScheduleType and Power values
+            if (current_item.get('ScheduleType') != new_item.get('ScheduleType') or
+                    current_item.get('Power') != new_item.get('Power')):
+                logger.debug("Time of use item %d differs in essential values: "
+                             "ScheduleType current=%s vs new=%s, "
+                             "Power current=%s vs new=%s",
+                             i, current_item.get(
+                                 'ScheduleType'), new_item.get('ScheduleType'),
+                             current_item.get('Power'), new_item.get('Power'))
+                return False
+
+        return True
 
     def set_time_of_use(self, timeofuselist):
         """ Set the planned battery charge/discharge schedule."""
         # Get current time of use configuration to check if update is needed
         current_timeofuse = self.get_time_of_use()
-        
-        # Compare current configuration with new one to avoid unnecessary updates
-        if current_timeofuse is not None and current_timeofuse == timeofuselist:
-            logger.debug("Time of use configuration is already identical, skipping update")
+
+        # Compare only ScheduleType and Power values to avoid unnecessary updates
+        if current_timeofuse is not None and \
+           self._compare_timeofuse_essentials(current_timeofuse, timeofuselist):
+            logger.debug("Time of use configuration (ScheduleType and Power) is"
+                         " already identical, skipping update")
             # Return a mock response object to maintain compatibility
-            class MockResponse:
-                def __init__(self):
-                    self.text = '{"writeSuccess": ["timeofuse"]}'
-                    self.status_code = 200
             return MockResponse()
-        
+
         config = {
             'timeofuse': timeofuselist
         }
@@ -543,8 +569,8 @@ class FroniusWR(InverterBaseclass):
         path = self.api_config.config_timeofuse_path
         logger.info("Updating time of use configuration")
         response = self.send_request(
-              path, method='POST', payload=payload, auth=True
-            )
+            path, method='POST', payload=payload, auth=True
+        )
         if not response:
             raise RuntimeError('Failed to set time of use configuration')
         response_dict = json.loads(response.text)
@@ -560,7 +586,7 @@ class FroniusWR(InverterBaseclass):
             return self.capacity
 
         path = self.api_config.storage_path
-        response = self.send_request( path )
+        response = self.send_request(path)
         if not response:
             logger.warning(
                 'Capacity request failed. Returning default value'
@@ -571,7 +597,7 @@ class FroniusWR(InverterBaseclass):
         self.capacity = capacity
         return capacity
 
-    def send_request (self, path, method='GET', payload="", params=None, headers=None, auth=False):
+    def send_request(self, path, method='GET', payload="", params=None, headers=None, auth=False):
         """Send a HTTP REST request to the inverter.
 
             auth = This request needs to be run with authentication.
@@ -582,14 +608,15 @@ class FroniusWR(InverterBaseclass):
             headers = {}
         for i in range(3):
             # Try tp send the request, if it fails, try to login and resend
-            response = self.__send_one_http_request(path, method, payload, params, headers, auth)
+            response = self.__send_one_http_request(
+                path, method, payload, params, headers, auth)
             if response.status_code == 200:
                 if auth:
                     self.__retrieve_auth_from_response(response)
                 return response
             # 401 - unauthorized , relogin
             # 403 - is forbidden, what happens at 01.00 in the night
-            if response.status_code in( 401, 403 ):
+            if response.status_code in (401, 403):
                 self.__retrieve_auth_from_response(response)
                 self.login()
             else:
@@ -603,7 +630,7 @@ class FroniusWR(InverterBaseclass):
         return None
 
     def __send_one_http_request(self, path, method='GET', payload="",
-                                        params=None, headers=None, auth=False):
+                                params=None, headers=None, auth=False):
         """ Send one HTTP Request to the backend.
             This method does not handle application errors, only connection errors.
         """
@@ -623,13 +650,13 @@ class FroniusWR(InverterBaseclass):
             # 3 retries if connection can't be established
             try:
                 response = requests.request(
-                                    method=method,
-                                    url=url,
-                                    params=params,
-                                    headers=headers,
-                                    data=payload,
-                                    timeout=30
-                                )
+                    method=method,
+                    url=url,
+                    params=params,
+                    headers=headers,
+                    data=payload,
+                    timeout=30
+                )
                 return response
             except requests.exceptions.ConnectionError as err:
                 logger.error(
@@ -638,15 +665,15 @@ class FroniusWR(InverterBaseclass):
                     self.address,
                     i,
                     err
-                    )
+                )
                 time.sleep(60)
 
-        logger.error( 'Request failed without response.')
+        logger.error('Request failed without response.')
         raise RuntimeError(
-                f"\turl:{url}, \n\tparams:{params} \n\theaders {headers} \n"
-                f"\tnonce {self.nonce} \n"
-                f"\tpayload {payload}"
-            )
+            f"\turl:{url}, \n\tparams:{params} \n\theaders {headers} \n"
+            f"\tnonce {self.nonce} \n"
+            f"\tpayload {payload}"
+        )
 
     def login(self):
         """Login to Fronius API"""
@@ -675,13 +702,13 @@ class FroniusWR(InverterBaseclass):
                 logger.info(
                     "Retrying login in 10 seconds")
                 time.sleep(10)
-        if self.login_attempts  >= 3:
+        if self.login_attempts >= 3:
             logger.info(
                 'Login failed 3 times .. aborting'
-                )
+            )
             raise RuntimeError(
                 'Login failed repeatedly .. wrong credentials?'
-                )
+            )
 
     def logout(self):
         """Logout from Fronius API"""
@@ -735,7 +762,8 @@ class FroniusWR(InverterBaseclass):
         for item in auth_list:
             key, value = item.split("=")
             auth_dict[key] = value
-            logger.debug("Authentication header key-value pair - %s: %s", key, value)
+            logger.debug(
+                "Authentication header key-value pair - %s: %s", key, value)
         return auth_dict
 
     def get_auth_header(self, method, path) -> str:
@@ -757,12 +785,12 @@ class FroniusWR(InverterBaseclass):
         ha2 = hash_utf8(a2)
         noncebit = f"{nonce}:{ncvalue}:{cnonce}:auth:{ha2}"
         respdig = hash_utf8(f"{ha1}:{noncebit}")
-        auth_header  = f'Digest username="{user}", realm="{realm}", nonce="{nonce}", uri="{path}", '
+        auth_header = f'Digest username="{user}", realm="{realm}", nonce="{nonce}", uri="{path}", '
         auth_header += f'algorithm="MD5", qop=auth, nc={ncvalue}, cnonce="{cnonce}", '
         auth_header += f'response="{respdig}"'
         return auth_header
 
-    def __set_em(self, mode = None, power = None):
+    def __set_em(self, mode=None, power=None):
         """ Change Energy Management """
         settings = {}
         settings = {
@@ -865,9 +893,9 @@ class FroniusWR(InverterBaseclass):
             self.mqtt_api.generic_publish(
                 self.__get_mqtt_topic() + 'capacity', self.get_capacity())
             self.mqtt_api.generic_publish(
-                self.__get_mqtt_topic() + 'em_mode' , self.em_mode)
+                self.__get_mqtt_topic() + 'em_mode', self.em_mode)
             self.mqtt_api.generic_publish(
-                self.__get_mqtt_topic() + 'em_power' , self.em_power)
+                self.__get_mqtt_topic() + 'em_power', self.em_power)
 
     def api_set_max_grid_charge_rate(self, max_grid_charge_rate: int):
         """ Set the maximum power in W that can be used to load the battery from the grid."""
@@ -899,7 +927,7 @@ class FroniusWR(InverterBaseclass):
 
     def api_set_em_mode(self, em_mode: int):
         """ Set the Energy Management Mode."""
-        if not isinstance(em_mode , int):
+        if not isinstance(em_mode, int):
             logger.warning(
                 'API: Invalid type em_mode %s',
                 em_mode
@@ -922,7 +950,7 @@ class FroniusWR(InverterBaseclass):
             positive = get from grid
             negative = feed to grid
         """
-        if not isinstance(em_power , int):
+        if not isinstance(em_power, int):
             logger.warning(
                 'API: Invalid type em_power %s',
                 em_power
