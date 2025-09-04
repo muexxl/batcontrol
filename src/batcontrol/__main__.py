@@ -23,6 +23,7 @@ def main() -> int:
     # Load the config for the logger with the loaded configuration
     loglevel = config.get('loglevel', 'info')
     logfile_enabled = config.get('logfile_enabled', LOGFILE_ENABLED_DEFAULT)
+    log_everything = config.get('log_everything', False)
     logfile = LOGFILE if logfile_enabled else None
 
     if not logfile_enabled:
@@ -39,6 +40,11 @@ def main() -> int:
     # Setup the logger based on the config
     setup_logging(level=loglevel_mapping.get(loglevel, logging.INFO), logfile=logfile)
     logger = logging.getLogger(__name__)
+
+    # Reduce the default loglevel for urllib3.connectionpool
+    if not log_everything:
+        logging.getLogger("urllib3.connectionpool").setLevel(logging.WARNING)
+        logging.getLogger("batcontrol.inverter.fronius.auth").setLevel(logging.INFO)
 
     bc = Batcontrol(config)
     try:
