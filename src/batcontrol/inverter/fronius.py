@@ -25,6 +25,7 @@ import hashlib
 from dataclasses import dataclass
 import requests
 from packaging import version
+from cachetools import TTLCache
 from .baseclass import InverterBaseclass
 
 logger = logging.getLogger(__name__)
@@ -153,6 +154,9 @@ class FroniusWR(InverterBaseclass):
         self.em_power = self.previous_battery_config['HYB_EM_POWER']
 
         self.set_solar_api_active(True)
+        
+        # Initialize SOC cache with 30-second TTL (maxsize=1 since we only cache one SOC value)
+        self._soc_cache = TTLCache(maxsize=1, ttl=30)
 
         if not self.previous_battery_config:
             raise RuntimeError(
@@ -213,7 +217,15 @@ class FroniusWR(InverterBaseclass):
         return version.parse(version_string)
 
     def get_SOC(self):
-        """ Get the state of charge (SOC) of the battery."""
+        """ Get the state of charge (SOC) of the battery with 30-second caching."""
+        # Check if we have a cached value
+        cache_key = "soc"
+        if cache_key in self._soc_cache:
+            logger.debug("Returning cached SOC value")
+            return self._soc_cache[cache_key]
+        
+        # Fetch fresh SOC value from inverter
+        logger.debug("Fetching fresh SOC value from inverter")
         path = self.api_config.powerflow_path
         response = self.send_request(path)
         if not response:
@@ -223,6 +235,11 @@ class FroniusWR(InverterBaseclass):
             return 99.0
         result = json.loads(response.text)
         soc = result['Body']['Data']['Inverters']['1']['SOC']
+        
+        # Cache the result
+        self._soc_cache[cache_key] = soc
+        logger.debug("Cached SOC value: %s", soc)
+        
         return soc
 
     def get_battery_config(self):
