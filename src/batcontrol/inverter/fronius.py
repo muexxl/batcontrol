@@ -522,15 +522,31 @@ class FroniusWR(InverterBaseclass):
                 )
 
     def set_time_of_use(self, timeofuselist):
-        """ Get the planned battery charge/discharge schedule."""
+        """ Set the planned battery charge/discharge schedule."""
+        # Get current time of use configuration to check if update is needed
+        current_timeofuse = self.get_time_of_use()
+        
+        # Compare current configuration with new one to avoid unnecessary updates
+        if current_timeofuse is not None and current_timeofuse == timeofuselist:
+            logger.debug("Time of use configuration is already identical, skipping update")
+            # Return a mock response object to maintain compatibility
+            class MockResponse:
+                def __init__(self):
+                    self.text = '{"writeSuccess": ["timeofuse"]}'
+                    self.status_code = 200
+            return MockResponse()
+        
         config = {
             'timeofuse': timeofuselist
         }
         payload = json.dumps(config)
         path = self.api_config.config_timeofuse_path
+        logger.info("Updating time of use configuration")
         response = self.send_request(
               path, method='POST', payload=payload, auth=True
             )
+        if not response:
+            raise RuntimeError('Failed to set time of use configuration')
         response_dict = json.loads(response.text)
         expected_write_successes = ['timeofuse']
         for expected_write_success in expected_write_successes:
