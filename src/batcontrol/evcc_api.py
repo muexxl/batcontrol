@@ -242,7 +242,7 @@ class EvccApi():
 
     def __do_block_battery(self, block: bool):
         """ Block or unblock the battery if configured to do so """
-        if self.block_battery_while_charging is True and \
+        if self.block_battery_while_charging and \
            self.block_function is not None:
             self.block_function(block)
         else:
