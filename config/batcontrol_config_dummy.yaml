@@ -114,10 +114,7 @@ evcc:
   # always_allow_discharge_limit is always relevant, together with the
   # battery_halt_topic (if configured), evcc controls the battery lock state.
   #
-  # If false, the battery will not be locked while the car is charging, but as soon
-  # as the non-reserved energy is consumed, the battery will be locked.
-  # Notice: if the car is charging with high power, the reserved_energy might be
-  #         overshoot.
+  #         overshot.
   block_battery_while_charging: true
   username: user
   password: password
