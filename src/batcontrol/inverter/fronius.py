@@ -31,6 +31,7 @@ from .baseclass import InverterBaseclass
 logger = logging.getLogger(__name__)
 logger.info('Loading module ')
 
+logger_auth = logging.getLogger("batcontrol.inverter.fronius.auth")
 
 def hash_utf8(x):
     """Hash a string or bytes object."""
@@ -684,7 +685,7 @@ class FroniusWR(InverterBaseclass):
 
     def login(self):
         """Login to Fronius API"""
-        logger.debug("Logging in")
+        logger_auth.debug("Logging in")
         path = self.api_config.commands_login_path
         self.cnonce = "NaN"
         self.ncvalue_num = 1
@@ -694,23 +695,23 @@ class FroniusWR(InverterBaseclass):
             response = self.__send_one_http_request(path, auth=True)
             if response.status_code == 200:
                 self.subsequent_login = True
-                logger.info('Login successful %s', response)
-                logger.debug("Response: %s", response.headers)
+                logger_auth.info('Login successful %s', response)
+                logger_auth.debug("Response: %s", response.headers)
                 self.__retrieve_auth_from_response(response)
                 self.login_attempts = 0
                 return
             elif response.status_code == 401:
                 self.__retrieve_auth_from_response(response)
 
-            logger.error(
+            logger_auth.error(
                 'Login -%d- failed, Response: %s', i, response)
-            logger.error('Response-raw: %s', response.raw)
+            logger_auth.error('Response-raw: %s', response.raw)
             if self.subsequent_login:
-                logger.info(
+                logger_auth.info(
                     "Retrying login in 10 seconds")
                 time.sleep(10)
-        if self.login_attempts >= 3:
-            logger.info(
+        if self.login_attempts  >= 3:
+            logger_auth.info(
                 'Login failed 3 times .. aborting'
             )
             raise RuntimeError(
@@ -722,11 +723,11 @@ class FroniusWR(InverterBaseclass):
         path = self.api_config.commands_logout_path
         response = self.send_request(path, auth=True)
         if not response:
-            logger.warning('Logout failed. No response from server')
+            logger_auth.warning('Logout failed. No response from server')
         if response.status_code == 200:
-            logger.info('Logout successful')
+            logger_auth.info('Logout successful')
         else:
-            logger.info('Logout failed')
+            logger_auth.info('Logout failed')
         return response
 
     def __retrieve_auth_from_response(self, response):
@@ -759,17 +760,17 @@ class FroniusWR(InverterBaseclass):
             auth_string = response.headers['Authentication-Info']
         else:
             # Return an empty dict to work with Fronius below 1.35.4-1
-            logger.debug(
+            logger_auth.debug(
                 'No authentication header found in response')
             return auth_dict
 
         auth_list = auth_string.replace(" ", "").replace('"', '').split(',')
-        logger.debug("Authentication header: %s", auth_list)
+        logger_auth.debug("Authentication header: %s", auth_list)
         auth_dict = {}
         for item in auth_list:
             key, value = item.split("=")
             auth_dict[key] = value
-            logger.debug(
+            logger_auth.debug(
                 "Authentication header key-value pair - %s: %s", key, value)
         return auth_dict
 
