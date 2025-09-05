@@ -21,6 +21,7 @@ class EvccApi():
         evcc_is_charging (bool): Internal state indicating if evcc is charging.
         evcc_batter_halt_soc (int): BufferSOC value from evcc.
         battery_halt_soc_float (float): BufferSOC value as float.
+        block_battery_while_charging (bool): If true, block battery while evcc is charging.
         block_function (function): Function to be called to block/unblock Battery.
         set_always_allow_discharge_limit_function (function): Function to set the discharge limit.
         get_always_allow_discharge_limit_function (function): Function to get the discharge limit.
@@ -98,6 +99,9 @@ class EvccApi():
             self.list_topics_loadpoint = config['loadpoint_topic']
         else:
             logger.error('Invalid loadpoint_topic type')
+
+        self.block_battery_while_charging = config.get(
+            'block_battery_while_charging', True)
 
         self.client = mqtt.Client(clean_session=True)
 
@@ -236,6 +240,14 @@ class EvccApi():
                 logger.info('evcc is online')
             self.evcc_is_online = online
 
+    def __do_block_battery(self, block: bool):
+        """ Block or unblock the battery if configured to do so """
+        if self.block_battery_while_charging is True and \
+           self.block_function is not None:
+            self.block_function(block)
+        else:
+            logger.debug('Not blocking battery, block_battery_while_charging is False')
+
     def set_evcc_charging(self, charging: bool):
         """ Set the evcc charging status and handle state changes """
         if self.evcc_is_charging != charging:
@@ -243,14 +255,14 @@ class EvccApi():
                 # We set the block, so we do not discharge the battery
                 logger.info('evcc is charging, set block')
                 self.evcc_is_charging = True
-                self.block_function(True)
+                self.__do_block_battery(True)
                 if self.topic_battery_halt_soc is not None:
                     self.__save_old_limits()
                     self.set_evcc_discharge_limit_on_batcontrol()
             else:
                 logger.info('evcc is not charging, remove block')
                 self.evcc_is_charging = False
-                self.block_function(False)
+                self.__do_block_battery(False)
                 self.__restore_old_limits()
         self.evcc_is_charging = charging
 
