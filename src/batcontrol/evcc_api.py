@@ -19,7 +19,7 @@ class EvccApi():
         config (dict): Configuration dictionary containing MQTT broker details, topics.
         evcc_is_online (bool): Internal state indicating if evcc is online.
         evcc_is_charging (bool): Internal state indicating if evcc is charging.
-        evcc_batter_halt_soc (int): BufferSOC value from evcc.
+        evcc_battery_halt_soc (int): BufferSOC value from evcc.
         battery_halt_soc_float (float): BufferSOC value as float.
         block_battery_while_charging (bool): If true, block battery while evcc is charging.
         block_function (function): Function to be called to block/unblock Battery.
