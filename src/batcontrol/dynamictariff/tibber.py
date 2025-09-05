@@ -24,9 +24,14 @@ class Tibber(DynamicTariffBaseclass):
         data="""{ "query":
         "{viewer {homes {currentSubscription {priceInfo { current {total startsAt } today {total startsAt } tomorrow {total startsAt }}}}}}" }
         """
-        response=requests.post(self.url, data, headers=headers, timeout=30)
-        if response.status_code != 200:
-            raise RuntimeError(f'[Tibber] Tibber Api responded with Error {response}')
+        try:
+            response = requests.post(self.url, data, headers=headers, timeout=30)
+            response.raise_for_status()
+            if response.status_code != 200:
+                raise ConnectionError(f'[Tibber] API responded with {response}')
+        except requests.exceptions.RequestException as e:
+            raise ConnectionError(f'[Tibber] API request failed: {e}') from e
+
         raw_data=response.json()
         return raw_data
 

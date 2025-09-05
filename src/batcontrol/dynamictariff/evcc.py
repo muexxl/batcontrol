@@ -39,10 +39,13 @@ class Evcc(DynamicTariffBaseclass):
         self.url=url
 
     def get_raw_data_from_provider(self) -> dict:  # pylint: disable=unused-private-member
-        response=requests.get(self.url, timeout=30)
-
-        if response.status_code != 200:
-            raise RuntimeError(f'[evcc] API returned {response}')
+        try:
+            response = requests.get(self.url, timeout=30)
+            response.raise_for_status()
+            if response.status_code != 200:
+                raise ConnectionError(f'[evcc] API returned {response}')
+        except requests.exceptions.RequestException as e:
+            raise ConnectionError(f'[evcc] API request failed: {e}') from e
 
         # {"result":
         #     { "rates": [

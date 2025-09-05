@@ -18,19 +18,23 @@ class DynamicTariffBaseclass(TariffInterface):
 
     def get_prices(self) -> dict[int, float]:
         """ Get prices from provider """
-        now=time.time()
-        time_passed=now-self.last_update
-        if time_passed> self.min_time_between_updates:
+        now = time.time()
+        time_passed = now - self.last_update
+        if time_passed > self.min_time_between_updates:
             # Not on initial call
             if self.last_update > 0 and self.delay_evaluation_by_seconds > 0:
                 sleeptime = random.randrange(0, self.delay_evaluation_by_seconds, 1)
                 logger.debug(
-                        'Waiting for %d seconds before requesting new data',
-                        sleeptime)
+                    'Waiting for %d seconds before requesting new data',
+                    sleeptime)
                 time.sleep(sleeptime)
-            self.raw_data=self.get_raw_data_from_provider()
-            self.last_update=now
-        prices=self.get_prices_from_raw_data()
+            try:
+                self.raw_data = self.get_raw_data_from_provider()
+                self.last_update = now
+            except (ConnectionError, TimeoutError) as e:
+                logger.error('Error getting raw tariff data: %s', e)
+                logger.warning('Using cached raw tariff data')
+        prices = self.get_prices_from_raw_data()
         return prices
 
     def get_raw_data_from_provider(self) -> dict:
