@@ -111,6 +111,12 @@ evcc:
   loadpoint_topic:
     - evcc/loadpoints/1/charging
     - evcc/loadpoints/2/charging
+  # if true (default) the battery will be locked while the car is charging.
+  # always_allow_discharge_limit is always relevant, together with the
+  # battery_halt_topic (if configured), evcc controls the battery lock state.
+  #
+  #         overshot.
+  block_battery_while_charging: true
   username: user
   password: password
   tls: false
