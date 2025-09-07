@@ -33,11 +33,20 @@ logger.info('Loading module ')
 
 logger_auth = logging.getLogger("batcontrol.inverter.fronius.auth")
 
-def hash_utf8(x):
-    """Hash a string or bytes object."""
+def hash_utf8(x, algorithm="MD5"):
+    """Hash a string or bytes object.
+    
+    Args:
+        x: String or bytes to hash
+        algorithm: Hash algorithm to use ("MD5" or "SHA256")
+    """
     if isinstance(x, str):
         x = x.encode("utf-8")
-    return hashlib.md5(x).hexdigest()
+    
+    if algorithm.upper() == "SHA256":
+        return hashlib.sha256(x).hexdigest()
+    else:  # Default to MD5 for backward compatibility
+        return hashlib.md5(x).hexdigest()
 
 
 def strip_dict(original):
@@ -76,6 +85,7 @@ class FroniusApiConfig:
     config_timeofuse_path: str
     commands_login_path: str
     commands_logout_path: str
+    auth_algorithm: str = "MD5"  # Authentication algorithm: "MD5" or "SHA256"
 
 
 # Alle Konfigurationen in einer Liste
@@ -108,6 +118,19 @@ API_CONFIGS = [
     ),
     FroniusApiConfig(
         from_version=version.parse("1.36"),
+        to_version=version.parse("1.38.6-1"),
+        version_path='/api/status/version',
+        powerflow_path='/solar_api/v1/GetPowerFlowRealtimeData.fcgi',
+        storage_path='/solar_api/v1/GetStorageRealtimeData.cgi',
+        config_battery_path='/api/config/batteries',
+        config_powerunit_path='/api/config/powerunit',
+        config_solar_api_path='/api/config/solar_api',
+        config_timeofuse_path='/api/config/timeofuse',
+        commands_login_path='/api/commands/Login',
+        commands_logout_path='/api/commands/Logout',
+    ),
+    FroniusApiConfig(
+        from_version=version.parse("1.38.6-1"),
         to_version=version.parse("9999.99.99"),
         version_path='/api/status/version',
         powerflow_path='/solar_api/v1/GetPowerFlowRealtimeData.fcgi',
@@ -118,6 +141,7 @@ API_CONFIGS = [
         config_timeofuse_path='/api/config/timeofuse',
         commands_login_path='/api/commands/Login',
         commands_logout_path='/api/commands/Logout',
+        auth_algorithm="SHA256",
     ),
 ]
 
@@ -782,6 +806,8 @@ class FroniusWR(InverterBaseclass):
         cnonce = self.cnonce
         user = self.user
         password = self.password
+        algorithm = self.api_config.auth_algorithm
+        
         if len(self.user) < 4:
             raise RuntimeError("User needed for Authorization")
         if len(self.password) < 4:
@@ -789,12 +815,12 @@ class FroniusWR(InverterBaseclass):
 
         a1 = f"{user}:{realm}:{password}"
         a2 = f"{method}:{path}"
-        ha1 = hash_utf8(a1)
-        ha2 = hash_utf8(a2)
+        ha1 = hash_utf8(a1, algorithm)
+        ha2 = hash_utf8(a2, algorithm)
         noncebit = f"{nonce}:{ncvalue}:{cnonce}:auth:{ha2}"
-        respdig = hash_utf8(f"{ha1}:{noncebit}")
+        respdig = hash_utf8(f"{ha1}:{noncebit}", algorithm)
         auth_header = f'Digest username="{user}", realm="{realm}", nonce="{nonce}", uri="{path}", '
-        auth_header += f'algorithm="MD5", qop=auth, nc={ncvalue}, cnonce="{cnonce}", '
+        auth_header += f'algorithm="{algorithm}", qop=auth, nc={ncvalue}, cnonce="{cnonce}", '
         auth_header += f'response="{respdig}"'
         return auth_header
 
