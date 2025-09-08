@@ -880,7 +880,6 @@ class FroniusWR(InverterBaseclass):
             # Setting this here prevents __store_latest_password_hash_method from changing it later
             self.password_hash = password_algorithm
 
-
         return password_algorithm
 
     def __store_latest_password_hash_method(self):
