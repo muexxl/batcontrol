@@ -165,7 +165,7 @@ class FroniusWR(InverterBaseclass):
         super().__init__(config)
         self.subsequent_login = False
         self.ncvalue_num = 1
-        self.cnonce = "NaN"
+        self.cnonce = hashlib.md5(os.urandom(8)).hexdigest()
         self.login_attempts = 0
         self.address = config['address']
         self.capacity = -1
@@ -716,7 +716,7 @@ class FroniusWR(InverterBaseclass):
         """Login to Fronius API"""
         logger_auth.debug("Logging in")
         path = self.api_config.commands_login_path
-        self.cnonce = "NaN"
+        self.cnonce = hashlib.md5(os.urandom(8)).hexdigest()
         self.ncvalue_num = 1
         self.login_attempts = 0
         for i in range(3):
@@ -772,8 +772,6 @@ class FroniusWR(InverterBaseclass):
             self.ncvalue_num = 1
         if auth_dict.get('cnonce'):
             self.cnonce = auth_dict['cnonce']
-        else:
-            self.cnonce = "NaN"
         if auth_dict.get('nonce'):
             self.nonce = auth_dict['nonce']
 
