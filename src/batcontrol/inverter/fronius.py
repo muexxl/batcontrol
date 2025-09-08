@@ -680,6 +680,8 @@ class FroniusWR(InverterBaseclass):
         if auth:
             headers['Authorization'] = self.get_auth_header(
                 method=method, path=fullpath)
+            logger_auth.debug("Requesting %s , header: %s",
+                                fullpath, headers)
 
         for i in range(3):
             # 3 retries if connection can't be established
@@ -732,7 +734,7 @@ class FroniusWR(InverterBaseclass):
 
             logger_auth.error(
                 'Login -%d- failed, Response: %s', i, response)
-            logger_auth.error('Response-raw: %s', response.raw)
+            logger_auth.error('Response: %s ; %s', response.headers, response)
             if self.subsequent_login:
                 logger_auth.info(
                     "Retrying login in 10 seconds")
@@ -775,6 +777,12 @@ class FroniusWR(InverterBaseclass):
         if auth_dict.get('nonce'):
             self.nonce = auth_dict['nonce']
 
+        logger_auth.debug("nc: %s, cnonce: %s, nonce: %s",
+            self.ncvalue_num ,
+            self.cnonce,
+            self.nonce
+         )
+
     def __split_response_auth_header(self, response):
         """ Split the response header into a dictionary."""
         auth_dict = {}
@@ -791,14 +799,20 @@ class FroniusWR(InverterBaseclass):
                 'No authentication header found in response')
             return auth_dict
 
-        auth_list = auth_string.replace(" ", "").replace('"', '').split(',')
+        # Remove quotes and split by comma
+        auth_list = auth_string.replace('"', '').split(',')
         logger_auth.debug("Authentication header: %s", auth_list)
         auth_dict = {}
         for item in auth_list:
-            key, value = item.split("=")
-            auth_dict[key] = value
-            logger_auth.debug(
-                "Authentication header key-value pair - %s: %s", key, value)
+            # Strip whitespace from each item and check if it contains '='
+            item = item.strip()
+            if '=' in item:
+                key, value = item.split("=", 1)  # Split only on first '=' 
+                key = key.strip()
+                value = value.strip()
+                auth_dict[key] = value
+                logger_auth.debug(
+                    "Authentication header key-value pair - %s: %s", key, value)
         return auth_dict
 
     def get_auth_header(self, method, path) -> str:
