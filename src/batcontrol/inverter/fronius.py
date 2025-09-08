@@ -164,8 +164,17 @@ class FroniusWR(InverterBaseclass):
     def __init__(self, config: dict) -> None:
         super().__init__(config)
 
-        self.usable_password_hash_methods = [ "SHA256", "MD5", "MD5" ]
+        # We are doing three login tests during first login.
+        # As MD5 was the default on the old firmware, the latest
+        # retries should be MD5.
+        self.usable_password_hash_methods = [
+            "SHA256",  # First try: SHA256
+            "MD5",     # Second try: MD5
+            "MD5"      # Third try: MD5 again (retry with same method)
+        ]
+        self._last_password_hash_method_index = -1
         self.password_hash = None
+
         self.subsequent_login = False
         self.ncvalue_num = 1
         self.cnonce = hashlib.md5(os.urandom(8)).hexdigest()
@@ -228,7 +237,7 @@ class FroniusWR(InverterBaseclass):
                 self.previous_battery_config['HYB_BACKUP_RESERVED']
             )
         self.max_soc = self.previous_battery_config['BAT_M0_SOC_MAX']
-        self.backup_time_of_use()  # save timesofuse
+        self.backup_time_of_use() # save timesofuse
         self.set_allow_grid_charging(True)
 
     def get_firmware_version(self) -> version:
@@ -727,9 +736,7 @@ class FroniusWR(InverterBaseclass):
             response = self.__send_one_http_request(path, auth=True)
             if response.status_code == 200:
                 if not self.subsequent_login:
-                    self.password_hash = self.usable_password_hash_methods[i]
-                    logger_auth.debug("Password hash method set to %s",
-                                      self.password_hash)
+                    self.__store_latest_password_hash_method()
                 self.subsequent_login = True
                 logger_auth.info('Login successful %s', response)
                 logger_auth.debug("Response: %s", response.headers)
@@ -831,17 +838,7 @@ class FroniusWR(InverterBaseclass):
         algorithm = self.api_config.auth_algorithm
         password_algorithm = algorithm
 
-        if self.password_hash is not None:
-            password_algorithm = self.password_hash
-        else:
-            if algorithm == "SHA256":
-                # Try SHA256 first, then MD5 and then SHA256 again
-                # Based on config above
-                # Login attempts start at 1
-                password_algorithm = self.usable_password_hash_methods[ self.login_attempts -1 ]
-            else:
-                password_algorithm = algorithm
-                self.password_hash = algorithm
+        password_algorithm = self.__get_password_hash_method()
 
         if len(self.user) < 4:
             raise RuntimeError("User needed for Authorization")
@@ -858,6 +855,44 @@ class FroniusWR(InverterBaseclass):
         auth_header += f'algorithm="{algorithm}", qop=auth, nc={ncvalue}, cnonce="{cnonce}", '
         auth_header += f'response="{respdig}"'
         return auth_header
+
+
+    def __get_password_hash_method(self) -> str:
+        """ Figure out the password hash method during first login."""
+        # If we already found a working method, use it
+        if self.password_hash is not None:
+            return self.password_hash
+
+        # Index is initialized to -1. Increment to get the next method.
+        password_algorithm = ""
+        if self.api_config.auth_algorithm == "SHA256":
+            self._last_password_hash_method_index += 1
+            if self._last_password_hash_method_index >= len(self.usable_password_hash_methods):
+                self._last_password_hash_method_index = 0
+            password_algorithm = self.usable_password_hash_methods[
+                                                    self._last_password_hash_method_index
+                                                    ]
+            logger_auth.debug("Trying password hash method %s", password_algorithm)
+        else:
+            # Fallback to MD5 only for older firmwares
+            password_algorithm = "MD5"
+            # Set password_hash immediately for MD5 since there's only one option
+            # Setting this here prevents __store_latest_password_hash_method from changing it later
+            self.password_hash = password_algorithm
+
+
+        return password_algorithm
+
+    def __store_latest_password_hash_method(self):
+        """ Save the password hash method to use after a successful login."""
+        if self.password_hash is not None:
+            # We already have a working method, do not change it
+            return
+        self.password_hash = self.usable_password_hash_methods[
+                                    self._last_password_hash_method_index
+                                    ]
+        logger_auth.debug("Password hash method set to %s",
+                            self.password_hash)
 
     def __set_em(self, mode=None, power=None):
         """ Change Energy Management """
