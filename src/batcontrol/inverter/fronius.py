@@ -805,7 +805,7 @@ class FroniusWR(InverterBaseclass):
             # Strip whitespace from each item and check if it contains '='
             item = item.strip()
             if '=' in item:
-                key, value = item.split("=", 1)  # Split only on first '=' 
+                key, value = item.split("=", 1)  # Split only on first '='
                 key = key.strip()
                 value = value.strip()
                 auth_dict[key] = value
