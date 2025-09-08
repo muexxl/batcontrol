@@ -35,14 +35,14 @@ logger_auth = logging.getLogger("batcontrol.inverter.fronius.auth")
 
 def hash_utf8(x, algorithm="MD5"):
     """Hash a string or bytes object.
-    
+
     Args:
         x: String or bytes to hash
         algorithm: Hash algorithm to use ("MD5" or "SHA256")
     """
     if isinstance(x, str):
         x = x.encode("utf-8")
-    
+
     if algorithm.upper() == "SHA256":
         return hashlib.sha256(x).hexdigest()
     else:  # Default to MD5 for backward compatibility
@@ -85,7 +85,7 @@ class FroniusApiConfig:
     config_timeofuse_path: str
     commands_login_path: str
     commands_logout_path: str
-    auth_algorithm: str = "MD5"  # Authentication algorithm: "MD5" or "SHA256"
+    auth_algorithm: str = "SHA256"  # Authentication algorithm: "MD5" or "SHA256"
 
 
 # Alle Konfigurationen in einer Liste
@@ -102,6 +102,7 @@ API_CONFIGS = [
         config_timeofuse_path='/config/timeofuse',
         commands_login_path='/commands/Login',
         commands_logout_path='/commands/Logout',
+        auth_algorithm="MD5",
     ),
     FroniusApiConfig(
         from_version=version.parse("1.28.7-1"),
@@ -115,6 +116,7 @@ API_CONFIGS = [
         config_timeofuse_path='/config/timeofuse',
         commands_login_path='/commands/Login',
         commands_logout_path='/commands/Logout',
+        auth_algorithm="MD5",
     ),
     FroniusApiConfig(
         from_version=version.parse("1.36"),
@@ -128,6 +130,7 @@ API_CONFIGS = [
         config_timeofuse_path='/api/config/timeofuse',
         commands_login_path='/api/commands/Login',
         commands_logout_path='/api/commands/Logout',
+        auth_algorithm="MD5",
     ),
     FroniusApiConfig(
         from_version=version.parse("1.38.6-1"),
@@ -807,7 +810,7 @@ class FroniusWR(InverterBaseclass):
         user = self.user
         password = self.password
         algorithm = self.api_config.auth_algorithm
-        
+
         if len(self.user) < 4:
             raise RuntimeError("User needed for Authorization")
         if len(self.password) < 4:
