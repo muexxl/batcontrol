@@ -163,6 +163,9 @@ class FroniusWR(InverterBaseclass):
 
     def __init__(self, config: dict) -> None:
         super().__init__(config)
+
+        self.usable_password_hash_methods = [ "SHA256", "MD5", "MD5" ]
+        self.password_hash = None
         self.subsequent_login = False
         self.ncvalue_num = 1
         self.cnonce = hashlib.md5(os.urandom(8)).hexdigest()
@@ -723,6 +726,10 @@ class FroniusWR(InverterBaseclass):
             self.login_attempts += 1
             response = self.__send_one_http_request(path, auth=True)
             if response.status_code == 200:
+                if not self.subsequent_login:
+                    self.password_hash = self.usable_password_hash_methods[i]
+                    logger_auth.debug("Password hash method set to %s",
+                                      self.password_hash)
                 self.subsequent_login = True
                 logger_auth.info('Login successful %s', response)
                 logger_auth.debug("Response: %s", response.headers)
@@ -822,6 +829,19 @@ class FroniusWR(InverterBaseclass):
         user = self.user
         password = self.password
         algorithm = self.api_config.auth_algorithm
+        password_algorithm = algorithm
+
+        if self.password_hash is not None:
+            password_algorithm = self.password_hash
+        else:
+            if algorithm == "SHA256":
+                # Try SHA256 first, then MD5 and then SHA256 again
+                # Based on config above
+                # Login attempts start at 1
+                password_algorithm = self.usable_password_hash_methods[ self.login_attempts -1 ]
+            else:
+                password_algorithm = algorithm
+                self.password_hash = algorithm
 
         if len(self.user) < 4:
             raise RuntimeError("User needed for Authorization")
@@ -830,7 +850,7 @@ class FroniusWR(InverterBaseclass):
 
         a1 = f"{user}:{realm}:{password}"
         a2 = f"{method}:{path}"
-        ha1 = hash_utf8(a1, algorithm)
+        ha1 = hash_utf8(a1, password_algorithm)
         ha2 = hash_utf8(a2, algorithm)
         noncebit = f"{nonce}:{ncvalue}:{cnonce}:auth:{ha2}"
         respdig = hash_utf8(f"{ha1}:{noncebit}", algorithm)
