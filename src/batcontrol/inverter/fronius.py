@@ -207,6 +207,9 @@ class FroniusWR(InverterBaseclass):
         # Initialize SOC cache with 30-second TTL (maxsize=1 since we only cache one SOC value)
         self._soc_cache = TTLCache(maxsize=1, ttl=30)
 
+        # Initialize time of use cache with 15-minute TTL (maxsize=1 since we only cache one config)
+        self._time_of_use_cache = TTLCache(maxsize=1, ttl=900)  # 15 minutes = 900 seconds
+
         if not self.previous_battery_config:
             raise RuntimeError(
                 f'Failed to load Battery config from Inverter at {self.address}')
@@ -468,13 +471,26 @@ class FroniusWR(InverterBaseclass):
 
 
     def get_time_of_use(self):
-        """ Get time of use configuration from inverter."""
+        """ Get time of use configuration from inverter with 15-minute caching."""
+        # Check if we have a cached value
+        cache_key = "time_of_use"
+        if cache_key in self._time_of_use_cache:
+            logger.debug("Returning cached time of use configuration")
+            return self._time_of_use_cache[cache_key]
+
+        # Fetch fresh time of use configuration from inverter
+        logger.debug("Fetching fresh time of use configuration from inverter")
         path = self.api_config.config_timeofuse_path
         response = self.send_request(path, auth=True)
         if not response:
             return None
 
         result = json.loads(response.text)['timeofuse']
+
+        # Cache the result
+        self._time_of_use_cache[cache_key] = result
+        logger.debug("Cached time of use configuration")
+
         return result
 
     def set_mode_avoid_discharge(self):
@@ -625,6 +641,13 @@ class FroniusWR(InverterBaseclass):
         for expected_write_success in expected_write_successes:
             if not expected_write_success in response_dict['writeSuccess']:
                 raise RuntimeError(f'failed to set {expected_write_success}')
+
+        # Invalidate the cache after successfully updating the configuration
+        cache_key = "time_of_use"
+        if cache_key in self._time_of_use_cache:
+            del self._time_of_use_cache[cache_key]
+            logger.debug("Invalidated time of use cache after update")
+
         return response
 
     def get_capacity(self):
