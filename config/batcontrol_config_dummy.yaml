@@ -103,12 +103,15 @@ pvinstallations:
 #--------------------------
 #  Forecast Consumption
 #  See more Details in: https://github.com/muexxl/batcontrol/wiki/Consumption-forecast
+#  
+#  DEMO: This configuration uses the default load profile for demonstration.
+#  For real operation, you can customize this with your own consumption data.
 #--------------------------
 consumption_forecast:
   type: csv
   csv:
     annual_consumption: 4500 # total consumption in kWh p.a. the load profile
-    load_profile: load_profile.csv #name of the load profile file within the config folder
+    load_profile: load_profile_default.csv #using default profile for demo
 
 #--------------------------
 # evcc connection
