@@ -6,7 +6,7 @@ timezone: Europe/Berlin #your time zone. not optional.
 loglevel: debug
 logfile_enabled: true
 log_everything: false # if false debug messages from fronius.auth and urllib3.connectionpool will be suppressed
-max_logfile_size: 100 #kB
+max_logfile_size: 200 #kB
 logfile_path: logs/batcontrol.log
 battery_control:
                                  # min_price_difference is the absolute minimum price difference in Euro to justify charging your battery
