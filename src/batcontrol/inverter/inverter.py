@@ -39,6 +39,12 @@ class Inverter:
                 'max_grid_charge_rate': config['max_grid_charge_rate']
             }
             inverter=Testdriver(iv_config)
+        elif config['type'].lower() == 'dummy':
+            from .dummy import Dummy
+            iv_config = {
+                'max_grid_charge_rate': config['max_grid_charge_rate']
+            }
+            inverter=Dummy(iv_config)
         else:
             raise RuntimeError(f'[Inverter] Unkown inverter type {config["type"]}')
 

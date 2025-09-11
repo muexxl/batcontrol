@@ -12,17 +12,24 @@ fi
 
 # Check if the config file is available
 if test ! -f "$CONFIG_FILE" ; then
-  echo "ERROR: Config file not found: $CONFIG_FILE !"
-  echo "       Please mount the config file to /app/config/batcontrol_config.yaml"
-  echo "       You can download a sample config file from :"
+  echo "Config file not found: $CONFIG_FILE"
+  echo "Copying dummy config for first startup..."
+  cp /app/config/batcontrol_config_dummy.yaml "$CONFIG_FILE"
+  echo "IMPORTANT: Dummy configuration copied!"
+  echo "          This uses a 'dummy' inverter for demonstration only."
+  echo "          Please edit $CONFIG_FILE and:"
+  echo "          1. Change inverter type from 'dummy' to your actual inverter (e.g., 'fronius_gen24')"
+  echo "          2. Configure your inverter address, user, and password"
+  echo "          3. Update PV installation details"
+  echo "          4. Configure your electricity tariff"
+  echo ""
+  echo "       You can download the latest sample config from:"
   if [[ "snapshot" == "$BATCONTROL_VERSION" ]]; then
      echo "        https://raw.githubusercontent.com/muexxl/batcontrol/${BATCONTROL_GIT_SHA}/config/batcontrol_config_dummy.yaml"
   else
      echo "        https://raw.githubusercontent.com/muexxl/batcontrol/refs/tags/${BATCONTROL_VERSION}/config/batcontrol_config_dummy.yaml"
   fi
   echo ""
-  echo "       In the config folder a template is available to copy."
-  exit 1
 fi
 
 # Print BATCONTROL_VERSION and BATCONTROL_GIT_SHA
