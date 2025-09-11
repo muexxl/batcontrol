@@ -111,7 +111,7 @@ consumption_forecast:
   type: csv
   csv:
     annual_consumption: 4500 # total consumption in kWh p.a. the load profile
-    load_profile: load_profile_default.csv #using default profile for demo
+    load_profile: load_profile.csv #name of the load profile file within the config folder
 
 #--------------------------
 # evcc connection
