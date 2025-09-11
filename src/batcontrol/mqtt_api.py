@@ -431,6 +431,16 @@ class MqttApi:
             self.base_topic + "/inverters/0/max_pv_charge_rate",
             self.base_topic + "/inverters/0/max_pv_charge_rate/set",
             entity_category="config",min_value=0, max_value=10000,initial_value=10000)
+        self.publish_mqtt_discovery_message("EM Mode",
+            "batcontrol_em_mode", "number", None, None,
+            self.base_topic + "/inverters/0/em_mode",
+            self.base_topic + "/inverters/0/em_mode/set",
+            entity_category="config",min_value=0, max_value=2,initial_value=0)
+        self.publish_mqtt_discovery_message("EM Power",
+            "batcontrol_em_power", "number", "power", "W",
+            self.base_topic + "/inverters/0/em_power",
+            self.base_topic + "/inverters/0/em_power/set",
+            entity_category="config",min_value=-10000, max_value=10000,initial_value=0)
         # prepared for other PR regarding /fix_discharge_with_max_power_set
         #self.publish_mqtt_discovery_message("Max Bat Discharge Rate",
         #   "batcontrol_max_bat_discharge_rate", "number", "power", "W",
