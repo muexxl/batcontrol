@@ -4,12 +4,13 @@ import os
 import yaml
 from logging.handlers import RotatingFileHandler
 
-def setup_logging(level=logging.INFO, logfile=None):
+def setup_logging(level=logging.INFO, logfile=None, max_logfile_size_kb=200):
     """Configure root logger with consistent formatting.
     
     Args:
         level (int): Log level to set for the root logger.
         logfile (str): If specified, log to this file as well as the console.
+        max_logfile_size_kb (int): Maximum log file size in kilobytes before rotation.
 
     Returns:
         logging.Logger: Root logger
@@ -36,7 +37,9 @@ def setup_logging(level=logging.INFO, logfile=None):
     if logfile:
         if not os.path.exists(os.path.dirname(logfile)):
             os.makedirs(os.path.dirname(logfile))
-        file_handler = RotatingFileHandler(logfile, maxBytes=10*1024*1024, backupCount=2)
+        # Convert KB to bytes for RotatingFileHandler
+        max_bytes = max_logfile_size_kb * 1024
+        file_handler = RotatingFileHandler(logfile, maxBytes=max_bytes, backupCount=2)
         file_handler.setFormatter(formatter)
         root_logger.addHandler(file_handler)
 
