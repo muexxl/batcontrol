@@ -24,7 +24,9 @@ def main() -> int:
     loglevel = config.get('loglevel', 'info')
     logfile_enabled = config.get('logfile_enabled', LOGFILE_ENABLED_DEFAULT)
     log_everything = config.get('log_everything', False)
-    logfile = LOGFILE if logfile_enabled else None
+    max_logfile_size = config.get('max_logfile_size', 200)  # Default 200KB
+    logfile_path = config.get('logfile_path', LOGFILE)
+    logfile = logfile_path if logfile_enabled else None
 
     if not logfile_enabled:
         logger.info("Logfile disabled in config. Proceeding without logfile")
@@ -38,7 +40,7 @@ def main() -> int:
     }
 
     # Setup the logger based on the config
-    setup_logging(level=loglevel_mapping.get(loglevel, logging.INFO), logfile=logfile)
+    setup_logging(level=loglevel_mapping.get(loglevel, logging.INFO), logfile=logfile, max_logfile_size_kb=max_logfile_size)
     logger = logging.getLogger(__name__)
 
     # Reduce the default loglevel for urllib3.connectionpool
