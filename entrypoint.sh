@@ -14,7 +14,7 @@ fi
 if test ! -f "$CONFIG_FILE" ; then
   echo "Config file not found: $CONFIG_FILE"
   echo "Copying dummy config for first startup..."
-  cp /app/config/batcontrol_config_dummy.yaml "$CONFIG_FILE"
+  cp /app/config_template/batcontrol_config_dummy.yaml "$CONFIG_FILE"
   echo "IMPORTANT: Dummy configuration copied!"
   echo "          This uses a 'dummy' inverter for demonstration only."
   echo "          Please edit $CONFIG_FILE and:"
