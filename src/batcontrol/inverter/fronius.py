@@ -208,7 +208,7 @@ class FroniusWR(InverterBaseclass):
         self._soc_cache = TTLCache(maxsize=1, ttl=30)
 
         # Initialize time of use cache with 15-minute TTL (maxsize=1 since we only cache one config)
-        self._time_of_use_cache = TTLCache(maxsize=1, ttl=900)  # 15 minutes = 900 seconds
+        self._time_of_use_cache = TTLCache(maxsize=1, ttl=910)  # 15 minutes , 10 Seconds = 910 seconds
 
         if not self.previous_battery_config:
             raise RuntimeError(
