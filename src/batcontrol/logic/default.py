@@ -81,7 +81,7 @@ class DefaultLogic(LogicInterface):
 
         if self.calculation_output is None:
             logger.error("Calculation output is not set. Please call calculate() first.")
-            return None
+            raise ValueError("Calculation output is not set. Please call calculate() first.")
 
         net_consumption = calc_input.consumption - calc_input.production
         prices = calc_input.prices
@@ -101,32 +101,41 @@ class DefaultLogic(LogicInterface):
             logger.debug('Discharging is NOT allowed')
             inverter_control_settings.allow_discharge = False
             charging_limit_percent = self.calculation_parameters.max_charging_from_grid_limit * 100
-            required_recharge_energy = self.__get_required_recharge_energy(
-                calc_input,
-                net_consumption[:max_hour],
-                prices
-            )
             charge_limit_capacity = self.common.max_capacity * \
                 self.calculation_parameters.max_charging_from_grid_limit
             is_charging_possible = calc_input.stored_energy < charge_limit_capacity
 
-            logger.debug('Charging allowed: %s',
-                         is_charging_possible)
+            # Defaults to 0, only calculate if charging is possible
+            required_recharge_energy = 0
+
+            logger.debug('Charging allowed: %s', is_charging_possible)
             if is_charging_possible:
                 logger.debug('Charging is allowed, because SOC is below %.0f%%',
                              charging_limit_percent
                              )
+                required_recharge_energy = self.__get_required_recharge_energy(
+                    calc_input,
+                    net_consumption[:max_hour],
+                    prices
+                )
             else:
                 logger.debug('Charging is NOT allowed, because SOC is above %.0f%%',
                              charging_limit_percent
                              )
 
             if required_recharge_energy > 0:
-                logger.debug(
+                allowed_charging_energy = charge_limit_capacity - calc_input.stored_energy
+                if required_recharge_energy > allowed_charging_energy:
+                    required_recharge_energy = allowed_charging_energy
+                    logger.debug(
+                        'Required recharge energy limited by max. charging limit to %0.1f Wh',
+                        required_recharge_energy
+                    )
+                logger.info(
                     'Get additional energy via grid: %0.1f Wh',
                     required_recharge_energy
                 )
-            else:
+            elif required_recharge_energy == 0 and is_charging_possible:
                 logger.debug(
                     'No additional energy required or possible price found.')
 
