@@ -1,6 +1,7 @@
 import logging
 import datetime
 import numpy as np
+from typing import Optional
 
 from .logic_interface import LogicInterface
 from .logic_interface import CalculationParameters, CalculationInput
@@ -40,7 +41,7 @@ class DefaultLogic(LogicInterface):
         """ Set the timezone for the logic calculations """
         self.timezone = timezone
 
-    def calculate(self, input_data: CalculationInput, calc_timestamp:datetime = None) -> bool:
+    def calculate(self, input_data: CalculationInput, calc_timestamp: Optional[datetime.datetime] = None) -> bool:
         """ Calculate the inverter control settings based on the input data """
 
         logger.debug("Calculating inverter control settings...")
@@ -69,7 +70,7 @@ class DefaultLogic(LogicInterface):
         return self.inverter_control_settings
 
     def calculate_inverter_mode(self, calc_input: CalculationInput,
-                                calc_timestamp:datetime = None) -> InverterControlSettings:
+                                calc_timestamp: Optional[datetime.datetime] = None) -> InverterControlSettings:
         """ Main control logic for battery control """
         # default settings
         inverter_control_settings = InverterControlSettings(
@@ -159,7 +160,7 @@ class DefaultLogic(LogicInterface):
     def __is_discharge_allowed(self, calc_input: CalculationInput,
                                     net_consumption: np.ndarray,
                                     prices: dict,
-                                    calc_timestamp:datetime = None) -> bool:
+                                    calc_timestamp: Optional[datetime.datetime] = None) -> bool:
         """ Evaluate if the battery is allowed to discharge
 
             - Check if battery is above always_allow_discharge_limit
