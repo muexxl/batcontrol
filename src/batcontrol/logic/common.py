@@ -87,10 +87,11 @@ class CommonLogic:
 
         if capacity >= self.max_capacity * self.always_allow_discharge_limit:
             logger.debug(
-                'Discharge is always allowed for capacity: %s', round(capacity,0))
+                'Discharge is \'always allowed\' for current capacity: %s', round(capacity,0))
             return True
+
         logger.debug(
-            'Discharge is NOT always allowed for capacity: %s', round(capacity,0))
+            'Discharge is NOT \'always allowed\' for current capacity: %s', round(capacity,0))
         return False
 
 
