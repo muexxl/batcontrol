@@ -3,6 +3,7 @@ To integrate batcontrol with Home Assistant, use the following repository: [ha_a
 
 [![Pylint](https://github.com/muexxl/batcontrol/actions/workflows/pylint.yml/badge.svg?branch=main)](https://github.com/muexxl/batcontrol/actions/workflows/pylint.yml)
 [![Docker Image CI](https://github.com/muexxl/batcontrol/actions/workflows/docker-image.yml/badge.svg?branch=main)](https://github.com/muexxl/batcontrol/actions/workflows/docker-image.yml)
+[![Wiki](https://github.com/muexxl/batcontrol/wiki)]
 
 ## Prerequisites:
 
