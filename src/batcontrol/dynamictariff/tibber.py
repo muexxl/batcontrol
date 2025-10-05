@@ -42,8 +42,6 @@ class Tibber(DynamicTariffBaseclass):
         rawdata=self.raw_data['data']
         now=datetime.datetime.now().astimezone(self.timezone)
         prices={}
-        
-        # Add prices from today and tomorrow
         for day in ['today', 'tomorrow']:
             dayinfo=rawdata['viewer']['homes'][homeid]['currentSubscription']['priceInfo'][day]
             for item in dayinfo:
@@ -52,13 +50,4 @@ class Tibber(DynamicTariffBaseclass):
                 rel_hour=math.ceil(diff.total_seconds()/3600)
                 if rel_hour >=0:
                     prices[rel_hour]=item['total']
-        
-        # Override with current hourly price for hour 0 to ensure accuracy
-        current_price=rawdata['viewer']['homes'][homeid]['currentSubscription']['priceInfo']['current']
-        current_timestamp=datetime.datetime.fromisoformat(current_price['startsAt'])
-        diff=current_timestamp-now
-        rel_hour=math.ceil(diff.total_seconds()/3600)
-        if rel_hour >=0:
-            prices[rel_hour]=current_price['total']
-        
         return prices
