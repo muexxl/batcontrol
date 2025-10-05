@@ -5,7 +5,11 @@ To integrate batcontrol with Home Assistant, use the following repository: [ha_a
 [![Docker Image CI](https://github.com/muexxl/batcontrol/actions/workflows/docker-image.yml/badge.svg?branch=main)](https://github.com/muexxl/batcontrol/actions/workflows/docker-image.yml)
 
 
-[Wiki/Documentation](https://github.com/muexxl/batcontrol/wiki)
+## Documentation
+
+- [Wiki](https://github.com/muexxl/batcontrol/wiki) - Complete documentation on GitHub Wiki
+- [Documentation folder](docs/) - Source documentation files, including:
+  - [EVCC Dynamic Tariff Integration](docs/evcc-dynamic-tariff.md)
 
 ## Prerequisites:
 

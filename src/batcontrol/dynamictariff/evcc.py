@@ -25,7 +25,6 @@ Usage:
     python evcc.py <url>
 """
 import datetime
-import math
 import requests
 from .baseclass import DynamicTariffBaseclass
 
@@ -71,6 +70,8 @@ class Evcc(DynamicTariffBaseclass):
         """ Process the raw data from the evcc API and return a dictionary of prices indexed
             by relative hour.
             The relative hour is calculated from the current time in the specified timezone.
+            If multiple price entries are provided for the same hour (e.g., every 15 minutes),
+            the hourly price is calculated as the average of all entries for that hour.
         """
         data=self.raw_data.get('rates', None)
         if data is None:
@@ -78,19 +79,36 @@ class Evcc(DynamicTariffBaseclass):
             data=self.raw_data['result']['rates']
 
         now=datetime.datetime.now().astimezone(self.timezone)
-        prices={}
+        current_hour_start=now.replace(minute=0, second=0, microsecond=0)
+
+        # Store all prices for each hour to calculate average
+        hourly_prices={}
 
         for item in data:
             # "start":"2024-06-20T08:00:00+02:00" to timestamp
             timestamp=datetime.datetime.fromisoformat(item['start']).astimezone(self.timezone)
-            diff=timestamp-now
-            rel_hour=math.ceil(diff.total_seconds()/3600)
+            # Calculate relative hour based on hour boundaries
+            hour_start=timestamp.replace(minute=0, second=0, microsecond=0)
+            diff_hours=(hour_start-current_hour_start).total_seconds()/3600
+            rel_hour=int(diff_hours)
+
             if rel_hour >=0:
                 # since evcc 0.203.0 value is the name of the price field.
                 if item.get('value', None) is not None:
-                    prices[rel_hour]=item['value']
+                    price=item['value']
                 else:
-                    prices[rel_hour]=item['price']
+                    price=item['price']
+
+                # Collect all prices for each hour
+                if rel_hour not in hourly_prices:
+                    hourly_prices[rel_hour]=[]
+                hourly_prices[rel_hour].append(price)
+
+        # Calculate average price for each hour
+        prices={}
+        for rel_hour, price_list in hourly_prices.items():
+            prices[rel_hour]=sum(price_list)/len(price_list)
+
         return prices
 
 def test():
