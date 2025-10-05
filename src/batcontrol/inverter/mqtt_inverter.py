@@ -12,26 +12,41 @@ All topics follow the pattern: <base_topic>/<subtopic>
 
 Status Topics (Inverter -> batcontrol):
 ---------------------------------------
-These topics MUST be published as RETAINED by the external inverter/bridge system:
-- <base_topic>/status/soc                  - State of Charge in % (float, 0-100)
+These topics MUST be published as RETAINED by the external inverter/bridge
+system:
+- <base_topic>/status/soc                  - State of Charge in %
+                                             (float, 0-100)
 - <base_topic>/status/capacity             - Battery capacity in Wh (float)
-- <base_topic>/status/mode                 - Current mode (string: 'force_charge', 'allow_discharge', 'avoid_discharge')
+- <base_topic>/status/mode                 - Current mode (string:
+                                             'force_charge',
+                                             'allow_discharge',
+                                             'avoid_discharge')
 
 Optional status topics (also RETAINED):
-- <base_topic>/status/min_soc              - Minimum SoC limit in % (float, 0-100)
-- <base_topic>/status/max_soc              - Maximum SoC limit in % (float, 0-100)
-- <base_topic>/status/max_charge_rate      - Maximum charge rate in W (float)
+- <base_topic>/status/min_soc              - Minimum SoC limit in %
+                                             (float, 0-100)
+- <base_topic>/status/max_soc              - Maximum SoC limit in %
+                                             (float, 0-100)
+- <base_topic>/status/max_charge_rate      - Maximum charge rate in W
+                                             (float)
 
 Command Topics (batcontrol -> Inverter):
 ----------------------------------------
 These topics are published by batcontrol and MUST NOT be retained:
-- <base_topic>/command/mode                - Set mode: 'force_charge', 'allow_discharge', 'avoid_discharge'
-- <base_topic>/command/charge_rate         - Set charge rate in W (float)
+- <base_topic>/command/mode                - Set mode:
+                                             'force_charge',
+                                             'allow_discharge',
+                                             'avoid_discharge'
+- <base_topic>/command/charge_rate         - Set charge rate in W
+                                             (float)
 
 WHY RETENTION MATTERS:
-- Status topics MUST be RETAINED so batcontrol can read the current state immediately on startup
-- Command topics MUST NOT be retained to avoid re-executing stale commands on reconnect
-- If command topics are retained, the inverter may execute old commands after restart
+- Status topics MUST be RETAINED so batcontrol can read the current state
+  immediately on startup
+- Command topics MUST NOT be retained to avoid re-executing stale commands
+  on reconnect
+- If command topics are retained, the inverter may execute old commands
+  after restart
 
 CONFIGURATION EXAMPLE
 =====================
@@ -89,11 +104,11 @@ client.publish("inverter/status/max_charge_rate", "5000", retain=True)
 def on_message(client, userdata, message):
     topic = message.topic
     value = message.payload.decode()
-    
+
     if topic == "inverter/command/mode":
         print(f"Setting mode to: {value}")
         # Implement your inverter control here
-        
+
     elif topic == "inverter/command/charge_rate":
         print(f"Setting charge rate to: {value}W")
         # Implement your charge rate control here
@@ -114,7 +129,7 @@ LIMITATIONS
 
 TROUBLESHOOTING
 ================
-1. "No SOC data available": 
+1. "No SOC data available":
    - Check that <base_topic>/status/soc is published as RETAINED
    - Verify MQTT broker connectivity and credentials
    - Check topic permissions
@@ -145,7 +160,7 @@ logger.info('Loading module')
 class MqttInverter(InverterBaseclass):
     """
     MQTT Inverter driver for batcontrol.
-    
+
     Integrates external battery/inverter systems via MQTT topics.
     See module docstring for complete documentation on topics, retention, and configuration.
     """
@@ -153,7 +168,7 @@ class MqttInverter(InverterBaseclass):
     def __init__(self, config):
         """
         Initialize MQTT Inverter driver.
-        
+
         Args:
             config (dict): Configuration dictionary containing:
                 - mqtt_broker: MQTT broker hostname/IP (required)
@@ -167,44 +182,46 @@ class MqttInverter(InverterBaseclass):
                 - max_grid_charge_rate: Maximum charge rate in W (required)
         """
         super().__init__(config)
-        
+
         # Configuration
         self.mqtt_broker = config['mqtt_broker']
         self.mqtt_port = config['mqtt_port']
         self.mqtt_user = config.get('mqtt_user', None)
         self.mqtt_password = config.get('mqtt_password', None)
         self.base_topic = config['base_topic']
-        
+
         # Battery parameters (from config or defaults)
         self.capacity = config['capacity']
         self.min_soc = config.get('min_soc', 10)
         self.max_soc = config.get('max_soc', 95)
         self.max_grid_charge_rate = config['max_grid_charge_rate']
-        
+
         # Cached state from MQTT
-        self.SOC = None  # Current state of charge
+        self.soc_value = None  # Current state of charge
         self.mode = 'allow_discharge'  # Current operating mode
-        
+
         # MQTT client setup
         self.mqtt_client = mqtt.Client()
         if self.mqtt_user and self.mqtt_password:
             self.mqtt_client.username_pw_set(self.mqtt_user, self.mqtt_password)
-        
+
         self.mqtt_client.on_connect = self._on_connect
         self.mqtt_client.on_message = self._on_message
-        
+
         # Connect to broker
         try:
-            logger.info('Connecting to MQTT broker %s:%d', self.mqtt_broker, self.mqtt_port)
+            logger.info('Connecting to MQTT broker %s:%d',
+                       self.mqtt_broker, self.mqtt_port)
             self.mqtt_client.connect(self.mqtt_broker, self.mqtt_port, 60)
             self.mqtt_client.loop_start()
         except Exception as e:
             logger.error('Failed to connect to MQTT broker: %s', e)
             raise
-        
-        logger.info('MQTT Inverter initialized with base topic: %s', self.base_topic)
 
-    def _on_connect(self, client, userdata, flags, rc):
+        logger.info('MQTT Inverter initialized with base topic: %s',
+                   self.base_topic)
+
+    def _on_connect(self, client, userdata, flags, rc):  # pylint: disable=unused-argument
         """
         Callback when MQTT connection is established.
         Subscribes to all status topics.
@@ -218,57 +235,58 @@ class MqttInverter(InverterBaseclass):
         else:
             logger.error('Failed to connect to MQTT broker with code: %s', rc)
 
-    def _on_message(self, client, userdata, message):
+    def _on_message(self, client, userdata, message):  # pylint: disable=unused-argument
         """
         Callback for incoming MQTT messages.
         Updates cached state from status topics.
         """
         topic = message.topic
         payload = message.payload.decode('utf-8')
-        
+
         logger.debug('Received MQTT message: %s = %s', topic, payload)
-        
+
         try:
             # Parse topic
             if topic == f'{self.base_topic}/status/soc':
-                self.SOC = float(payload)
-                logger.debug('Updated SOC: %s%%', self.SOC)
-                
+                self.soc_value = float(payload)
+                logger.debug('Updated SOC: %s%%', self.soc_value)
+
             elif topic == f'{self.base_topic}/status/capacity':
                 self.capacity = float(payload)
                 logger.debug('Updated capacity: %s Wh', self.capacity)
-                
+
             elif topic == f'{self.base_topic}/status/mode':
                 self.mode = payload
                 logger.debug('Updated mode: %s', self.mode)
-                
+
             elif topic == f'{self.base_topic}/status/min_soc':
                 self.min_soc = float(payload)
                 logger.debug('Updated min_soc: %s%%', self.min_soc)
-                
+
             elif topic == f'{self.base_topic}/status/max_soc':
                 self.max_soc = float(payload)
                 logger.debug('Updated max_soc: %s%%', self.max_soc)
-                
+
             elif topic == f'{self.base_topic}/status/max_charge_rate':
                 self.max_grid_charge_rate = float(payload)
-                logger.debug('Updated max_charge_rate: %s W', self.max_grid_charge_rate)
-                
+                logger.debug('Updated max_charge_rate: %s W',
+                           self.max_grid_charge_rate)
+
         except (ValueError, TypeError) as e:
             logger.error('Error parsing MQTT message %s: %s', topic, e)
 
     def set_mode_force_charge(self, chargerate=500):
         """
         Set inverter to force charge mode.
-        
+
         Publishes mode and charge rate to MQTT command topics (non-retained).
-        
+
         Args:
             chargerate (float): Charge rate in W
         """
         self.mode = 'force_charge'
         logger.info('Setting mode to force_charge with rate %sW', chargerate)
-        
+
         # Publish mode command (QoS 1, not retained)
         self.mqtt_client.publish(
             f'{self.base_topic}/command/mode',
@@ -276,7 +294,7 @@ class MqttInverter(InverterBaseclass):
             qos=1,
             retain=False
         )
-        
+
         # Publish charge rate command (QoS 1, not retained)
         self.mqtt_client.publish(
             f'{self.base_topic}/command/charge_rate',
@@ -288,12 +306,12 @@ class MqttInverter(InverterBaseclass):
     def set_mode_allow_discharge(self):
         """
         Set inverter to allow discharge mode.
-        
+
         Publishes mode to MQTT command topic (non-retained).
         """
         self.mode = 'allow_discharge'
         logger.info('Setting mode to allow_discharge')
-        
+
         # Publish mode command (QoS 1, not retained)
         self.mqtt_client.publish(
             f'{self.base_topic}/command/mode',
@@ -305,12 +323,12 @@ class MqttInverter(InverterBaseclass):
     def set_mode_avoid_discharge(self):
         """
         Set inverter to avoid discharge mode.
-        
+
         Publishes mode to MQTT command topic (non-retained).
         """
         self.mode = 'avoid_discharge'
         logger.info('Setting mode to avoid_discharge')
-        
+
         # Publish mode command (QoS 1, not retained)
         self.mqtt_client.publish(
             f'{self.base_topic}/command/mode',
@@ -322,31 +340,31 @@ class MqttInverter(InverterBaseclass):
     def get_capacity(self):
         """
         Get battery capacity in Wh.
-        
+
         Returns:
             float: Battery capacity in Wh
         """
         return self.capacity
 
-    def get_SOC(self):
+    def get_SOC(self):  # pylint: disable=invalid-name
         """
         Get current state of charge.
-        
+
         Returns:
             float: State of charge in percentage (0-100)
         """
-        if self.SOC is None:
+        if self.soc_value is None:
             logger.warning('SOC not yet received from MQTT, returning 0')
             return 0.0
-        return self.SOC
+        return self.soc_value
 
     def activate_mqtt(self, api_mqtt_api):
         """
         Activate batcontrol's MQTT API for publishing inverter state.
-        
+
         This allows batcontrol to publish inverter state to its own MQTT topics
         (separate from the inverter control topics).
-        
+
         Args:
             api_mqtt_api: The MQTT API instance from batcontrol
         """
@@ -356,16 +374,19 @@ class MqttInverter(InverterBaseclass):
     def refresh_api_values(self):
         """
         Publish current values to batcontrol's MQTT API.
-        
+
         This is separate from the inverter MQTT topics - it publishes to
         batcontrol's own MQTT topic structure for monitoring/visualization.
         """
-        super().refresh_api_values()
+        # Parent class handles standard MQTT publishing
+        if self.mqtt_api:
+            # Call parent to publish standard metrics
+            super().refresh_api_values()
 
     def shutdown(self):
         """
         Cleanly shutdown the MQTT connection.
-        
+
         Disconnects from MQTT broker and stops the network loop.
         """
         logger.info('Shutting down MQTT Inverter')
@@ -373,5 +394,5 @@ class MqttInverter(InverterBaseclass):
             self.mqtt_client.loop_stop()
             self.mqtt_client.disconnect()
             logger.info('MQTT Inverter shutdown complete')
-        except Exception as e:
+        except ConnectionError as e:
             logger.error('Error during MQTT Inverter shutdown: %s', e)
