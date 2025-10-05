@@ -45,6 +45,20 @@ class Inverter:
                 'max_grid_charge_rate': config['max_grid_charge_rate']
             }
             inverter=Dummy(iv_config)
+        elif config['type'].lower() == 'mqtt':
+            from .mqtt_inverter import MqttInverter
+            iv_config = {
+                'mqtt_broker': config['mqtt_broker'],
+                'mqtt_port': config['mqtt_port'],
+                'mqtt_user': config.get('mqtt_user'),
+                'mqtt_password': config.get('mqtt_password'),
+                'base_topic': config['base_topic'],
+                'capacity': config['capacity'],
+                'min_soc': config.get('min_soc', 10),
+                'max_soc': config.get('max_soc', 95),
+                'max_grid_charge_rate': config['max_grid_charge_rate']
+            }
+            inverter=MqttInverter(iv_config)
         else:
             raise RuntimeError(f'[Inverter] Unkown inverter type {config["type"]}')
 

@@ -13,6 +13,101 @@ To integrate batcontrol with Home Assistant, use the following repository: [ha_a
 2. An EPEX Spot based contract with hourly electricity pricing, like Awattar, Tibber etc. (Get a €50 bonus on sign-up to Tibber using this [link](https://invite.tibber.com/x8ci52nj).)
 3. Customer login details to the inverter.
 
+**OR** use the MQTT inverter driver to integrate any battery/inverter system - see [MQTT Inverter Integration](#mqtt-inverter-integration) below.
+
+## MQTT Inverter Integration
+
+Batcontrol can integrate with any battery/inverter system via MQTT topics. This allows you to use batcontrol with systems other than Fronius Gen24 inverters.
+
+### How it works
+
+The MQTT inverter driver enables batcontrol to:
+- Read battery state (SOC, capacity, mode) from MQTT topics
+- Send control commands (mode changes, charge rate) via MQTT topics
+- Dynamically update configuration (min/max SoC, charge rate) via MQTT
+
+### Prerequisites for MQTT Integration
+
+1. An MQTT broker (e.g., Mosquitto) accessible to both batcontrol and your inverter/bridge
+2. A bridge script or system that:
+   - Publishes battery status to MQTT (as RETAINED messages)
+   - Subscribes to control commands from batcontrol
+   - Controls your actual inverter/battery system
+
+### Topic Structure
+
+All topics use the pattern: `<base_topic>/<subtopic>`
+
+**Status Topics (MUST be RETAINED):**
+- `<base_topic>/status/soc` - State of Charge in % (float, 0-100)
+- `<base_topic>/status/capacity` - Battery capacity in Wh (float)
+- `<base_topic>/status/mode` - Current mode (string: 'force_charge', 'allow_discharge', 'avoid_discharge')
+- `<base_topic>/status/min_soc` - Minimum SoC limit in % (optional)
+- `<base_topic>/status/max_soc` - Maximum SoC limit in % (optional)
+- `<base_topic>/status/max_charge_rate` - Maximum charge rate in W (optional)
+
+**Command Topics (MUST NOT be retained):**
+- `<base_topic>/command/mode` - Set mode (string)
+- `<base_topic>/command/charge_rate` - Set charge rate in W (float)
+
+### Configuration Example
+
+```yaml
+inverter:
+  type: mqtt
+  mqtt_broker: 192.168.1.100
+  mqtt_port: 1883
+  mqtt_user: batcontrol
+  mqtt_password: secret
+  base_topic: inverter
+  capacity: 10000              # Battery capacity in Wh (required)
+  min_soc: 10                  # Minimum SoC % (default: 10)
+  max_soc: 95                  # Maximum SoC % (default: 95)
+  max_grid_charge_rate: 5000   # Maximum charge rate in W (required)
+```
+
+### Example Bridge Implementation
+
+Here's a minimal Python bridge example using paho-mqtt:
+
+```python
+import paho.mqtt.client as mqtt
+
+# Connect to MQTT broker
+client = mqtt.Client()
+client.username_pw_set("batcontrol", "secret")
+client.connect("192.168.1.100", 1883, 60)
+
+# Publish initial state (RETAINED)
+client.publish("inverter/status/soc", "65.5", retain=True)
+client.publish("inverter/status/capacity", "10000", retain=True)
+client.publish("inverter/status/mode", "allow_discharge", retain=True)
+
+# Subscribe to commands and implement control logic
+def on_message(client, userdata, message):
+    topic = message.topic
+    value = message.payload.decode()
+    
+    if topic == "inverter/command/mode":
+        print(f"Setting mode to: {value}")
+        # Implement your inverter control here
+        
+    elif topic == "inverter/command/charge_rate":
+        print(f"Setting charge rate to: {value}W")
+        # Implement your charge rate control here
+
+client.on_message = on_message
+client.subscribe("inverter/command/#")
+client.loop_forever()
+```
+
+### Important Notes
+
+- **Status topics MUST be RETAINED** so batcontrol can read state immediately on startup
+- **Command topics MUST NOT be retained** to avoid executing stale commands after restart
+- Your bridge must re-publish all status topics on reconnect
+- See `src/batcontrol/inverter/mqtt_inverter.py` for complete documentation
+
 ## Preparations:
 
 # Local installation
