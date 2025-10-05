@@ -71,6 +71,8 @@ class Evcc(DynamicTariffBaseclass):
         """ Process the raw data from the evcc API and return a dictionary of prices indexed
             by relative hour.
             The relative hour is calculated from the current time in the specified timezone.
+            If multiple prices are provided for the same hour (e.g., every 15 minutes),
+            the hourly price is calculated as the average of all those entries.
         """
         data=self.raw_data.get('rates', None)
         if data is None:
@@ -78,19 +80,31 @@ class Evcc(DynamicTariffBaseclass):
             data=self.raw_data['result']['rates']
 
         now=datetime.datetime.now().astimezone(self.timezone)
-        prices={}
+        # Use a dictionary to collect all prices for each hour
+        hourly_prices={}
 
         for item in data:
             # "start":"2024-06-20T08:00:00+02:00" to timestamp
             timestamp=datetime.datetime.fromisoformat(item['start']).astimezone(self.timezone)
             diff=timestamp-now
-            rel_hour=math.ceil(diff.total_seconds()/3600)
+            rel_hour=math.floor(diff.total_seconds()/3600)
             if rel_hour >=0:
                 # since evcc 0.203.0 value is the name of the price field.
                 if item.get('value', None) is not None:
-                    prices[rel_hour]=item['value']
+                    price=item['value']
                 else:
-                    prices[rel_hour]=item['price']
+                    price=item['price']
+                
+                # Collect all prices for this hour
+                if rel_hour not in hourly_prices:
+                    hourly_prices[rel_hour]=[]
+                hourly_prices[rel_hour].append(price)
+        
+        # Calculate average for each hour
+        prices={}
+        for hour, price_list in hourly_prices.items():
+            prices[hour]=sum(price_list)/len(price_list)
+        
         return prices
 
 def test():
