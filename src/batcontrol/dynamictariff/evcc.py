@@ -20,9 +20,7 @@ Methods:
     test():
         A test function to run the Evcc class with a provided URL and print the fetched prices.
 
-Usage:
-    To use this module, run it as a script with the API URL as an argument:
-    python evcc.py <url>
+
 """
 import datetime
 import math
@@ -106,41 +104,3 @@ class Evcc(DynamicTariffBaseclass):
             prices[hour]=sum(price_list)/len(price_list)
         
         return prices
-
-def test():
-    """
-    This script tests the functionality of the Evcc class by fetching and printing
-    electric vehicle charging prices from a specified URL.
-
-    Usage:
-        python evcc.py <url>
-
-    Arguments:
-        url (str): The URL to fetch the EV charging prices from.
-
-    The script performs the following steps:
-    1. Initializes an instance of the Evcc class with the specified URL and the
-       'Europe/Berlin' timezone.
-    2. Fetches the EV charging prices using the get_prices method of the Evcc class.
-    3. Prints the fetched prices in a formatted JSON structure.
-
-    Dependencies:
-        - sys
-        - json
-        - pytz
-    """
-    import sys  # pylint: disable=import-outside-toplevel
-    import json # pylint: disable=import-outside-toplevel
-    import pytz # pylint: disable=import-outside-toplevel
-    if len(sys.argv) != 2:
-        print("Usage: python evcc.py <url>")
-        sys.exit(1)
-
-    url = sys.argv[1]
-    evcc = Evcc(pytz.timezone('Europe/Berlin'), url)  # Assuming the Evcc constructor takes a URL
-
-    prices = evcc.get_prices()
-    print(json.dumps(prices, indent=4))
-
-if __name__ == "__main__":
-    test()
