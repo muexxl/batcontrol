@@ -20,9 +20,7 @@ Methods:
     test():
         A test function to run the Evcc class with a provided URL and print the fetched prices.
 
-Usage:
-    To use this module, run it as a script with the API URL as an argument:
-    python evcc.py <url>
+
 """
 import datetime
 import math
@@ -71,6 +69,8 @@ class Evcc(DynamicTariffBaseclass):
         """ Process the raw data from the evcc API and return a dictionary of prices indexed
             by relative hour.
             The relative hour is calculated from the current time in the specified timezone.
+            If multiple prices are provided for the same hour (e.g., every 15 minutes),
+            the hourly price is calculated as the average of all those entries.
         """
         data=self.raw_data.get('rates', None)
         if data is None:
@@ -78,55 +78,29 @@ class Evcc(DynamicTariffBaseclass):
             data=self.raw_data['result']['rates']
 
         now=datetime.datetime.now().astimezone(self.timezone)
-        prices={}
+        # Use a dictionary to collect all prices for each hour
+        hourly_prices={}
 
         for item in data:
             # "start":"2024-06-20T08:00:00+02:00" to timestamp
             timestamp=datetime.datetime.fromisoformat(item['start']).astimezone(self.timezone)
             diff=timestamp-now
-            rel_hour=math.ceil(diff.total_seconds()/3600)
+            rel_hour=math.floor(diff.total_seconds()/3600)
             if rel_hour >=0:
                 # since evcc 0.203.0 value is the name of the price field.
                 if item.get('value', None) is not None:
-                    prices[rel_hour]=item['value']
+                    price=item['value']
                 else:
-                    prices[rel_hour]=item['price']
+                    price=item['price']
+                
+                # Collect all prices for this hour
+                if rel_hour not in hourly_prices:
+                    hourly_prices[rel_hour]=[]
+                hourly_prices[rel_hour].append(price)
+        
+        # Calculate average for each hour
+        prices={}
+        for hour, price_list in hourly_prices.items():
+            prices[hour]=sum(price_list)/len(price_list)
+        
         return prices
-
-def test():
-    """
-    This script tests the functionality of the Evcc class by fetching and printing
-    electric vehicle charging prices from a specified URL.
-
-    Usage:
-        python evcc.py <url>
-
-    Arguments:
-        url (str): The URL to fetch the EV charging prices from.
-
-    The script performs the following steps:
-    1. Initializes an instance of the Evcc class with the specified URL and the
-       'Europe/Berlin' timezone.
-    2. Fetches the EV charging prices using the get_prices method of the Evcc class.
-    3. Prints the fetched prices in a formatted JSON structure.
-
-    Dependencies:
-        - sys
-        - json
-        - pytz
-    """
-    import sys  # pylint: disable=import-outside-toplevel
-    import json # pylint: disable=import-outside-toplevel
-    import pytz # pylint: disable=import-outside-toplevel
-    if len(sys.argv) != 2:
-        print("Usage: python evcc.py <url>")
-        sys.exit(1)
-
-    url = sys.argv[1]
-    evcc = Evcc(pytz.timezone('Europe/Berlin'), url)  # Assuming the Evcc constructor takes a URL
-
-    prices = evcc.get_prices()
-    print(json.dumps(prices, indent=4))
-
-if __name__ == "__main__":
-    test()
