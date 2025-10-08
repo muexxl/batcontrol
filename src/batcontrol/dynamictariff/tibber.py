@@ -22,7 +22,7 @@ class Tibber(DynamicTariffBaseclass):
         headers={"Authorization":"Bearer " + self.access_token,
                 "Content-Type":"application/json"}
         data="""{ "query":
-        "{viewer {homes {currentSubscription {priceInfo { current {total startsAt } today {total startsAt } tomorrow {total startsAt }}}}}}" }
+        "{viewer {homes {currentSubscription {priceInfo(resolution: HOURLY) { current {total startsAt } today {total startsAt } tomorrow {total startsAt }}}}}}" }
         """
         try:
             response = requests.post(self.url, data, headers=headers, timeout=30)
