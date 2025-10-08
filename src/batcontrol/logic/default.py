@@ -377,9 +377,11 @@ class DefaultLogic(LogicInterface):
 
         if not self.common.is_charging_above_minimum(recharge_energy):
             recharge_energy = 0.0
+        else:
+            # We are adding that minimum charge energy here, that we are not stucking between limits.
+            recharge_energy = recharge_energy + self.common.min_charge_energy
 
-        # We are adding that minimum charge energy here, that we are not stucking between limits.
-        self.calculation_output.required_recharge_energy = recharge_energy + self.common.min_charge_energy
+        self.calculation_output.required_recharge_energy = recharge_energy
         return recharge_energy
 
     def __calculate_min_dynamic_price_difference(self, price: float) -> float:
