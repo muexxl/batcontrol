@@ -24,9 +24,9 @@ class CalculationParameters:
 @dataclass
 class CalculationOutput:
     """ Output from the calculation besides the InverterControlSettings """
-    reserved_energy: float
-    required_recharge_energy: float
-    min_dynamic_price_difference: float
+    reserved_energy: float = 0.0
+    required_recharge_energy: float = 0.0
+    min_dynamic_price_difference: float = 0.05
 
 @dataclass
 class InverterControlSettings:

@@ -16,7 +16,6 @@ battery_control:
                                  #    _rel helps to avoid charging at high prices with less efficiency
   always_allow_discharge_limit: 0.90 # 0.00 to 1.00 above this SOC limit using energy from the battery is always allowed
   max_charging_from_grid_limit: 0.89 # 0.00 to 1.00 charging from the grid is only allowed until this SOC limit
-  min_recharge_amount: 100           # in Wh, start & minimum amount of energy to recharge the battery
 
 #--------------------------
 #  Battery Control Expert Tuning Parameters
@@ -56,7 +55,8 @@ inverter:
 #  See more Details in: https://github.com/muexxl/batcontrol/wiki/Dynamic-tariff-provider
 #--------------------------
 utility:
-  type: awattar_at # [tibber, awattar_at, awattar_de, evcc]
+  type: evcc #awattar_at # [tibber, awattar_at, awattar_de, evcc]
+  url: http://evcc.lan/api/tariff/grid
   vat: 0.20 # only required for awattar
   fees: 0.015 # only required for awattar
   markup: 0.03 # only required for awattar
@@ -90,16 +90,10 @@ mqtt:
 #  DEMO: This configuration uses a simple PV installation for demonstration.
 #  For real operation, update the values below with your actual PV system details.
 #--------------------------
-solar_forecast_provider: fcsolarapi
+solar_forecast_provider: evcc-solar
 pvinstallations:
-  - name: Demo PV System #name - update this for your system
-    lat: 48.4334480    # Update with your actual latitude
-    lon: 8.7654968     # Update with your actual longitude  
-    declination: 30    # inclination toward horizon 0..90 0=flat 90=vertical (e.g. wallmounted)
-    azimuth: 0         # -90:East, 0:South, 90:West -180..180
-    kWp: 10.0          # power in kWp - update with your actual system size
-    #horizon: # leave empty for default PVGIS horizon, only modify if solar array is shaded by trees or houses
-    #api: #fcsolarapi
+  - name: main
+    url: http://evcc.lan/api/tariff/solar
 
 #--------------------------
 #  Forecast Consumption
