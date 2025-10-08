@@ -331,7 +331,7 @@ class DefaultLogic(LogicInterface):
 
         # start with nearest hour
         high_price_hours.sort()
-        required_energy = 0
+        required_energy = 0.0
         for high_price_hour in high_price_hours:
             energy_to_shift = consumption[high_price_hour]
 
@@ -349,7 +349,7 @@ class DefaultLogic(LogicInterface):
             # add_remaining energy to shift to recharge amount
             required_energy += energy_to_shift
 
-        if required_energy > 0:
+        if required_energy > 0.0:
             logger.debug("[Rule] Required Energy: %0.1f Wh is based on next 'high price' hours %s",
                          required_energy,
                          high_price_hours
@@ -360,23 +360,26 @@ class DefaultLogic(LogicInterface):
                          recharge_energy
                          )
         else:
-            recharge_energy = 0
+            recharge_energy = 0.0
 
         free_capacity = calc_input.free_capacity
 
-        if recharge_energy <= 0:
+        if recharge_energy <= 0.0:
             logger.debug(
                 "[Rule] No additional energy required, because stored energy is sufficient."
             )
-            recharge_energy = 0
+            recharge_energy = 0.0
 
         if recharge_energy > free_capacity:
             recharge_energy = free_capacity
             logger.debug(
                 "[Rule] Recharge limited by free capacity: %0.1f Wh", recharge_energy)
 
-        self.calculation_output.required_recharge_energy = recharge_energy
+        if not self.common.is_charging_above_minimum(recharge_energy):
+            recharge_energy = 0.0
 
+        # We are adding that minimum charge energy here, that we are not stucking between limits.
+        self.calculation_output.required_recharge_energy = recharge_energy + self.common.min_charge_energy
         return recharge_energy
 
     def __calculate_min_dynamic_price_difference(self, price: float) -> float:

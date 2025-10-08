@@ -23,17 +23,20 @@ class CommonLogic:
     charge_rate_multiplier: float
     always_allow_discharge_limit: float
     max_capacity: float  # Maximum capacity of the battery in Wh
+    min_charge_energy: float = 100  # Minimum amount of energy before charging from grid in Wh
 
     @classmethod
     def get_instance(cls, charge_rate_multiplier=1.1,
                      always_allow_discharge_limit=0.9,
-                     max_capacity=10000) -> "CommonLogic":
+                     max_capacity=10000,
+                     min_charge_energy=100) -> "CommonLogic":
         """ Get the singleton instance of CommonLogic. """
         if cls._instance is None:
             cls._instance = cls.__new__(cls)
             cls._instance.initialize(charge_rate_multiplier,
                                  always_allow_discharge_limit,
-                                 max_capacity)
+                                 max_capacity,
+                                 min_charge_energy)
         return cls._instance
 
     def __init__(self, *args, **kwargs):
@@ -45,11 +48,13 @@ class CommonLogic:
 
     def initialize(self, charge_rate_multiplier=1.1,
                always_allow_discharge_limit=0.9,
-               max_capacity=10000):
+               max_capacity=10000,
+               min_charge_energy=100):
         """ Private initialization method. """
         self.charge_rate_multiplier = charge_rate_multiplier
         self.always_allow_discharge_limit = always_allow_discharge_limit
         self.max_capacity = max_capacity
+        self.min_charge_energy = min_charge_energy
 
     def set_charge_rate_multiplier(self, multiplier: float):
         """ Set the charge rate multiplier. """
@@ -94,6 +99,19 @@ class CommonLogic:
             'Discharge is NOT \'always allowed\' for current capacity: %s', round(capacity,0))
         return False
 
+    def is_charging_above_minimum(self, needed_energy: float) -> bool:
+        """ Check if charging from grid is allowed based on the needed energy.
+        Args:
+            needed_energy (float): Needed energy in Wh.
+        Returns:
+            bool: True if charging from grid is allowed, False otherwise."""
+        if needed_energy >= self.min_charge_energy:
+            return True
+
+        logger.debug(
+            'Charging needed recharge energy is below threshold(%s): %s', round(self.min_charge_energy,0),
+                     round(needed_energy,0))
+        return False
 
     def calculate_charge_rate(self, charge_rate: float) -> int:
         """ Calculate the charge rate based on the charge rate multiplier.

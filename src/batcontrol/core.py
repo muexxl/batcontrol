@@ -158,7 +158,8 @@ class Batcontrol:
                 'charge_rate_multiplier', 1.1),
             always_allow_discharge_limit=self.batconfig.get(
             'always_allow_discharge_limit', 0.9),
-            max_capacity=self.inverter.get_max_capacity()
+            max_capacity=self.inverter.get_max_capacity(),
+            min_charge_energy=self.batconfig.get('min_recharge_amount', 100.0)
         )
 
         self.mqtt_api = None
