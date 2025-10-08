@@ -378,7 +378,7 @@ class DefaultLogic(LogicInterface):
         if not self.common.is_charging_above_minimum(recharge_energy):
             recharge_energy = 0.0
         else:
-            # We are adding that minimum charge energy here, that we are not stucking between limits.
+            # We are adding that minimum charge energy here, so that we are not stuck between limits.
             recharge_energy = recharge_energy + self.common.min_charge_energy
 
         self.calculation_output.required_recharge_energy = recharge_energy
