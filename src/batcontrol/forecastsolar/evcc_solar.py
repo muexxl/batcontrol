@@ -134,8 +134,8 @@ class EvccSolar(ForecastSolarInterface):
                     if value is None:
                         value = 0
 
-                    # Store the value as-is (assuming evcc returns values in Watts)
-                    prediction[rel_hour] = value
+                    # Store the value rounded to 1 decimal place
+                    prediction[rel_hour] = round(value, 1)
 
             except (KeyError, ValueError, TypeError) as e:
                 logger.warning('Error processing forecast item %s: %s', item, e)
