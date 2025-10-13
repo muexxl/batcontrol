@@ -22,6 +22,12 @@ Configuration:
 
     The URL should point to your evcc instance's solar tariff API endpoint.
 
+Data Processing:
+    The module handles 15-minute interval data from evcc and converts it to hourly forecasts by:
+    - Grouping multiple intervals that fall within the same forecast hour
+    - Calculating the average power value for each hour
+    - This ensures accurate hourly forecasts regardless of the interval frequency
+
 Usage:
     To use this module, instantiate the EvccSolar class with appropriate configuration
     and call get_forecast() to retrieve solar production forecasts.
@@ -127,7 +133,7 @@ class EvccSolar(ForecastSolarInterface):
                 # Parse timestamp from "start" field
                 timestamp = datetime.datetime.fromisoformat(item['start']).astimezone(self.timezone)
                 diff = timestamp - now
-                rel_hour = math.floor(diff.total_seconds() / 3600)
+                rel_hour = math.ceil(diff.total_seconds() / 3600)
 
                 if rel_hour >= 0:
                     # Get the forecast value (power in Watts)
@@ -150,6 +156,8 @@ class EvccSolar(ForecastSolarInterface):
                 # Average the power values for the hour
                 avg_power = hourly_values[hour] / hourly_counts[hour]
                 prediction[hour] = float(round(avg_power, 1))
+            else:
+                prediction[hour] = 0.0
 
         # Fill missing hours with 0
         if prediction:
@@ -157,6 +165,9 @@ class EvccSolar(ForecastSolarInterface):
             for h in range(max_hour + 1):
                 if h not in prediction:
                     prediction[h] = 0.0
+        else:
+            # If no prediction data, still include hour 0
+            prediction[0] = 0.0
 
         # Sort output
         output = dict(sorted(prediction.items()))
