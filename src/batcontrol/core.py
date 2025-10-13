@@ -318,14 +318,16 @@ class Batcontrol:
 
         net_consumption = consumption-production
 
-        logger.debug('Production Forecast: %s',
-                     np.ndarray.round(production, 1))
-        logger.debug('Consumption Forecast: %s',
-                     np.ndarray.round(consumption, 1))
-        logger.debug('Net Consumption Forecast: %s',
-                     np.ndarray.round(net_consumption, 1))
-        logger.debug('Prices: %s', np.ndarray.round(
-            prices, self.round_price_digits))
+        # Format arrays consistently for logging (suppress scientific notation)
+        with np.printoptions(suppress=True):
+            logger.debug('Production Forecast: %s',
+                         production.round(1))
+            logger.debug('Consumption Forecast: %s',
+                         consumption.round(1))
+            logger.debug('Net Consumption Forecast: %s',
+                         net_consumption.round(1))
+            logger.debug('Prices: %s', 
+                         prices.round(self.round_price_digits))
         # negative = charging or feed in
         # positive = dis-charging or grid consumption
 
