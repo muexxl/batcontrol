@@ -135,7 +135,7 @@ class EvccSolar(ForecastSolarInterface):
                         value = 0
 
                     # sum up values for the same hour
-                    prediction[rel_hour] = prediction.get(rel_hour, 0) + int(round(value, 0))
+                    prediction[rel_hour] = float(round(prediction.get(rel_hour, 0) + value, 1))
 
             except (KeyError, ValueError, TypeError) as e:
                 logger.warning('Error processing forecast item %s: %s', item, e)
