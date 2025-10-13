@@ -105,13 +105,14 @@ class EvccSolar(ForecastSolarInterface):
         Process the raw data from the evcc API and return a dictionary of forecast values indexed
         by relative hour.
         """
-        # Initialize prediction dictionary
-        prediction = {}
+        # Initialize dictionaries for accumulating values and counting intervals per hour
+        hourly_values = {}
+        hourly_counts = {}
 
         # Return empty prediction if no data available
         if not self.raw_data:
             logger.warning('No results from evcc Solar API available')
-            return prediction
+            return {}
 
         # Get rates from raw data (similar to evcc tariff implementation)
         data = self.raw_data.get('rates', None)
@@ -126,26 +127,36 @@ class EvccSolar(ForecastSolarInterface):
                 # Parse timestamp from "start" field
                 timestamp = datetime.datetime.fromisoformat(item['start']).astimezone(self.timezone)
                 diff = timestamp - now
-                rel_hour = math.ceil(diff.total_seconds() / 3600)
+                rel_hour = math.floor(diff.total_seconds() / 3600)
 
                 if rel_hour >= 0:
-                    # Get the forecast value (likely already in Watts)
+                    # Get the forecast value (power in Watts)
                     value = item.get('value', 0)
                     if value is None:
                         value = 0
 
-                    # sum up values for the same hour
-                    prediction[rel_hour] = float(round(prediction.get(rel_hour, 0) + value, 1))
+                    # Accumulate values and count intervals for each hour
+                    hourly_values[rel_hour] = hourly_values.get(rel_hour, 0) + value
+                    hourly_counts[rel_hour] = hourly_counts.get(rel_hour, 0) + 1
 
             except (KeyError, ValueError, TypeError) as e:
                 logger.warning('Error processing forecast item %s: %s', item, e)
                 continue
 
+        # Calculate average power for each hour
+        prediction = {}
+        for hour in hourly_values:
+            if hourly_counts[hour] > 0:
+                # Average the power values for the hour
+                avg_power = hourly_values[hour] / hourly_counts[hour]
+                prediction[hour] = float(round(avg_power, 1))
+
         # Fill missing hours with 0
-        max_hour = max(prediction.keys()) if prediction else 0
-        for h in range(max_hour + 1):
-            if h not in prediction:
-                prediction[h] = 0
+        if prediction:
+            max_hour = max(prediction.keys())
+            for h in range(max_hour + 1):
+                if h not in prediction:
+                    prediction[h] = 0.0
 
         # Sort output
         output = dict(sorted(prediction.items()))
