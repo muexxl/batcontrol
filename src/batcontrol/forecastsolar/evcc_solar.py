@@ -24,8 +24,10 @@ Configuration:
 
 Data Processing:
     The module handles 15-minute interval data from evcc and converts it to hourly forecasts by:
-    - Grouping multiple intervals that fall within the same forecast hour
-    - Calculating the average power value for each hour
+    - Using math.floor to group timestamps into hourly buckets (aligned with evcc tariff implementation)
+    - Collecting all power values that fall within the same forecast hour
+    - Calculating the average power value for each hour using sum/len
+    - Rounding the result to 1 decimal place for display purposes
     - This ensures accurate hourly forecasts regardless of the interval frequency
 
 Usage:
