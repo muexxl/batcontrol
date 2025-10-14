@@ -23,7 +23,6 @@ Methods:
 
 """
 import datetime
-import math
 import requests
 from .baseclass import DynamicTariffBaseclass
 
@@ -97,15 +96,15 @@ class Evcc(DynamicTariffBaseclass):
                     price=item['value']
                 else:
                     price=item['price']
-                
+
                 # Collect all prices for this hour
                 if rel_hour not in hourly_prices:
                     hourly_prices[rel_hour]=[]
                 hourly_prices[rel_hour].append(price)
-        
+
         # Calculate average for each hour
         prices={}
         for hour, price_list in hourly_prices.items():
             prices[hour]=sum(price_list)/len(price_list)
-        
+
         return prices
