@@ -250,6 +250,71 @@ class TestEvcc(unittest.TestCase):
         # Hour 2: single price of 0.28
         self.assertEqual(prices[2], 0.28)
 
+    def test_time_consistency_within_hour(self):
+        """Test that price calculation is consistent regardless of when within the hour it's called
+        
+        This test verifies the fix for issue #205 where price averaging was inconsistent
+        as time progressed within an hour due to incorrect rel_hour calculation.
+        """
+        evcc = Evcc(self.timezone, self.url)
+        
+        # Mock raw data with 15-minute intervals
+        # Hour starting at 10:00 has prices: 0.20, 0.22, 0.24, 0.26
+        evcc.raw_data = {
+            'rates': [
+                {
+                    'start': '2024-06-20T10:00:00+02:00',
+                    'end': '2024-06-20T10:15:00+02:00',
+                    'value': 0.20
+                },
+                {
+                    'start': '2024-06-20T10:15:00+02:00',
+                    'end': '2024-06-20T10:30:00+02:00',
+                    'value': 0.22
+                },
+                {
+                    'start': '2024-06-20T10:30:00+02:00',
+                    'end': '2024-06-20T10:45:00+02:00',
+                    'value': 0.24
+                },
+                {
+                    'start': '2024-06-20T10:45:00+02:00',
+                    'end': '2024-06-20T11:00:00+02:00',
+                    'value': 0.26
+                }
+            ]
+        }
+        
+        # Test at different times within the hour 09:00-10:00
+        # All should produce the same average price for rel_hour=1 (10:00-11:00)
+        test_times = [
+            datetime.datetime(2024, 6, 20, 9, 0, 0),   # At 09:00:00
+            datetime.datetime(2024, 6, 20, 9, 10, 0),  # At 09:10:00
+            datetime.datetime(2024, 6, 20, 9, 30, 0),  # At 09:30:00
+            datetime.datetime(2024, 6, 20, 9, 45, 0),  # At 09:45:00
+            datetime.datetime(2024, 6, 20, 9, 59, 59), # At 09:59:59
+        ]
+        
+        expected_avg = (0.20 + 0.22 + 0.24 + 0.26) / 4  # 0.23
+        
+        for test_time in test_times:
+            with patch('batcontrol.dynamictariff.evcc.datetime') as mock_datetime:
+                mock_now = self.timezone.localize(test_time)
+                mock_datetime.datetime.now.return_value = mock_now
+                mock_datetime.datetime.fromisoformat = datetime.datetime.fromisoformat
+                
+                prices = evcc.get_prices_from_raw_data()
+                
+                # All test times should produce the same average price
+                self.assertIn(1, prices, 
+                    f"rel_hour=1 should be present at {test_time.strftime('%H:%M:%S')}")
+                self.assertAlmostEqual(
+                    prices[1], 
+                    expected_avg, 
+                    places=5,
+                    msg=f"Price at {test_time.strftime('%H:%M:%S')} should be {expected_avg}"
+                )
+
 
 if __name__ == '__main__':
     unittest.main()

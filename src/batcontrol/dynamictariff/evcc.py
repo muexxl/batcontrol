@@ -78,14 +78,19 @@ class Evcc(DynamicTariffBaseclass):
             data=self.raw_data['result']['rates']
 
         now=datetime.datetime.now().astimezone(self.timezone)
+        # Get the start of the current hour
+        current_hour_start = now.replace(minute=0, second=0, microsecond=0)
         # Use a dictionary to collect all prices for each hour
         hourly_prices={}
 
         for item in data:
             # "start":"2024-06-20T08:00:00+02:00" to timestamp
             timestamp=datetime.datetime.fromisoformat(item['start']).astimezone(self.timezone)
-            diff=timestamp-now
-            rel_hour=math.floor(diff.total_seconds()/3600)
+            # Get the start of the hour for this timestamp
+            interval_hour_start = timestamp.replace(minute=0, second=0, microsecond=0)
+            # Calculate relative hour based on hour boundaries
+            diff = interval_hour_start - current_hour_start
+            rel_hour = int(diff.total_seconds() / 3600)
             if rel_hour >=0:
                 # since evcc 0.203.0 value is the name of the price field.
                 if item.get('value', None) is not None:
