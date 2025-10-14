@@ -110,11 +110,9 @@ class EvccSolar(ForecastSolarInterface):
         """
         Process the raw data from the evcc API and return a dictionary of forecast values indexed
         by relative hour.
+        If multiple values are provided for the same hour (e.g., every 15 minutes),
+        the hourly value is calculated as the average of all those entries.
         """
-        # Initialize dictionaries for accumulating values and counting intervals per hour
-        hourly_values = {}
-        hourly_counts = {}
-
         # Return empty prediction if no data available
         if not self.raw_data:
             logger.warning('No results from evcc Solar API available')
@@ -127,13 +125,15 @@ class EvccSolar(ForecastSolarInterface):
             data = self.raw_data.get('result', {}).get('rates', [])
 
         now = datetime.datetime.now().astimezone(self.timezone)
+        # Use a dictionary to collect all values for each hour
+        hourly_values = {}
 
         for item in data:
             try:
                 # Parse timestamp from "start" field
                 timestamp = datetime.datetime.fromisoformat(item['start']).astimezone(self.timezone)
                 diff = timestamp - now
-                rel_hour = math.ceil(diff.total_seconds() / 3600)
+                rel_hour = math.floor(diff.total_seconds() / 3600)
 
                 if rel_hour >= 0:
                     # Get the forecast value (power in Watts)
@@ -141,9 +141,10 @@ class EvccSolar(ForecastSolarInterface):
                     if value is None:
                         value = 0
 
-                    # Accumulate values and count intervals for each hour
-                    hourly_values[rel_hour] = hourly_values.get(rel_hour, 0) + value
-                    hourly_counts[rel_hour] = hourly_counts.get(rel_hour, 0) + 1
+                    # Collect all values for this hour
+                    if rel_hour not in hourly_values:
+                        hourly_values[rel_hour] = []
+                    hourly_values[rel_hour].append(value)
 
             except (KeyError, ValueError, TypeError) as e:
                 logger.warning('Error processing forecast item %s: %s', item, e)
@@ -151,13 +152,10 @@ class EvccSolar(ForecastSolarInterface):
 
         # Calculate average power for each hour
         prediction = {}
-        for hour in hourly_values:
-            if hourly_counts[hour] > 0:
-                # Average the power values for the hour
-                avg_power = hourly_values[hour] / hourly_counts[hour]
-                prediction[hour] = float(round(avg_power, 1))
-            else:
-                prediction[hour] = 0.0
+        for hour, value_list in hourly_values.items():
+            # Average the power values for the hour
+            avg_power = sum(value_list) / len(value_list)
+            prediction[hour] = float(round(avg_power, 1))
 
         # Fill missing hours with 0
         if prediction:
