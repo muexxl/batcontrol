@@ -23,7 +23,6 @@ Methods:
 
 """
 import datetime
-import math
 import requests
 from .baseclass import DynamicTariffBaseclass
 
@@ -85,7 +84,7 @@ class Evcc(DynamicTariffBaseclass):
             # "start":"2024-06-20T08:00:00+02:00" to timestamp
             timestamp=datetime.datetime.fromisoformat(item['start']).astimezone(self.timezone)
             diff=timestamp-now
-            rel_hour=math.floor(diff.total_seconds()/3600)
+            rel_hour=int(diff.total_seconds()/3600)
             if rel_hour >=0:
                 # since evcc 0.203.0 value is the name of the price field.
                 if item.get('value', None) is not None:

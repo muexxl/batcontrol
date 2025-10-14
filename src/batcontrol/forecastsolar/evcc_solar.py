@@ -24,7 +24,7 @@ Configuration:
 
 Data Processing:
     The module handles 15-minute interval data from evcc and converts it to hourly forecasts by:
-    - Using math.floor to group timestamps into hourly buckets (aligned with evcc tariff implementation)
+    - Using int() to group timestamps into hourly buckets (aligned with evcc tariff implementation)
     - Collecting all power values that fall within the same forecast hour
     - Calculating the average power value for each hour using sum/len
     - Rounding the result to 1 decimal place for display purposes
@@ -35,7 +35,6 @@ Usage:
     and call get_forecast() to retrieve solar production forecasts.
 """
 import datetime
-import math
 import time
 import random
 import logging
@@ -135,7 +134,7 @@ class EvccSolar(ForecastSolarInterface):
                 # Parse timestamp from "start" field
                 timestamp = datetime.datetime.fromisoformat(item['start']).astimezone(self.timezone)
                 diff = timestamp - now
-                rel_hour = math.floor(diff.total_seconds() / 3600)
+                rel_hour = int(diff.total_seconds() / 3600)
 
                 if rel_hour >= 0:
                     # Get the forecast value (power in Watts)
