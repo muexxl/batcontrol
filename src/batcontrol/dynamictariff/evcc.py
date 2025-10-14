@@ -83,7 +83,10 @@ class Evcc(DynamicTariffBaseclass):
         for item in data:
             # "start":"2024-06-20T08:00:00+02:00" to timestamp
             timestamp=datetime.datetime.fromisoformat(item['start']).astimezone(self.timezone)
-            diff=timestamp-now
+            # Normalize both current time and interval times to hour boundaries
+            current_hour_start=now.replace(minute=0, second=0, microsecond=0)
+            interval_hour_start=timestamp.replace(minute=0, second=0, microsecond=0)
+            diff=interval_hour_start-current_hour_start
             rel_hour=int(diff.total_seconds()/3600)
             if rel_hour >=0:
                 # since evcc 0.203.0 value is the name of the price field.
