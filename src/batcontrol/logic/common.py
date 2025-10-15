@@ -92,11 +92,11 @@ class CommonLogic:
 
         if capacity >= self.max_capacity * self.always_allow_discharge_limit:
             logger.debug(
-                'Discharge is \'always allowed\' for current capacity: %s', round(capacity,0))
+                'Discharge is \'always allowed\' for current capacity: %s Wh', round(capacity,0))
             return True
 
         logger.debug(
-            'Discharge is NOT \'always allowed\' for current capacity: %s', round(capacity,0))
+            'Discharge is NOT \'always allowed\' for current capacity: %s Wh', round(capacity,0))
         return False
 
     def is_charging_above_minimum(self, needed_energy: float) -> bool:
@@ -109,7 +109,7 @@ class CommonLogic:
             return True
 
         logger.debug(
-            'Charging needed recharge energy is below threshold(%s): %s', round(self.min_charge_energy,0),
+            'Charging needed recharge energy is below threshold(%s): %s Wh', round(self.min_charge_energy,0),
                      round(needed_energy,0))
         return False
 
@@ -127,5 +127,6 @@ class CommonLogic:
                 MIN_CHARGE_RATE, adjusted_charge_rate)
             adjusted_charge_rate = MIN_CHARGE_RATE
 
-        logger.debug('Adjusted charge rate: %s', adjusted_charge_rate)
-        return int(round(adjusted_charge_rate))
+        adjusted_charge_rate = int(round(adjusted_charge_rate, 0))  
+        logger.debug('Adjusted charge rate: %s W', adjusted_charge_rate)
+        return adjusted_charge_rate
