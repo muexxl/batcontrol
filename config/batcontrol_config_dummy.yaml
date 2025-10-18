@@ -8,6 +8,10 @@ logfile_enabled: true
 log_everything: false # if false debug messages from fronius.auth and urllib3.connectionpool will be suppressed
 max_logfile_size: 200 #kB
 logfile_path: logs/batcontrol.log
+
+# Asynchronous provider fetching configuration
+use_background_fetching: true   # Enable background fetching for non-blocking provider updates
+use_parallel_fetching: true     # Enable parallel fetching as fallback
 battery_control:
                                  # min_price_difference is the absolute minimum price difference in Euro to justify charging your battery
                                  # if min_price_difference_rel results in a higher price difference, that will be used

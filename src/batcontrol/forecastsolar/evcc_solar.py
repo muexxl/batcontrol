@@ -1,52 +1,30 @@
 """
-This module defines the EvccSolar class, which is used to interact with the evcc API to fetch
-solar forecast data.
+Refactored EvccSolar using BaseFetcher infrastructure.
 
-Classes:
-    EvccSolar: A class to interact with the evcc API and process solar forecast data.
-
-Methods:
-    __init__(self, pvinstallations, timezone, api_delay):
-        Initializes the EvccSolar instance with the given timezone and configuration.
-
-    get_forecast(self):
-        Fetches solar forecast data from the evcc API and returns it as a dictionary.
-
-Configuration:
-    To use evcc-solar as your solar forecast provider, configure your batcontrol_config.yaml 
-    as follows:
-
-    solar_forecast_provider: evcc-solar
-    pvinstallations:
-      - url: https://your-evcc-instance.local/api/tariff/solar
-
-    The URL should point to your evcc instance's solar tariff API endpoint.
-
-Data Processing:
-    The module handles 15-minute interval data from evcc and converts it to hourly forecasts by:
-    - Grouping multiple intervals that fall within the same forecast hour
-    - Calculating the average power value for each hour
-    - This ensures accurate hourly forecasts regardless of the interval frequency
-
-Usage:
-    To use this module, instantiate the EvccSolar class with appropriate configuration
-    and call get_forecast() to retrieve solar production forecasts.
+This version consolidates the caching, delay, and error handling logic
+into the shared BaseFetcher class.
 """
 import datetime
 import math
-import time
-import random
 import logging
 import requests
+from ..fetching import BaseFetcher, PROVIDER_TYPE_LOCAL
+from ..fetching.constants import LOCAL_REFRESH_INTERVAL
 from .forecastsolar_interface import ForecastSolarInterface
 
 logger = logging.getLogger(__name__)
 
-class EvccSolar(ForecastSolarInterface):
-    """ Implement evcc API to get solar forecast data
-        Inherits from ForecastSolarInterface
+
+class EvccSolar(BaseFetcher, ForecastSolarInterface):
     """
-    def __init__(self, pvinstallations, timezone, api_delay):
+    Refactored evcc API to get solar forecast data.
+    
+    Now inherits from both ForecastSolarInterface and BaseFetcher
+    to use shared infrastructure.
+    """
+    
+    def __init__(self, pvinstallations, timezone, api_delay,
+                 cache_manager=None, http_client=None, rate_limit_manager=None):
         """
         Initialize the EvccSolar instance.
 
@@ -55,13 +33,20 @@ class EvccSolar(ForecastSolarInterface):
                                   this should contain a single entry with 'url' key.
             timezone: Timezone information for the forecast data
             api_delay (int): Delay in seconds for API evaluation
+            cache_manager: Shared cache manager instance (deprecated, use BaseFetcher)
+            http_client: Shared HTTP client instance (deprecated, use BaseFetcher)
+            rate_limit_manager: Shared rate limit manager instance (deprecated, use BaseFetcher)
         """
+        # Initialize BaseFetcher with local provider settings for 15min refresh
+        BaseFetcher.__init__(
+            self, 
+            timezone=timezone,
+            provider_type=PROVIDER_TYPE_LOCAL,
+            refresh_interval=LOCAL_REFRESH_INTERVAL,  # Use constant (15 min)
+            max_delay=api_delay
+        )
+        
         self.pvinstallations = pvinstallations
-        self.timezone = timezone
-        self.api_delay = api_delay
-        self.raw_data = {}
-        self.last_update = 0
-        self.min_time_between_updates = 900  # 15 minutes default
 
         # Extract URL from pvinstallations config
         if not pvinstallations or not isinstance(pvinstallations, list):
@@ -75,7 +60,12 @@ class EvccSolar(ForecastSolarInterface):
             raise ValueError("[EvccSolar] URL must be provided in installation configuration")
 
         self.url = installation['url']
-        logger.info('Initialized EvccSolar with URL: %s', self.url)
+        logger.info('[EvccSolar] Initialized with URL: %s (refresh_interval: %ss, cache_ttl: %ss)', 
+                   self.url, self.refresh_interval, self.cache_ttl)
+
+    def get_provider_id(self) -> str:
+        """Return unique identifier for this provider."""
+        return "evcc_solar"
 
     def get_forecast(self) -> dict[int, float]:
         """
@@ -85,145 +75,113 @@ class EvccSolar(ForecastSolarInterface):
             dict[int, float]: Dictionary with relative hours as keys and solar production
                             values (in Watts) as values
         """
-        now = time.time()
-        time_passed = now - self.last_update
+        return self.get_data()
 
-        if time_passed > self.min_time_between_updates:
-            # Not on initial call
-            if self.last_update > 0 and self.api_delay > 0:
-                sleeptime = random.randrange(0, self.api_delay, 1)
-                logger.debug(
-                    'Waiting for %d seconds before requesting new data',
-                    sleeptime)
-                time.sleep(sleeptime)
-            try:
-                self.raw_data = self._get_raw_forecast()
-                self.last_update = now
-            except (ConnectionError, TimeoutError) as e:
-                logger.error('Error getting raw solar forecast data: %s', e)
-                logger.warning('Using cached raw solar forecast data')
-
-        forecast = self._get_forecast_from_raw_data()
-        return forecast
-
-    def _get_forecast_from_raw_data(self) -> dict[int, float]:
+    def get_raw_data_from_provider(self) -> dict:
         """
-        Process the raw data from the evcc API and return a dictionary of forecast values indexed
-        by relative hour.
+        Fetch raw data from the evcc API.
+        
+        Returns:
+            Raw JSON data from evcc API
+        """
+        response = self.http_client.get_with_rate_limit_handling(
+            url=self.url,
+            provider_id=self.get_provider_id(),
+            provider_type=self.provider_type,
+            max_delay=self.max_delay,
+            last_update=self.last_update
+        )
+        
+        raw_data = response.json()
+        logger.debug('[EvccSolar] Received raw data with %d entries', 
+                    len(raw_data.get('result', {}).get('rates', [])))
+        return raw_data
+
+    def process_raw_data(self, raw_data: dict) -> dict[int, float]:
+        """
+        Process the raw data from the evcc API and return a dictionary of forecast values 
+        indexed by relative hour.
+        
+        Args:
+            raw_data: Raw JSON data from evcc API
+            
+        Returns:
+            dict[int, float]: Hourly forecast data
         """
         # Initialize dictionaries for accumulating values and counting intervals per hour
         hourly_values = {}
         hourly_counts = {}
 
         # Return empty prediction if no data available
-        if not self.raw_data:
-            logger.warning('No results from evcc Solar API available')
-            return {}
+        if not raw_data:
+            logger.warning('[EvccSolar] No results from evcc Solar API available')
+            raise RuntimeWarning('No results from evcc Solar API available')
 
-        # Get rates from raw data (similar to evcc tariff implementation)
-        data = self.raw_data.get('rates', None)
-        if data is None:
-            # Fallback for older evcc versions
-            data = self.raw_data.get('result', {}).get('rates', [])
-
+        # Calculate current hour for relative hour calculation
         now = datetime.datetime.now().astimezone(self.timezone)
+        current_hour = datetime.datetime(
+            now.year, now.month, now.day, now.hour
+        ).astimezone(self.timezone)
 
-
-        # Die Logik aus dynamictariff/evcc.py: rel_hour auf Stundenbeginn, dann gruppieren
-        current_hour_start = now.replace(minute=0, second=0, microsecond=0)
-        hourly_values = {}
-        for item in data:
+        # Process rates from evcc API
+        rates = raw_data.get('result', {}).get('rates', [])
+        
+        for rate in rates:
             try:
-                timestamp = datetime.datetime.fromisoformat(item['start']).astimezone(self.timezone)
-                interval_hour_start = timestamp.replace(minute=0, second=0, microsecond=0)
-                diff = interval_hour_start - current_hour_start
-                rel_hour = int(diff.total_seconds() / 3600)
-                if rel_hour >= 0:
-                    value = item.get('value', 0)
-                    if value is None:
-                        value = 0
-                    if rel_hour not in hourly_values:
-                        hourly_values[rel_hour] = []
-                    hourly_values[rel_hour].append(value)
-            except (KeyError, ValueError, TypeError) as e:
-                logger.warning('Error processing forecast item %s: %s', item, e)
+                # Parse start time of this interval
+                start_time_str = rate.get('start')
+                if not start_time_str:
+                    continue
+                    
+                start_time = datetime.datetime.fromisoformat(start_time_str)
+                
+                # Calculate relative hour from current hour
+                time_diff = start_time - current_hour
+                relative_hour = math.ceil(time_diff.total_seconds() / 3600) - 1
+                
+                # Only include future hours (relative_hour >= 0)
+                if relative_hour >= 0:
+                    power_value = float(rate.get('price', 0))  # 'price' contains power values in evcc solar API
+                    
+                    # Accumulate values for this hour
+                    if relative_hour in hourly_values:
+                        hourly_values[relative_hour] += power_value
+                        hourly_counts[relative_hour] += 1
+                    else:
+                        hourly_values[relative_hour] = power_value
+                        hourly_counts[relative_hour] = 1
+                        
+            except (ValueError, TypeError, KeyError) as e:
+                logger.warning('[EvccSolar] Error processing rate entry: %s', e)
                 continue
 
+        # Calculate average power for each hour and convert to final forecast
+        forecast = {}
+        for hour in hourly_values:
+            # Calculate average power for this hour
+            avg_power = hourly_values[hour] / hourly_counts[hour]
+            forecast[hour] = avg_power
 
-        # Durchschnitt pro Stunde berechnen
-        prediction = {}
-        for hour, value_list in hourly_values.items():
-            if value_list:
-                avg_power = sum(value_list) / len(value_list)
-                prediction[hour] = float(round(avg_power, 1))
-            else:
-                prediction[hour] = 0.0
-
-        # Fehlende Stunden mit 0 auffüllen
-        if prediction:
-            max_hour = max(prediction.keys())
+        # Fill in missing hours with 0 values up to the maximum hour
+        if forecast:
+            max_hour = max(forecast.keys())
             for h in range(max_hour + 1):
-                if h not in prediction:
-                    prediction[h] = 0.0
-        else:
-            prediction[0] = 0.0
+                if h not in forecast:
+                    forecast[h] = 0.0
 
-        # Sortiert zurückgeben
-        output = dict(sorted(prediction.items()))
-        return output
+        # Sort the output by hour
+        forecast = dict(sorted(forecast.items()))
+        
+        logger.info('[EvccSolar] Processed forecast for %d hours', len(forecast))
+        return forecast
 
-    def _get_raw_forecast(self) -> dict:
+    def get_recommended_refresh_interval(self) -> int:
         """
-        Fetch raw forecast data from evcc API.
+        Get recommended refresh interval for EVCC solar provider.
+        
+        Local EVCC APIs can be refreshed less frequently than external APIs.
         """
-        try:
-            logger.info('Requesting solar forecast from evcc API: %s', self.url)
-            response = requests.get(self.url, timeout=30)
-            response.raise_for_status()
-
-            if response.status_code != 200:
-                raise ConnectionError(f'[EvccSolar] API returned {response.status_code}')
-
-        except requests.exceptions.RequestException as e:
-            raise ConnectionError(f'[EvccSolar] API request failed: {e}') from e
-
-        try:
-            raw_data = response.json()
-            logger.debug('Successfully retrieved raw forecast data')
-            return raw_data
-        except ValueError as e:
-            raise ConnectionError(f'[EvccSolar] Invalid JSON response: {e}') from e
+        return 3600  # 1 hour for local APIs
 
 
-def test():
-    """
-    Test function for the EvccSolar class.
-
-    Usage:
-        python evcc_solar.py <url>
-    """
-    import sys
-    import json
-    import pytz
-
-    if len(sys.argv) != 2:
-        print("Usage: python evcc_solar.py <url>")
-        sys.exit(1)
-
-    url = sys.argv[1]
-
-    # Create test configuration
-    pvinstallations = [{'url': url}]
-    timezone = pytz.timezone('Europe/Berlin')
-
-    try:
-        evcc_solar = EvccSolar(pvinstallations, timezone, api_delay=0)
-        forecast = evcc_solar.get_forecast()
-        print(json.dumps(forecast, indent=4))
-    except Exception as e:
-        print(f"Error: {e}")
-        sys.exit(1)
-
-
-if __name__ == "__main__":
-    test()
+# EvccSolar ist jetzt die Standard-Implementierung (vorher refactored)
