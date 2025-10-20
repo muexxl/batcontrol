@@ -15,7 +15,7 @@ Features:
 import logging
 import threading
 from typing import Dict, Optional, Any, Callable
-from concurrent.futures import ThreadPoolExecutor, Future, as_completed
+from concurrent.futures import ThreadPoolExecutor
 import time
 import schedule
 
@@ -25,7 +25,7 @@ from .fetching.rate_limit_manager import RateLimitManager
 
 logger = logging.getLogger(__name__)
 
-class ProviderManager:
+class ProviderManager:  # pylint: disable=too-many-instance-attributes
     """
     Global manager for provider infrastructure and coordination.
 
@@ -107,6 +107,7 @@ class ProviderManager:
         Returns:
             ThreadPoolExecutor: Global thread pool instance
         """
+        # pylint: disable=protected-access
         if self._thread_pool is None or self._thread_pool._shutdown:
             with self._lock:
                 if self._thread_pool is None or self._thread_pool._shutdown:
@@ -114,12 +115,12 @@ class ProviderManager:
                         max_workers=max_workers,
                         thread_name_prefix="provider_"
                     )
-                    logger.debug(f"Created global thread pool with {max_workers} workers")
+                    logger.debug("Created global thread pool with %d workers", max_workers)
         return self._thread_pool
 
-    def fetch_parallel(
+    def fetch_parallel(  # pylint: disable=too-many-locals
         self,
-        provider_calls: Dict[str, callable],
+        provider_calls: Dict[str, Callable],
         timeout: float = 60.0,
         fail_fast: bool = False
     ) -> Dict[str, Any]:
@@ -153,7 +154,7 @@ class ProviderManager:
         for name, call_func in provider_calls.items():
             future = thread_pool.submit(call_func)
             futures[name] = future
-            logger.debug(f"Submitted {name} provider call to thread pool")
+            logger.debug("Submitted %s provider call to thread pool", name)
 
         # Collect results with timeout
         try:
@@ -162,19 +163,19 @@ class ProviderManager:
                 try:
                     result = future.result(timeout=remaining_timeout)
                     results[name] = result
-                    logger.debug(f"Successfully fetched {name} provider data")
-                except Exception as e:
-                    logger.warning(f"Failed to fetch {name} provider data: {e}")
-                    results[name] = e
+                    logger.debug("Successfully fetched %s provider data", name)
+                except Exception as exc:  # pylint: disable=broad-exception-caught
+                    logger.warning("Failed to fetch %s provider data: %s", name, exc)
+                    results[name] = exc
                     if fail_fast:
                         # Cancel remaining futures
                         for remaining_name, remaining_future in futures.items():
                             if remaining_name != name and not remaining_future.done():
                                 remaining_future.cancel()
-                        raise e
+                        raise exc
 
-        except Exception as e:
-            logger.error(f"Error in parallel fetch: {e}")
+        except Exception as exc:
+            logger.error("Error in parallel fetch: %s", exc)
             # Cancel any remaining futures
             for future in futures.values():
                 if not future.done():
@@ -182,8 +183,10 @@ class ProviderManager:
             raise
 
         total_time = time.time() - start_time
-        success_count = sum(1 for result in results.values() if not isinstance(result, Exception))
-        logger.info(f"Parallel fetch completed: {success_count}/{len(provider_calls)} successful in {total_time:.2f}s")
+        success_count = sum(
+            1 for result in results.values() if not isinstance(result, Exception))
+        logger.info("Parallel fetch completed: %d/%d successful in %.2fs",
+                    success_count, len(provider_calls), total_time)
 
         return results
 
@@ -220,7 +223,8 @@ class ProviderManager:
                     self._safe_background_fetch, provider_id
                 ).tag(provider_id)
 
-        logger.info(f"Registered {provider_id} for background fetching every {interval_seconds} seconds")
+        logger.info("Registered %s for background fetching every %d seconds",
+                    provider_id, interval_seconds)
 
     def start_background_fetching(self):
         """Start the background fetching thread."""
@@ -232,7 +236,7 @@ class ProviderManager:
             self._background_running = True
 
             # Schedule all registered fetchers
-            for provider_id, provider_info in self._background_fetchers.items():
+            for provider_id in self._background_fetchers:
                 interval = self._background_intervals[provider_id]
                 self._scheduler.every(interval).minutes.do(
                     self._safe_background_fetch, provider_id
@@ -275,20 +279,20 @@ class ProviderManager:
             try:
                 self._scheduler.run_pending()
                 time.sleep(30)  # Check every 30 seconds
-            except Exception as e:
-                logger.error(f"Error in background scheduler: {e}", exc_info=True)
+            except Exception as exc:  # pylint: disable=broad-exception-caught
+                logger.error("Error in background scheduler: %s", exc, exc_info=True)
 
         logger.debug("Background scheduler thread stopped")
 
     def _safe_background_fetch(self, provider_id: str):
         """Safely execute a background fetch with error handling."""
         try:
-            logger.debug(f"Starting background fetch for {provider_id}")
+            logger.debug("Starting background fetch for %s", provider_id)
             start_time = time.time()
 
             provider_info = self._background_fetchers.get(provider_id)
             if not provider_info:
-                logger.warning(f"No provider info found for {provider_id}")
+                logger.warning("No provider info found for %s", provider_id)
                 return
 
             fetch_func = provider_info['fetch_func']
@@ -300,10 +304,11 @@ class ProviderManager:
                 self._background_fetchers[provider_id]['last_data'] = result
 
             duration = time.time() - start_time
-            logger.debug(f"Background fetch for {provider_id} completed in {duration:.2f}s")
+            logger.debug("Background fetch for %s completed in %.2fs",
+                        provider_id, duration)
 
-        except Exception as e:
-            logger.warning(f"Background fetch failed for {provider_id}: {e}")
+        except Exception as exc:  # pylint: disable=broad-exception-caught
+            logger.warning("Background fetch failed for %s: %s", provider_id, exc)
 
     def get_cached_data_non_blocking(self, provider_id: str) -> Optional[Any]:
         """
@@ -329,10 +334,11 @@ class ProviderManager:
             if provider_info and provider_info['provider_instance']:
                 # Try to access cache through provider's cache key
                 provider_instance = provider_info['provider_instance']
+                # pylint: disable=protected-access
                 if hasattr(provider_instance, '_cache_key'):
                     return self._cache_manager.get(provider_instance._cache_key)
-        except Exception as e:
-            logger.debug(f"Error getting cached data for {provider_id}: {e}")
+        except Exception as exc:  # pylint: disable=broad-exception-caught
+            logger.debug("Error getting cached data for %s: %s", provider_id, exc)
 
         return None
 
@@ -359,9 +365,10 @@ class ProviderManager:
             if use_cache_first:
                 # Try to get cached data first
                 cached_data = self.get_cached_data_non_blocking(provider_name)
-                if cached_data is not None and self.is_data_fresh(provider_name, max_cache_age_seconds):
+                if (cached_data is not None and
+                        self.is_data_fresh(provider_name, max_cache_age_seconds)):
                     results[provider_name] = cached_data
-                    logger.debug(f"Using cached data for {provider_name}")
+                    logger.debug("Using cached data for %s", provider_name)
                     continue
 
             # If no cached data or too old, fetch in background
@@ -370,16 +377,16 @@ class ProviderManager:
                 cached_data = self.get_cached_data_non_blocking(provider_name)
                 if cached_data is not None:
                     results[provider_name] = cached_data
-                    logger.debug(f"Using background-fetched data for {provider_name}")
+                    logger.debug("Using background-fetched data for %s", provider_name)
                     continue
 
             # Fallback: fetch synchronously
             try:
-                logger.debug(f"Fallback synchronous fetch for {provider_name}")
+                logger.debug("Fallback synchronous fetch for %s", provider_name)
                 results[provider_name] = fetch_func()
-            except Exception as e:
-                logger.error(f"Failed to fetch {provider_name}: {e}")
-                results[provider_name] = e
+            except Exception as exc:  # pylint: disable=broad-exception-caught
+                logger.error("Failed to fetch %s: %s", provider_name, exc)
+                results[provider_name] = exc
 
         return results
 
@@ -431,6 +438,7 @@ class ProviderManager:
             stats['rate_limits'] = {'status': 'not_initialized'}
 
         # Thread pool statistics
+        # pylint: disable=protected-access
         if self._thread_pool is not None and not self._thread_pool._shutdown:
             stats['thread_pool'] = {
                 'max_workers': self._thread_pool._max_workers,
@@ -477,36 +485,38 @@ class ProviderManager:
                 self._cache_manager.invalidate(test_key)
             else:
                 health['cache_manager'] = False
-        except Exception as e:
-            logger.warning(f"Cache manager health check failed: {e}")
+        except Exception as exc:  # pylint: disable=broad-exception-caught
+            logger.warning("Cache manager health check failed: %s", exc)
             health['cache_manager'] = False
 
         # HTTP client health
         try:
             health['http_client'] = self._http_client is not None
-        except Exception as e:
-            logger.warning(f"HTTP client health check failed: {e}")
+        except Exception as exc:  # pylint: disable=broad-exception-caught
+            logger.warning("HTTP client health check failed: %s", exc)
             health['http_client'] = False
 
         # Rate limit manager health
         try:
             health['rate_limit_manager'] = self._rate_limit_manager is not None
-        except Exception as e:
-            logger.warning(f"Rate limit manager health check failed: {e}")
+        except Exception as exc:  # pylint: disable=broad-exception-caught
+            logger.warning("Rate limit manager health check failed: %s", exc)
             health['rate_limit_manager'] = False
 
         # Thread pool health
         try:
+            # pylint: disable=protected-access
             health['thread_pool'] = (
                 self._thread_pool is not None and
                 not self._thread_pool._shutdown
             )
-        except Exception as e:
-            logger.warning(f"Thread pool health check failed: {e}")
+        except Exception as exc:  # pylint: disable=broad-exception-caught
+            logger.warning("Thread pool health check failed: %s", exc)
             health['thread_pool'] = False
 
         all_healthy = all(health.values())
-        logger.debug(f"Health check completed: {'all healthy' if all_healthy else 'issues detected'}")
+        logger.debug("Health check completed: %s",
+                    'all healthy' if all_healthy else 'issues detected')
 
         return health
 
