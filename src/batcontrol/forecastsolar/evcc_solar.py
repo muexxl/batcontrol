@@ -127,10 +127,9 @@ class EvccSolar(BaseFetcher, ForecastSolarInterface):
             raise RuntimeWarning('No results from evcc Solar API available')
 
         # Calculate current hour for relative hour calculation
-        now = datetime.datetime.now().astimezone(self.timezone)
-        current_hour = datetime.datetime(
-            now.year, now.month, now.day, now.hour
-        ).astimezone(self.timezone)
+        # Use now(tz=) to ensure consistent timezone handling in CI environments
+        now = datetime.datetime.now(tz=self.timezone)
+        current_hour = now.replace(minute=0, second=0, microsecond=0)
 
         # Process rates from evcc API
         rates = raw_data.get('result', {}).get('rates', [])
@@ -171,7 +170,8 @@ class EvccSolar(BaseFetcher, ForecastSolarInterface):
         for hour, value in hourly_values.items():
             # Calculate average power for this hour
             avg_power = value / hourly_counts[hour]
-            forecast[hour] = avg_power
+            # Round to 1 decimal place for consistency
+            forecast[hour] = round(avg_power, 1)
 
         # Fill in missing hours with 0 values up to the maximum hour
         if forecast:
