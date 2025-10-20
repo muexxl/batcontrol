@@ -33,12 +33,6 @@ class Inverter:
                 'max_pv_charge_rate': config['max_pv_charge_rate']
             }
             inverter=FroniusWR(iv_config)
-        elif config['type'].lower() == 'testdriver':
-            from .testdriver import Testdriver
-            iv_config = {
-                'max_grid_charge_rate': config['max_grid_charge_rate']
-            }
-            inverter=Testdriver(iv_config)
         elif config['type'].lower() == 'dummy':
             from .dummy import Dummy
             iv_config = {
