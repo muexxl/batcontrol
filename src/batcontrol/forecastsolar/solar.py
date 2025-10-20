@@ -99,8 +99,7 @@ class ForecastSolar:
                 timezone,
                 api_delay,
                 cache_manager=cache_manager,
-                http_client=http_client,
-                rate_limit_manager=rate_limit_manager
+                http_client=http_client
             )
 
         elif requested_provider.lower() == 'solarprognose':
@@ -109,8 +108,7 @@ class ForecastSolar:
                 timezone,
                 api_delay,
                 cache_manager=cache_manager,
-                http_client=http_client,
-                rate_limit_manager=rate_limit_manager
+                http_client=http_client
             )
 
         elif requested_provider.lower() == 'evcc-solar':
@@ -119,8 +117,7 @@ class ForecastSolar:
                 timezone,
                 api_delay,
                 cache_manager=cache_manager,
-                http_client=http_client,
-                rate_limit_manager=rate_limit_manager
+                http_client=http_client
             )
 
         else:

@@ -44,7 +44,9 @@ class EvccSolar(BaseFetcher, ForecastSolarInterface):
             timezone=timezone,
             provider_type=PROVIDER_TYPE_LOCAL,
             refresh_interval=LOCAL_REFRESH_INTERVAL,  # Use constant (15 min)
-            max_delay=api_delay
+            max_delay=api_delay,
+            shared_cache_manager=cache_manager,
+            shared_http_client=http_client
         )
 
         self.pvinstallations = pvinstallations

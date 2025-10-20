@@ -90,7 +90,16 @@ class SolarPrognose(BaseFetcher, ForecastSolarInterface):
         # Store rate limit manager reference for provider info
         self.rate_limit_manager = rate_limit_manager
 
-        self.pvinstallations = pvinstallations
+        # Convert list format to dict format if needed
+        if isinstance(pvinstallations, list):
+            # Convert from list of dicts to dict keyed by 'name'
+            # Keep all the other fields in the dict
+            self.pvinstallations = {
+                install.pop('name'): install for install in 
+                [dict(inst) for inst in pvinstallations]  # Create copies to avoid modifying originals
+            }
+        else:
+            self.pvinstallations = pvinstallations
         self.results = {}
 
         self.base_url = "https://www.solarprognose.de/web/solarprediction/api/v1"

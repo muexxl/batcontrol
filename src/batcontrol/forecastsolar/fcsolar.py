@@ -59,7 +59,16 @@ class FCSolar(BaseFetcher, ForecastSolarInterface):
         # Store rate limit manager reference for provider info
         self.rate_limit_manager = rate_limit_manager
 
-        self.pvinstallations = pvinstallations
+        # Convert list format to dict format if needed
+        if isinstance(pvinstallations, list):
+            # Convert from list of dicts to dict keyed by 'name'
+            # Keep all the other fields in the dict
+            self.pvinstallations = {
+                install.pop('name'): install for install in 
+                [dict(inst) for inst in pvinstallations]  # Create copies to avoid modifying originals
+            }
+        else:
+            self.pvinstallations = pvinstallations
         self.results = {}
 
         self.base_url = "https://api.forecast.solar"
@@ -67,6 +76,7 @@ class FCSolar(BaseFetcher, ForecastSolarInterface):
         # Legacy compatibility
         self.seconds_between_updates = self.refresh_interval
 
+        logger.debug("FCSolar pvinstallations: %s", self.pvinstallations)
         logger.info("FCSolar provider initialized with shared infrastructure "
                    "(refresh_interval: %ss, cache_ttl: %ss)",
                    self.refresh_interval, self.cache_ttl)
@@ -218,7 +228,9 @@ class FCSolar(BaseFetcher, ForecastSolarInterface):
         kwp = unit.get('kWp', unit.get('kwp'))
 
         # Validate required parameters
-        if not all([lat, lon, dec, az, kwp]):
+        logger.debug("Building URL for %s: lat=%s, lon=%s, dec=%s, az=%s, kwp=%s, unit=%s", 
+                    name, lat, lon, dec, az, kwp, unit)
+        if not all([lat is not None, lon is not None, dec is not None, az is not None, kwp is not None]):
             raise ValueError(f"Missing required parameters for installation {name}")
 
         # Handle optional API key

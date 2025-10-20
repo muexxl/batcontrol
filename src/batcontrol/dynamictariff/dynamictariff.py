@@ -116,9 +116,8 @@ class DynamicTariff:
                 country,
                 min_time_between_api_calls,
                 delay_evaluation_by_seconds,
-                cache_manager=cache_manager,
-                http_client=http_client,
-                rate_limit_manager=rate_limit_manager
+                shared_cache_manager=cache_manager,
+                shared_http_client=http_client
             )
 
             selected_tariff.set_price_parameters(vat, fees, markup)
@@ -137,9 +136,8 @@ class DynamicTariff:
                 token,
                 min_time_between_api_calls,
                 delay_evaluation_by_seconds,
-                cache_manager=cache_manager,
-                http_client=http_client,
-                rate_limit_manager=rate_limit_manager
+                shared_cache_manager=cache_manager,
+                shared_http_client=http_client
             )
 
         elif provider.lower() == 'evcc':
@@ -155,9 +153,8 @@ class DynamicTariff:
                 config.get('url'),
                 min_time_between_api_calls,
                 delay_evaluation_by_seconds,
-                cache_manager=cache_manager,
-                http_client=http_client,
-                rate_limit_manager=rate_limit_manager
+                shared_cache_manager=cache_manager,
+                shared_http_client=http_client
             )
         else:
             raise RuntimeError(f'[DynamicTariff] Unknown provider {provider}')
