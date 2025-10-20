@@ -1,10 +1,11 @@
 """
 Test module for EvccSolar forecast provider
 """
-import pytest
 import datetime
+
+import pytest
 import pytz
-from unittest.mock import MagicMock, patch
+
 from batcontrol.forecastsolar.evcc_solar import EvccSolar
 
 

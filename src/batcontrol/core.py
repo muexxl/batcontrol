@@ -35,7 +35,7 @@ from .forecastsolar import ForecastSolar as solar_factory
 from .forecastconsumption import Consumption as consumption_factory
 from .provider_manager import get_provider_manager
 from .fetching.constants import (
-    LOCAL_REFRESH_INTERVAL, 
+    LOCAL_REFRESH_INTERVAL,
     DEFAULT_MAX_DELAY,
     PARALLEL_FETCH_TIMEOUT
 )
@@ -64,17 +64,17 @@ class Batcontrol:
         """Initialize Batcontrol with configuration."""
         # Initialize core attributes
         self._initialize_core_attributes()
-        
+
         # Store config and setup timezone
         self.config = configdict
         self._setup_timezone(configdict)
-        
+
         # Initialize provider manager and providers
         self._initialize_providers(configdict)
-        
+
         # Initialize battery control settings
         self._initialize_battery_control(configdict)
-        
+
         # Setup external APIs (MQTT, EVCC)
         self._setup_external_apis(configdict)
 
@@ -139,7 +139,7 @@ class Batcontrol:
         # Initialize provider manager for shared infrastructure
         self.provider_manager = get_provider_manager()
         logger.info("Using refactored providers with shared infrastructure")
-        
+
         # Check if parallel fetching should be used
         self.use_parallel_fetching = config.get('use_parallel_fetching', True)  # Default to True
         if self.use_parallel_fetching:
@@ -226,7 +226,7 @@ class Batcontrol:
         logger.info('MQTT Connection enabled')
         self.mqtt_api = MqttApi(config.get('mqtt'))
         self.mqtt_api.wait_ready()
-        
+
         # Register for callbacks
         self.mqtt_api.register_set_callback('mode', self.api_set_mode, int)
         self.mqtt_api.register_set_callback('charge_rate', self.api_set_charge_rate, int)
@@ -275,23 +275,23 @@ class Batcontrol:
         try:
             # Register providers for background fetching
             self.provider_manager.register_background_fetcher(
-                "tariff", 
+                "tariff",
                 lambda: self.dynamic_tariff.get_prices(),
                 interval_seconds=LOCAL_REFRESH_INTERVAL,  # Use seconds directly
                 provider_instance=self.dynamic_tariff
             )
-            
+
             self.provider_manager.register_background_fetcher(
                 "solar",
-                lambda: self.fc_solar.get_forecast(), 
+                lambda: self.fc_solar.get_forecast(),
                 interval_seconds=LOCAL_REFRESH_INTERVAL,  # Use seconds directly
                 provider_instance=self.fc_solar
             )
-            
+
             # Start the background fetching
             self.provider_manager.start_background_fetching()
             logger.info("Background fetching started for tariff and solar providers")
-            
+
         except Exception as e:
             logger.error(f"Failed to setup background fetching: {e}")
             # Fallback to synchronous fetching
@@ -301,25 +301,25 @@ class Batcontrol:
     def shutdown(self):
         """ Shutdown Batcontrol and dependend modules (inverter..) """
         logger.info('Shutting down Batcontrol')
-        
+
         # Stop background fetching first
         if hasattr(self, 'use_background_fetching') and self.use_background_fetching:
             self.provider_manager.stop_background_fetching()
             logger.info('Background fetching stopped')
-        
+
         try:
             self.inverter.shutdown()
             del self.inverter
             if self.evcc_api is not None:
                 self.evcc_api.shutdown()
                 del self.evcc_api
-            
+
             # Shutdown provider manager if using refactored providers
             if self.provider_manager is not None:
                 logger.debug("Shutting down provider manager")
                 self.provider_manager.shutdown()
                 self.provider_manager = None
-                
+
         except Exception as e:
             logger.warning(f"Error during shutdown: {e}")
 
@@ -354,23 +354,23 @@ class Batcontrol:
         """ Main calculation & control loop """
         # Reset some values and validate constraints
         self._prepare_run()
-        
+
         try:
             # Get forecasts from providers
             price_dict, production_forecast, consumption_forecast, fc_period = self._fetch_all_forecasts()
-            
+
             # Process and prepare data for calculation
             production, consumption, net_consumption, prices = self._prepare_forecast_data(
                 price_dict, production_forecast, consumption_forecast, fc_period
             )
-            
+
             # Skip control logic if API overwrite is active
             if self._handle_api_overwrite():
                 return
-                
+
             # Run calculation and control logic
             self._execute_control_logic(production, consumption, prices)
-            
+
         except Exception as e:
             logger.warning('Exception occurred during run: %s', e, exc_info=True)
             self.handle_forecast_error()
@@ -414,69 +414,69 @@ class Batcontrol:
         """Fetch forecasts using asynchronous background fetching."""
         logger.debug("Using asynchronous background-fetched data")
         fetch_start_time = time.time()
-        
+
         # Get data asynchronously with cache-first strategy
         provider_calls = {
             'tariff': lambda: self.dynamic_tariff.get_prices(),
             'solar': lambda: self.fc_solar.get_forecast()
         }
-        
+
         fetch_results = self.provider_manager.get_provider_data_async(
             provider_calls,
             use_cache_first=True
             # Remove max_cache_age_minutes - let background fetching and TTL handle freshness
         )
-        
+
         fetch_duration = time.time() - fetch_start_time
         logger.info(f"Asynchronous data access completed in {fetch_duration:.3f}s")
-        
+
         # Extract results and handle errors
         if isinstance(fetch_results.get('tariff'), Exception):
             raise fetch_results['tariff']
         if isinstance(fetch_results.get('solar'), Exception):
             raise fetch_results['solar']
-        
+
         price_dict = fetch_results['tariff']
         production_forecast = fetch_results['solar']
-        
+
         return self._complete_forecast_fetch(price_dict, production_forecast)
 
     def _fetch_forecasts_parallel(self):
         """Fetch forecasts using parallel fetching."""
         logger.debug("Starting parallel provider fetch")
         fetch_start_time = time.time()
-        
+
         # Define provider calls for parallel execution
         provider_calls = {
             'prices': lambda: self.dynamic_tariff.get_prices(),
             'production': lambda: self.fc_solar.get_forecast()
         }
-        
+
         # Execute parallel fetch with timeout
         fetch_results = self.provider_manager.fetch_parallel(
-            provider_calls, 
+            provider_calls,
             timeout=PARALLEL_FETCH_TIMEOUT,  # Use centralized timeout constant
             fail_fast=False  # Don't fail on single provider error
         )
-        
+
         fetch_duration = time.time() - fetch_start_time
         logger.info(f"Parallel fetch completed in {fetch_duration:.2f}s")
-        
+
         # Extract results and handle errors
         if isinstance(fetch_results.get('prices'), Exception):
             raise fetch_results['prices']
         if isinstance(fetch_results.get('production'), Exception):
             raise fetch_results['production']
-        
+
         price_dict = fetch_results['prices']
         production_forecast = fetch_results['production']
-        
+
         # Log cache statistics for monitoring
         cache_stats = self.provider_manager.get_cache_manager().get_stats()
         logger.debug(f"Cache statistics: hits={cache_stats.get('hits', 0)}, "
                    f"misses={cache_stats.get('misses', 0)}, "
                    f"hit_rate={cache_stats.get('hit_rate', 0.0):.2%}")
-        
+
         return self._complete_forecast_fetch(price_dict, production_forecast)
 
     def _fetch_forecasts_sequential(self):
@@ -484,7 +484,7 @@ class Batcontrol:
         logger.debug("Starting sequential provider fetch")
         price_dict = self.dynamic_tariff.get_prices()
         production_forecast = self.fc_solar.get_forecast()
-        
+
         return self._complete_forecast_fetch(price_dict, production_forecast)
 
     def _complete_forecast_fetch(self, price_dict, production_forecast):
@@ -492,7 +492,7 @@ class Batcontrol:
         # harmonize forecast horizon
         fc_period = min(max(price_dict.keys()), max(production_forecast.keys()))
         consumption_forecast = self.fc_consumption.get_forecast(fc_period+1)
-        
+
         self.reset_forecast_error()
         return price_dict, production_forecast, consumption_forecast, fc_period
 
@@ -561,7 +561,7 @@ class Batcontrol:
 
         self.last_logic_instance = this_logic_run
         this_logic_run.set_calculation_parameters(calc_parameters)
-        
+
         # Calculate inverter mode
         logger.debug('Calculating inverter mode...')
         if not this_logic_run.calculate(calc_input):
@@ -579,7 +579,7 @@ class Batcontrol:
                 calc_output.min_dynamic_price_difference)
 
         # Apply discharge blocking if needed
-        if (self.discharge_blocked and 
+        if (self.discharge_blocked and
             not self.general_logic.is_discharge_always_allowed_soc(self.get_SOC())):
             logger.debug('Discharge blocked due to external lock')
             inverter_settings.allow_discharge = False
@@ -884,22 +884,22 @@ class Batcontrol:
     def get_provider_stats(self) -> dict:
         """
         Get comprehensive provider statistics for monitoring.
-        
+
         Returns:
             dict: Provider statistics including cache, rate limits, threading
         """
         return self.provider_manager.get_global_stats()
-    
+
     def clear_provider_caches(self):
         """Clear all provider caches via API call."""
         self.provider_manager.clear_all_caches()
         logger.info("API: Cleared all provider caches")
-    
+
     def reset_provider_rate_limits(self):
         """Reset all provider rate limits via API call."""
         self.provider_manager.reset_rate_limits()
         logger.info("API: Reset all provider rate limits")
-    
+
     def get_provider_health(self) -> dict:
         """Get provider infrastructure health status."""
         return self.provider_manager.health_check()

@@ -46,7 +46,7 @@ RATE_LIMIT_STATUS_CODES = [429, 503]
 RATE_LIMIT_HEADERS = [
     'X-Ratelimit-Retry-At',
     'Retry-After',
-    'X-RateLimit-Reset', 
+    'X-RateLimit-Reset',
     'RateLimit-Reset',
     'X-Rate-Limit-Reset'
 ]
