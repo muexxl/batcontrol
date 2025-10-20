@@ -141,7 +141,9 @@ class EvccSolar(BaseFetcher, ForecastSolarInterface):
                 
                 # Only include future hours (relative_hour >= 0)
                 if relative_hour >= 0:
-                    power_value = float(rate.get('price', 0))  # 'price' contains power values in evcc solar API
+                    # Get power value, treating None as 0
+                    price_raw = rate.get('price', 0)
+                    power_value = float(price_raw) if price_raw is not None else 0.0
                     
                     # Accumulate values for this hour
                     if relative_hour in hourly_values:
