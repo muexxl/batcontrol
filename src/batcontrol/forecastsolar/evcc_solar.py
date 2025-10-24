@@ -134,7 +134,13 @@ class EvccSolar(BaseFetcher, ForecastSolarInterface):
         current_hour = now.replace(minute=0, second=0, microsecond=0)
 
         # Process rates from evcc API
-        rates = raw_data.get('result', {}).get('rates', [])
+        rates = raw_data.get('rates', [])
+
+        logger.debug('[EvccSolar] Processing %d rate entries', len(rates))
+
+        if not rates:
+            logger.warning('[EvccSolar] No rates found in evcc API response')
+            raise RuntimeWarning('No rates from evcc Solar API')
 
         for rate in rates:
             try:
@@ -174,6 +180,11 @@ class EvccSolar(BaseFetcher, ForecastSolarInterface):
             avg_power = value / hourly_counts[hour]
             # Round to 1 decimal place for consistency
             forecast[hour] = round(avg_power, 1)
+
+        # Check if we got any valid forecast data
+        if not forecast:
+            logger.warning('[EvccSolar] No valid forecast data after processing rates')
+            raise RuntimeWarning('No valid forecast data from evcc Solar API')
 
         # Fill in missing hours with 0 values up to the maximum hour
         if forecast:

@@ -489,6 +489,15 @@ class Batcontrol:
 
     def _complete_forecast_fetch(self, price_dict, production_forecast):
         """Complete the forecast fetch by getting consumption forecast."""
+        # Check if we have valid data
+        if not price_dict:
+            logger.error("Price dictionary is empty - tariff provider returned no data")
+            raise RuntimeError("No price data available from tariff provider")
+
+        if not production_forecast:
+            logger.error("Production forecast is empty - solar provider returned no data")
+            raise RuntimeError("No production forecast available from solar provider")
+
         # harmonize forecast horizon
         fc_period = min(max(price_dict.keys()), max(production_forecast.keys()))
         consumption_forecast = self.fc_consumption.get_forecast(fc_period+1)
