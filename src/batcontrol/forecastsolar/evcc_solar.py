@@ -158,7 +158,7 @@ class EvccSolar(BaseFetcher, ForecastSolarInterface):
                 # Only include future hours (relative_hour >= 0)
                 if relative_hour >= 0:
                     # Get power value, treating None as 0
-                    price_raw = rate.get('price', 0)
+                    price_raw = rate.get('value', 0)
                     power_value = float(price_raw) if price_raw is not None else 0.0
 
                     # Accumulate values for this hour

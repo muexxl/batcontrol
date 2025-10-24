@@ -50,17 +50,17 @@ class TestEvccSolar:
                     {
                         'start': (datetime.datetime.now(tz=timezone) + 
                                  datetime.timedelta(hours=1)).isoformat(),
-                        'price': 508.2049876543
+                        'value': 508.2049876543
                     },
                     {
                         'start': (datetime.datetime.now(tz=timezone) + 
                                  datetime.timedelta(hours=2)).isoformat(),
-                        'price': 266.8012345678
+                        'value': 266.8012345678
                     },
                     {
                         'start': (datetime.datetime.now(tz=timezone) + 
                                  datetime.timedelta(hours=3)).isoformat(),
-                        'price': 98.19999999999
+                        'value': 98.19999999999
                     }
                 ]
             }
@@ -79,12 +79,12 @@ class TestEvccSolar:
                     {
                         'start': (datetime.datetime.now(tz=timezone) + 
                                  datetime.timedelta(hours=1)).isoformat(),
-                        'price': 0.0000000001
+                        'value': 0.0000000001
                     },
                     {
                         'start': (datetime.datetime.now(tz=timezone) + 
                                  datetime.timedelta(hours=2)).isoformat(),
-                        'price': 0
+                        'value': 0
                     }
                 ]
             }
@@ -102,12 +102,12 @@ class TestEvccSolar:
                     {
                         'start': (datetime.datetime.now(tz=timezone) + 
                                  datetime.timedelta(hours=1)).isoformat(),
-                        'price': 100.5555
+                        'value': 100.5555
                     },
                     {
                         'start': (datetime.datetime.now(tz=timezone) + 
                                  datetime.timedelta(hours=5)).isoformat(),
-                        'price': 200.7777
+                        'value': 200.7777
                     }
                 ]
             }
@@ -129,7 +129,7 @@ class TestEvccSolar:
                     {
                         'start': (datetime.datetime.now(tz=timezone) + 
                                  datetime.timedelta(hours=1)).isoformat(),
-                        'price': None
+                        'value': None
                     }
                 ]
             }
@@ -146,17 +146,17 @@ class TestEvccSolar:
                     {
                         'start': (datetime.datetime.now(tz=timezone) + 
                                  datetime.timedelta(hours=1)).isoformat(),
-                        'price': 5.0820e+02  # 508.20
+                        'value': 5.0820e+02  # 508.20
                     },
                     {
                         'start': (datetime.datetime.now(tz=timezone) + 
                                  datetime.timedelta(hours=2)).isoformat(),
-                        'price': 2.6680e+02  # 266.80
+                        'value': 2.6680e+02  # 266.80
                     },
                     {
                         'start': (datetime.datetime.now(tz=timezone) + 
                                  datetime.timedelta(hours=3)).isoformat(),
-                        'price': 5.0000e-01  # 0.5
+                        'value': 5.0000e-01  # 0.5
                     }
                 ]
             }
