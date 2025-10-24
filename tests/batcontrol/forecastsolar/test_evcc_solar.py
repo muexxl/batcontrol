@@ -46,7 +46,6 @@ class TestEvccSolar:
         """Test that forecast values are rounded to 1 decimal place"""
         # Mock raw data with high precision values
         raw_data = {
-            'result': {
                 'rates': [
                     {
                         'start': (datetime.datetime.now(tz=timezone) + 
@@ -65,7 +64,6 @@ class TestEvccSolar:
                     }
                 ]
             }
-        }
 
         forecast = evcc_solar_instance.process_raw_data(raw_data)
 
@@ -77,7 +75,6 @@ class TestEvccSolar:
     def test_zero_values_remain_zero(self, evcc_solar_instance, timezone):
         """Test that zero values remain zero after rounding"""
         raw_data = {
-            'result': {
                 'rates': [
                     {
                         'start': (datetime.datetime.now(tz=timezone) + 
@@ -91,7 +88,6 @@ class TestEvccSolar:
                     }
                 ]
             }
-        }
 
         forecast = evcc_solar_instance.process_raw_data(raw_data)
 
@@ -102,7 +98,6 @@ class TestEvccSolar:
     def test_missing_hours_filled_with_zero(self, evcc_solar_instance, timezone):
         """Test that missing hours are filled with 0"""
         raw_data = {
-            'result': {
                 'rates': [
                     {
                         'start': (datetime.datetime.now(tz=timezone) + 
@@ -116,7 +111,6 @@ class TestEvccSolar:
                     }
                 ]
             }
-        }
 
         forecast = evcc_solar_instance.process_raw_data(raw_data)
 
@@ -131,7 +125,6 @@ class TestEvccSolar:
     def test_none_values_treated_as_zero(self, evcc_solar_instance, timezone):
         """Test that None values are treated as zero"""
         raw_data = {
-            'result': {
                 'rates': [
                     {
                         'start': (datetime.datetime.now(tz=timezone) + 
@@ -140,7 +133,6 @@ class TestEvccSolar:
                     }
                 ]
             }
-        }
 
         forecast = evcc_solar_instance.process_raw_data(raw_data)
 
@@ -150,7 +142,6 @@ class TestEvccSolar:
     def test_rounding_with_scientific_notation_input(self, evcc_solar_instance, timezone):
         """Test rounding with values that would display in scientific notation"""
         raw_data = {
-            'result': {
                 'rates': [
                     {
                         'start': (datetime.datetime.now(tz=timezone) + 
@@ -169,7 +160,6 @@ class TestEvccSolar:
                     }
                 ]
             }
-        }
 
         forecast = evcc_solar_instance.process_raw_data(raw_data)
 
