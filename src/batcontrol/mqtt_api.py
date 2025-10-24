@@ -414,7 +414,7 @@ class MqttApi:
             self.base_topic + "/min_dynamic_price_difference")
         # configuration
         self.publish_mqtt_discovery_message("Charge Rate",
-            "batcontrol_charge_rate", "number", "power", "W", 
+            "batcontrol_charge_rate", "number", "power", "W",
             self.base_topic + "/charge_rate",
             self.base_topic + "/charge_rate/set",
             entity_category="config",
@@ -505,7 +505,7 @@ class MqttApi:
                     "{% endif %}"
         )
         self.publish_mqtt_discovery_message(
-            "Batcontrol mode", "batcontrol_mode", "select", None, None, 
+            "Batcontrol mode", "batcontrol_mode", "select", None, None,
             self.base_topic + "/mode",
             self.base_topic + "/mode/set", entity_category=None,
             options=["Charge from Grid", "Avoid Discharge", "Discharge Allowed"],

@@ -364,22 +364,23 @@ class DefaultLogic(LogicInterface):
 
         free_capacity = calc_input.free_capacity
 
-        if recharge_energy <= 0.0:
+        if recharge_energy <= 1:
             logger.debug(
                 "[Rule] No additional energy required, because stored energy is sufficient."
             )
             recharge_energy = 0.0
-
-        if recharge_energy > free_capacity:
-            recharge_energy = free_capacity
-            logger.debug(
-                "[Rule] Recharge limited by free capacity: %0.1f Wh", recharge_energy)
-
-        if not self.common.is_charging_above_minimum(recharge_energy):
-            recharge_energy = 0.0
         else:
-            # We are adding that minimum charge energy here, so that we are not stuck between limits.
-            recharge_energy = recharge_energy + self.common.min_charge_energy
+            if recharge_energy > free_capacity:
+                recharge_energy = free_capacity
+                logger.debug(
+                    "[Rule] Recharge limited by free capacity: %0.1f Wh", recharge_energy)
+
+            if not self.common.is_charging_above_minimum(recharge_energy):
+                recharge_energy = 0.0
+            else:
+                # We are adding that minimum charge energy here, so that we are not stuck
+                # between limits.
+                recharge_energy = recharge_energy + self.common.min_charge_energy
 
         self.calculation_output.required_recharge_energy = recharge_energy
         return recharge_energy
