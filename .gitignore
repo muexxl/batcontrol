@@ -6,8 +6,10 @@
 *.vscode*
 *venv*
 log
+logs/*
 test.py
-config/batcontrol_config.yaml.bck
+config/batcontrol_config.yaml.*
+config/batcontrol_config.yml.*
 run_infinite.sh
 
 # Byte-compiled / optimized / DLL files
@@ -178,3 +180,4 @@ cython_debug/
 bin
 lib64
 lib
+
