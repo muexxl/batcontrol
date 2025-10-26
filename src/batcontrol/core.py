@@ -124,6 +124,7 @@ class Batcontrol:
         self.fc_solar = solar_factory.create_solar_provider(
             self.pvsettings,
             self.timezone,
+            TIME_BETWEEN_UTILITY_API_CALLS,
             DELAY_EVALUATION_BY_SECONDS,
             requested_provider=config.get(
                 'solar_forecast_provider', 'fcsolarapi')

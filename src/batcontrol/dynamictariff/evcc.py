@@ -71,10 +71,10 @@ class Evcc(DynamicTariffBaseclass):
             If multiple prices are provided for the same hour (e.g., every 15 minutes),
             the hourly price is calculated as the average of all those entries.
         """
-        data=self.raw_data.get('rates', None)
+        data=self.get_raw_data().get('rates', None)
         if data is None:
             #prior to evcc 0.207.0 the rates were in the 'result' field
-            data=self.raw_data['result']['rates']
+            data=self.get_raw_data().get('result', {}).get('rates', None)
 
         now=datetime.datetime.now().astimezone(self.timezone)
         # Get the start of the current hour

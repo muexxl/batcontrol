@@ -10,17 +10,18 @@ class ForecastSolar:
     @staticmethod
     def create_solar_provider(config: dict,
                               timezone,
+                              min_time_between_api_calls,
                               api_delay=0,
                               requested_provider='fcsolarapi') -> ForecastSolarInterface:
         """ Select and configure a solar forecast provider based on the given configuration """
 
         provider = None
         if requested_provider.lower() == 'fcsolarapi':
-            provider = FCSolar(config, timezone, api_delay)
+            provider = FCSolar(config, timezone, min_time_between_api_calls, api_delay)
         elif requested_provider.lower() == 'solarprognose':
-            provider = SolarPrognose(config, timezone, api_delay)
+            provider = SolarPrognose(config, timezone, min_time_between_api_calls, api_delay)
         elif requested_provider.lower() == 'evcc-solar':
-            provider = EvccSolar(config, timezone, api_delay)
+            provider = EvccSolar(config, timezone, min_time_between_api_calls, api_delay)
         else:
             raise RuntimeError(f'[ForecastSolar] Unkown provider {requested_provider}')
         return provider

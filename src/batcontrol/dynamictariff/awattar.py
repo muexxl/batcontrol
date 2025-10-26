@@ -30,6 +30,8 @@ from .baseclass import DynamicTariffBaseclass
 class Awattar(DynamicTariffBaseclass):
     """ Implement Awattar API to get dynamic electricity prices
         Inherits from DynamicTariffBaseclass
+
+        # min_time_between_API_calls: Minimum time between API calls in seconds
     """
 
     def __init__(self, timezone ,country:str, min_time_between_API_calls=0, delay_evaluation_by_seconds=0):
@@ -51,6 +53,7 @@ class Awattar(DynamicTariffBaseclass):
         self.price_markup=price_markup
 
     def get_raw_data_from_provider(self):
+        """ Get raw data from Awattar API and return parsed json """
         try:
             response = requests.get(self.url, timeout=30)
             response.raise_for_status()
@@ -59,13 +62,13 @@ class Awattar(DynamicTariffBaseclass):
         except requests.exceptions.RequestException as e:
             raise ConnectionError(f'[Awattar] API request failed: {e}') from e
 
-
         raw_data = response.json()
         return raw_data
 
 
     def get_prices_from_raw_data(self):
-        data=self.raw_data['data']
+        raw_data = self.get_raw_data()
+        data=raw_data['data']
         now=datetime.datetime.now().astimezone(self.timezone)
         prices={}
         for item in data:
