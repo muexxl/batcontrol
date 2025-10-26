@@ -65,7 +65,12 @@ class FCSolar(ForecastSolarBaseclass):
     def get_raw_data_from_provider(self, pvinstallation_name) -> dict:
         """ Get raw data from Forecast Solar API """
 
-        unit = self.pvinstallations.get(pvinstallation_name, None)
+        unit = None
+        for installation in self.pvinstallations:
+            if installation['name'] == pvinstallation_name:
+                unit = installation
+                break
+
         if unit is None:
             raise RuntimeError(f'[FCSolar] PV Installation {pvinstallation_name} not found')
 
