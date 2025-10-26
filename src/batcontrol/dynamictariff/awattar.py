@@ -23,9 +23,12 @@ Methods:
         Processes the raw data to extract and calculate electricity prices.
 """
 import datetime
+import logging
 import math
 import requests
 from .baseclass import DynamicTariffBaseclass
+
+logger = logging.getLogger(__name__)
 
 class Awattar(DynamicTariffBaseclass):
     """ Implement Awattar API to get dynamic electricity prices
@@ -35,6 +38,7 @@ class Awattar(DynamicTariffBaseclass):
     """
 
     def __init__(self, timezone ,country:str, min_time_between_API_calls=0, delay_evaluation_by_seconds=0):
+        """ Initialize Awattar class with parameters """
         super().__init__(timezone,min_time_between_API_calls, delay_evaluation_by_seconds)
         country= country.lower()
         if country in ['at','de']:
@@ -54,6 +58,7 @@ class Awattar(DynamicTariffBaseclass):
 
     def get_raw_data_from_provider(self):
         """ Get raw data from Awattar API and return parsed json """
+        logger.debug('Requesting price forecast from Awattar API')
         try:
             response = requests.get(self.url, timeout=30)
             response.raise_for_status()

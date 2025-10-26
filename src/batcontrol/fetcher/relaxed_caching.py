@@ -77,7 +77,7 @@ class RelaxedCaching:
 
             # TTLCache automatically removes expired entries
             if self.entry_key not in self.cache_store:
-                logger.info(
+                logger.error(
                     'Cache miss: entry_key %s not found (expired or evicted)',
                     self.entry_key
                 )

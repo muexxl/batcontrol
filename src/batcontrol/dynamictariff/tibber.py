@@ -2,9 +2,12 @@
 """
 
 import datetime
+import logging
 import math
 import requests
 from .baseclass import DynamicTariffBaseclass
+
+logger = logging.getLogger(__name__)
 
 class Tibber(DynamicTariffBaseclass):
     """ Implement Tibber API to get dynamic electricity prices
@@ -17,6 +20,7 @@ class Tibber(DynamicTariffBaseclass):
 
     def get_raw_data_from_provider(self) -> dict:
         """ Get raw data from Tibber API """
+        logger.debug('Requesting price forecast from Tibber API')
         if not self.access_token:
             raise RuntimeError
         headers={"Authorization":"Bearer " + self.access_token,

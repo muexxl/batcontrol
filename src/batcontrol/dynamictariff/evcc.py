@@ -23,8 +23,11 @@ Methods:
 
 """
 import datetime
+import logging
 import requests
 from .baseclass import DynamicTariffBaseclass
+
+logger = logging.getLogger(__name__)
 
 class Evcc(DynamicTariffBaseclass):
     """ Implement evcc API to get dynamic electricity prices
@@ -36,6 +39,7 @@ class Evcc(DynamicTariffBaseclass):
         self.url=url
 
     def get_raw_data_from_provider(self) -> dict:  # pylint: disable=unused-private-member
+        logger.debug('Requesting price forecast from evcc API: %s', self.url)
         try:
             response = requests.get(self.url, timeout=30)
             response.raise_for_status()
