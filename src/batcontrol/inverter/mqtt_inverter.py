@@ -268,8 +268,8 @@ class MqttInverter(InverterBaseclass):
         """
         if self.mqtt_client:
             status_topic = f'{self.inverter_topic}/status/#'
-            self.mqtt_client.subscribe(status_topic)
             self.mqtt_client.message_callback_add(f'{self.inverter_topic}/status/#', self._on_message)
+            self.mqtt_client.subscribe(status_topic)
             logger.info('Subscribed to %s', status_topic)
 
     def _on_message(self, client, userdata, message):  # pylint: disable=unused-argument
