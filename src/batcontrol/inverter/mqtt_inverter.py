@@ -14,13 +14,7 @@ Status Topics (Inverter -> batcontrol):
 ---------------------------------------
 These topics MUST be published as RETAINED by the external inverter/bridge
 system:
-- <base_topic>/status/soc                  - State of Charge in %
-                                             (float, 0-100)
 - <base_topic>/status/capacity             - Battery capacity in Wh (float)
-- <base_topic>/status/mode                 - Current mode (string:
-                                             'force_charge',
-                                             'allow_discharge',
-                                             'avoid_discharge')
 
 Optional status topics (also RETAINED):
 - <base_topic>/status/min_soc              - Minimum SoC limit in %
@@ -29,6 +23,10 @@ Optional status topics (also RETAINED):
                                              (float, 0-100)
 - <base_topic>/status/max_charge_rate      - Maximum charge rate in W
                                              (float)
+Update these topics at least every 2 minutes to ensure batcontrol has fresh data:
+
+- <base_topic>/status/soc                  - State of Charge in %
+                                             (float, 0-100)
 
 Command Topics (batcontrol -> Inverter):
 ----------------------------------------
@@ -59,8 +57,8 @@ inverter:
   mqtt_password: secret
   base_topic: inverter
   capacity: 10000              # Battery capacity in Wh (required)
-  min_soc: 10                  # Minimum SoC % (default: 10)
-  max_soc: 95                  # Maximum SoC % (default: 95)
+  min_soc: 5                   # Minimum SoC % (default: 5)
+  max_soc: 100                 # Maximum SoC % (default: 100)
   max_grid_charge_rate: 5000   # Maximum charge rate in W (required)
 ```
 
@@ -70,15 +68,16 @@ EXTERNAL BRIDGE/INVERTER REQUIREMENTS
 Your external system (inverter, bridge script, etc.) must:
 
 1. Publish battery status as RETAINED messages:
-   - Current SoC percentage
    - Battery capacity in Wh
    - Current operating mode
 
-2. Subscribe to command topics (non-retained):
+2. Current soc as normal message (non-retained) to allow timely updates
+
+3. Subscribe to command topics (non-retained):
    - Mode changes (force_charge, allow_discharge, avoid_discharge)
    - Charge rate adjustments
 
-3. Handle reconnection gracefully:
+4. Handle reconnection gracefully:
    - Re-publish all status topics as RETAINED on reconnect
    - Don't retain command topics to avoid stale command execution
 
@@ -93,11 +92,10 @@ client.username_pw_set("batcontrol", "secret")
 client.connect("192.168.1.100", 1883, 60)
 
 # Publish initial state (RETAINED)
-client.publish("inverter/status/soc", "65.5", retain=True)
+client.publish("inverter/status/soc", "65.5")
 client.publish("inverter/status/capacity", "10000", retain=True)
-client.publish("inverter/status/mode", "allow_discharge", retain=True)
-client.publish("inverter/status/min_soc", "10", retain=True)
-client.publish("inverter/status/max_soc", "95", retain=True)
+client.publish("inverter/status/min_soc", "5", retain=True)
+client.publish("inverter/status/max_soc", "100", retain=True)
 client.publish("inverter/status/max_charge_rate", "5000", retain=True)
 
 # Subscribe to commands
@@ -150,6 +148,8 @@ TROUBLESHOOTING
 """
 
 import logging
+import time
+from cachetools import TTLCache
 import paho.mqtt.client as mqtt
 from .baseclass import InverterBaseclass
 
@@ -177,9 +177,10 @@ class MqttInverter(InverterBaseclass):
                 - mqtt_password: MQTT password (optional)
                 - base_topic: Base topic for all MQTT communication (required)
                 - capacity: Battery capacity in Wh (required)
-                - min_soc: Minimum SoC in % (default: 10)
+                - min_soc: Minimum SoC in % (default: 5)
                 - max_soc: Maximum SoC in % (default: 95)
                 - max_grid_charge_rate: Maximum charge rate in W (required)
+                - cache_ttl: optional TTL for cached values in seconds (default: 120)
         """
         super().__init__(config)
 
@@ -189,16 +190,26 @@ class MqttInverter(InverterBaseclass):
         self.mqtt_user = config.get('mqtt_user', None)
         self.mqtt_password = config.get('mqtt_password', None)
         self.base_topic = config['base_topic']
+        self.cache_ttl = config.get('cache_ttl', 120)
 
         # Battery parameters (from config or defaults)
-        self.capacity = config.get('capacity', None)
-        self.min_soc = config.get('min_soc', 10)
-        self.max_soc = config.get('max_soc', 95)
-        self.max_grid_charge_rate = config.get('max_grid_charge_rate', None)
+        self.min_soc = config.get('min_soc', 5)
+        self.max_soc = config.get('max_soc', 100)
+
+        # These values should be set in the config, if not throw ValueError
+        if 'capacity' not in config:
+            raise ValueError('Battery capacity must be specified in config')
+        if 'max_grid_charge_rate' not in config:
+            raise ValueError('Max grid charge rate must be specified in config')
+
+        self.capacity = config.get('capacity')
+        self.max_grid_charge_rate = config.get('max_grid_charge_rate')
 
         # Cached state from MQTT
-        self.soc_value = None  # Current state of charge
-        self.mode = 'allow_discharge'  # Current operating mode
+        self.soc_value = TTLCache(maxsize=2, ttl=config.get('cache_ttl', 120))
+        # use timestamp as key to store latest soc value
+        self.soc_key = None
+        self.charge_rate = 0  # Current charge rate in W
 
         # MQTT client setup
         self.mqtt_client = mqtt.Client()
@@ -248,17 +259,14 @@ class MqttInverter(InverterBaseclass):
         try:
             # Parse topic
             if topic == f'{self.base_topic}/status/soc':
-                self.soc_value = float(payload)
+                new_soc_key = time.time()
+                self.soc_value[new_soc_key] = float(payload)
+                self.soc_key = new_soc_key
                 logger.debug('Updated SOC: %s%%', self.soc_value)
 
             elif topic == f'{self.base_topic}/status/capacity':
                 self.capacity = float(payload)
                 logger.debug('Updated capacity: %s Wh', self.capacity)
-
-            elif topic == f'{self.base_topic}/status/mode':
-                self.mode = payload
-                logger.debug('Updated mode: %s', self.mode)
-
             elif topic == f'{self.base_topic}/status/min_soc':
                 self.min_soc = float(payload)
                 logger.debug('Updated min_soc: %s%%', self.min_soc)
@@ -302,6 +310,7 @@ class MqttInverter(InverterBaseclass):
             qos=1,
             retain=False
         )
+        self.charge_rate = chargerate
 
     def set_mode_allow_discharge(self):
         """
@@ -353,10 +362,17 @@ class MqttInverter(InverterBaseclass):
         Returns:
             float: State of charge in percentage (0-100)
         """
-        if self.soc_value is None:
-            logger.warning('SOC not yet received from MQTT, returning 0')
-            return 0.0
-        return self.soc_value
+
+        soc_value = None
+        while soc_value is None:
+            if self.soc_key and self.soc_key in self.soc_value:
+                soc_value = self.soc_value[self.soc_key]
+                logger.debug('Current SOC value: %s', soc_value)
+            else:
+                logger.warning('No SOC data available from MQTT, waiting...')
+                time.sleep(1)  # Wait before retrying
+
+        return soc_value
 
     def activate_mqtt(self, api_mqtt_api):
         """

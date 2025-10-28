@@ -70,8 +70,8 @@ class TestMqttInverter:
         mock_client_instance.username_pw_set.assert_not_called()
 
         # Should use defaults for min/max soc
-        assert inverter.min_soc == 10
-        assert inverter.max_soc == 95
+        assert inverter.min_soc == 5
+        assert inverter.max_soc == 100
 
     @patch('batcontrol.inverter.mqtt_inverter.mqtt.Client')
     def test_mqtt_on_connect_subscribes_to_topics(self, mock_mqtt_client):
@@ -341,24 +341,6 @@ class TestMqttInverter:
             retain=False
         )
 
-    @patch('batcontrol.inverter.mqtt_inverter.mqtt.Client')
-    def test_get_soc_returns_zero_when_not_set(self, mock_mqtt_client):
-        """Test that get_SOC returns 0 when SOC hasn't been received yet"""
-        mock_client_instance = MagicMock()
-        mock_mqtt_client.return_value = mock_client_instance
-
-        config = {
-            'mqtt_broker': '192.168.1.100',
-            'mqtt_port': 1883,
-            'base_topic': 'inverter',
-            'capacity': 10000,
-            'max_grid_charge_rate': 5000
-        }
-
-        inverter = MqttInverter(config)
-
-        # SOC should be None initially and return 0
-        assert inverter.get_SOC() == 0.0
 
     @patch('batcontrol.inverter.mqtt_inverter.mqtt.Client')
     def test_shutdown_stops_mqtt_client(self, mock_mqtt_client):
@@ -433,8 +415,12 @@ class TestMqttInverter:
         # Should not crash
         inverter._on_message(mock_client_instance, None, mock_message)
 
-        # SOC should still be None/0
-        assert inverter.get_SOC() == 0.0
+        if inverter.soc_key and inverter.soc_key in inverter.soc_value:
+            soc_value = inverter.soc_value[inverter.soc_key]
+        else:
+            soc_value = None
+        # SOC should still be None
+        assert soc_value is None
 
     @patch('batcontrol.inverter.mqtt_inverter.mqtt.Client')
     def test_inherited_energy_calculations_work(self, mock_mqtt_client):

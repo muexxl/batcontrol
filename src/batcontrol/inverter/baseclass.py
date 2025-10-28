@@ -70,7 +70,6 @@ class InverterBaseclass(InverterInterface):
     def refresh_api_values(self):
         if self.mqtt_api:
             self.mqtt_api.generic_publish(self.__get_mqtt_topic() + 'SOC', self.get_SOC())
-            self.mqtt_api.generic_publish(self.__get_mqtt_topic() + 'mode', self.mode)
             self.mqtt_api.generic_publish(self.__get_mqtt_topic() + 'stored_energy', self.get_stored_energy())
             self.mqtt_api.generic_publish(self.__get_mqtt_topic() + 'stored_usable_energy', self.get_stored_usable_energy())
             self.mqtt_api.generic_publish(self.__get_mqtt_topic() + 'free_capacity', self.get_free_capacity())
