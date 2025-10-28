@@ -18,7 +18,7 @@ class TestMqttInverter:
         """Test that MQTT inverter initializes with correct configuration"""
         mock_client_instance = MagicMock()
         mock_mqtt_client.return_value = mock_client_instance
-        
+
         config = {
             'mqtt_broker': '192.168.1.100',
             'mqtt_port': 1883,
@@ -30,9 +30,9 @@ class TestMqttInverter:
             'max_soc': 95,
             'max_grid_charge_rate': 5000
         }
-        
+
         inverter = MqttInverter(config)
-        
+
         # Check configuration
         assert inverter.mqtt_broker == '192.168.1.100'
         assert inverter.mqtt_port == 1883
@@ -44,7 +44,7 @@ class TestMqttInverter:
         assert inverter.max_soc == 95
         assert inverter.max_grid_charge_rate == 5000
         assert inverter.mode == 'allow_discharge'
-        
+
         # Verify MQTT client setup
         mock_client_instance.username_pw_set.assert_called_once_with('testuser', 'testpass')
         mock_client_instance.connect.assert_called_once_with('192.168.1.100', 1883, 60)
@@ -55,7 +55,7 @@ class TestMqttInverter:
         """Test MQTT inverter initialization without username/password"""
         mock_client_instance = MagicMock()
         mock_mqtt_client.return_value = mock_client_instance
-        
+
         config = {
             'mqtt_broker': '192.168.1.100',
             'mqtt_port': 1883,
@@ -63,12 +63,12 @@ class TestMqttInverter:
             'capacity': 10000,
             'max_grid_charge_rate': 5000
         }
-        
+
         inverter = MqttInverter(config)
-        
+
         # Verify no auth was set
         mock_client_instance.username_pw_set.assert_not_called()
-        
+
         # Should use defaults for min/max soc
         assert inverter.min_soc == 10
         assert inverter.max_soc == 95
@@ -78,7 +78,7 @@ class TestMqttInverter:
         """Test that on_connect subscribes to status topics"""
         mock_client_instance = MagicMock()
         mock_mqtt_client.return_value = mock_client_instance
-        
+
         config = {
             'mqtt_broker': '192.168.1.100',
             'mqtt_port': 1883,
@@ -86,12 +86,12 @@ class TestMqttInverter:
             'capacity': 10000,
             'max_grid_charge_rate': 5000
         }
-        
+
         inverter = MqttInverter(config)
-        
+
         # Simulate connection callback
         inverter._on_connect(mock_client_instance, None, None, 0)
-        
+
         # Verify subscription
         mock_client_instance.subscribe.assert_called_once_with('test/inverter/status/#')
 
@@ -100,7 +100,7 @@ class TestMqttInverter:
         """Test that incoming SOC messages update the cached value"""
         mock_client_instance = MagicMock()
         mock_mqtt_client.return_value = mock_client_instance
-        
+
         config = {
             'mqtt_broker': '192.168.1.100',
             'mqtt_port': 1883,
@@ -108,17 +108,17 @@ class TestMqttInverter:
             'capacity': 10000,
             'max_grid_charge_rate': 5000
         }
-        
+
         inverter = MqttInverter(config)
-        
+
         # Create mock message for SOC
         mock_message = Mock()
         mock_message.topic = 'inverter/status/soc'
         mock_message.payload = b'75.5'
-        
+
         # Process message
         inverter._on_message(mock_client_instance, None, mock_message)
-        
+
         # Verify SOC was updated
         assert inverter.get_SOC() == 75.5
 
@@ -127,7 +127,7 @@ class TestMqttInverter:
         """Test that incoming capacity messages update the cached value"""
         mock_client_instance = MagicMock()
         mock_mqtt_client.return_value = mock_client_instance
-        
+
         config = {
             'mqtt_broker': '192.168.1.100',
             'mqtt_port': 1883,
@@ -135,17 +135,17 @@ class TestMqttInverter:
             'capacity': 10000,
             'max_grid_charge_rate': 5000
         }
-        
+
         inverter = MqttInverter(config)
-        
+
         # Create mock message for capacity
         mock_message = Mock()
         mock_message.topic = 'inverter/status/capacity'
         mock_message.payload = b'12000'
-        
+
         # Process message
         inverter._on_message(mock_client_instance, None, mock_message)
-        
+
         # Verify capacity was updated
         assert inverter.get_capacity() == 12000
 
@@ -154,7 +154,7 @@ class TestMqttInverter:
         """Test that incoming mode messages update the cached value"""
         mock_client_instance = MagicMock()
         mock_mqtt_client.return_value = mock_client_instance
-        
+
         config = {
             'mqtt_broker': '192.168.1.100',
             'mqtt_port': 1883,
@@ -162,17 +162,17 @@ class TestMqttInverter:
             'capacity': 10000,
             'max_grid_charge_rate': 5000
         }
-        
+
         inverter = MqttInverter(config)
-        
+
         # Create mock message for mode
         mock_message = Mock()
         mock_message.topic = 'inverter/status/mode'
         mock_message.payload = b'force_charge'
-        
+
         # Process message
         inverter._on_message(mock_client_instance, None, mock_message)
-        
+
         # Verify mode was updated
         assert inverter.mode == 'force_charge'
 
@@ -181,7 +181,7 @@ class TestMqttInverter:
         """Test that incoming min_soc messages update the cached value"""
         mock_client_instance = MagicMock()
         mock_mqtt_client.return_value = mock_client_instance
-        
+
         config = {
             'mqtt_broker': '192.168.1.100',
             'mqtt_port': 1883,
@@ -189,17 +189,17 @@ class TestMqttInverter:
             'capacity': 10000,
             'max_grid_charge_rate': 5000
         }
-        
+
         inverter = MqttInverter(config)
-        
+
         # Create mock message for min_soc
         mock_message = Mock()
         mock_message.topic = 'inverter/status/min_soc'
         mock_message.payload = b'15'
-        
+
         # Process message
         inverter._on_message(mock_client_instance, None, mock_message)
-        
+
         # Verify min_soc was updated
         assert inverter.min_soc == 15
 
@@ -208,7 +208,7 @@ class TestMqttInverter:
         """Test that incoming max_soc messages update the cached value"""
         mock_client_instance = MagicMock()
         mock_mqtt_client.return_value = mock_client_instance
-        
+
         config = {
             'mqtt_broker': '192.168.1.100',
             'mqtt_port': 1883,
@@ -216,17 +216,17 @@ class TestMqttInverter:
             'capacity': 10000,
             'max_grid_charge_rate': 5000
         }
-        
+
         inverter = MqttInverter(config)
-        
+
         # Create mock message for max_soc
         mock_message = Mock()
         mock_message.topic = 'inverter/status/max_soc'
         mock_message.payload = b'90'
-        
+
         # Process message
         inverter._on_message(mock_client_instance, None, mock_message)
-        
+
         # Verify max_soc was updated
         assert inverter.max_soc == 90
 
@@ -235,7 +235,7 @@ class TestMqttInverter:
         """Test that incoming max_charge_rate messages update the cached value"""
         mock_client_instance = MagicMock()
         mock_mqtt_client.return_value = mock_client_instance
-        
+
         config = {
             'mqtt_broker': '192.168.1.100',
             'mqtt_port': 1883,
@@ -243,17 +243,17 @@ class TestMqttInverter:
             'capacity': 10000,
             'max_grid_charge_rate': 5000
         }
-        
+
         inverter = MqttInverter(config)
-        
+
         # Create mock message for max_charge_rate
         mock_message = Mock()
         mock_message.topic = 'inverter/status/max_charge_rate'
         mock_message.payload = b'6000'
-        
+
         # Process message
         inverter._on_message(mock_client_instance, None, mock_message)
-        
+
         # Verify max_charge_rate was updated
         assert inverter.max_grid_charge_rate == 6000
 
@@ -262,7 +262,7 @@ class TestMqttInverter:
         """Test that force charge mode publishes correct MQTT commands"""
         mock_client_instance = MagicMock()
         mock_mqtt_client.return_value = mock_client_instance
-        
+
         config = {
             'mqtt_broker': '192.168.1.100',
             'mqtt_port': 1883,
@@ -270,19 +270,19 @@ class TestMqttInverter:
             'capacity': 10000,
             'max_grid_charge_rate': 5000
         }
-        
+
         inverter = MqttInverter(config)
-        
+
         # Set mode to force charge
         inverter.set_mode_force_charge(3000)
-        
+
         # Verify MQTT publish calls
         assert mock_client_instance.publish.call_count == 2
-        
+
         # Check mode command (QoS 1, not retained)
         mode_call = call('inverter/command/mode', 'force_charge', qos=1, retain=False)
         assert mode_call in mock_client_instance.publish.call_args_list
-        
+
         # Check charge rate command (QoS 1, not retained)
         rate_call = call('inverter/command/charge_rate', '3000', qos=1, retain=False)
         assert rate_call in mock_client_instance.publish.call_args_list
@@ -292,7 +292,7 @@ class TestMqttInverter:
         """Test that allow discharge mode publishes correct MQTT command"""
         mock_client_instance = MagicMock()
         mock_mqtt_client.return_value = mock_client_instance
-        
+
         config = {
             'mqtt_broker': '192.168.1.100',
             'mqtt_port': 1883,
@@ -300,12 +300,12 @@ class TestMqttInverter:
             'capacity': 10000,
             'max_grid_charge_rate': 5000
         }
-        
+
         inverter = MqttInverter(config)
-        
+
         # Set mode to allow discharge
         inverter.set_mode_allow_discharge()
-        
+
         # Verify MQTT publish call
         mock_client_instance.publish.assert_called_once_with(
             'inverter/command/mode',
@@ -319,7 +319,7 @@ class TestMqttInverter:
         """Test that avoid discharge mode publishes correct MQTT command"""
         mock_client_instance = MagicMock()
         mock_mqtt_client.return_value = mock_client_instance
-        
+
         config = {
             'mqtt_broker': '192.168.1.100',
             'mqtt_port': 1883,
@@ -327,12 +327,12 @@ class TestMqttInverter:
             'capacity': 10000,
             'max_grid_charge_rate': 5000
         }
-        
+
         inverter = MqttInverter(config)
-        
+
         # Set mode to avoid discharge
         inverter.set_mode_avoid_discharge()
-        
+
         # Verify MQTT publish call
         mock_client_instance.publish.assert_called_once_with(
             'inverter/command/mode',
@@ -346,7 +346,7 @@ class TestMqttInverter:
         """Test that get_SOC returns 0 when SOC hasn't been received yet"""
         mock_client_instance = MagicMock()
         mock_mqtt_client.return_value = mock_client_instance
-        
+
         config = {
             'mqtt_broker': '192.168.1.100',
             'mqtt_port': 1883,
@@ -354,9 +354,9 @@ class TestMqttInverter:
             'capacity': 10000,
             'max_grid_charge_rate': 5000
         }
-        
+
         inverter = MqttInverter(config)
-        
+
         # SOC should be None initially and return 0
         assert inverter.get_SOC() == 0.0
 
@@ -365,7 +365,7 @@ class TestMqttInverter:
         """Test that shutdown cleanly stops MQTT client"""
         mock_client_instance = MagicMock()
         mock_mqtt_client.return_value = mock_client_instance
-        
+
         config = {
             'mqtt_broker': '192.168.1.100',
             'mqtt_port': 1883,
@@ -373,12 +373,12 @@ class TestMqttInverter:
             'capacity': 10000,
             'max_grid_charge_rate': 5000
         }
-        
+
         inverter = MqttInverter(config)
-        
+
         # Shutdown
         inverter.shutdown()
-        
+
         # Verify MQTT cleanup
         mock_client_instance.loop_stop.assert_called_once()
         mock_client_instance.disconnect.assert_called_once()
@@ -388,7 +388,7 @@ class TestMqttInverter:
         """Test that the factory can create an MQTT inverter"""
         mock_client_instance = MagicMock()
         mock_mqtt_client.return_value = mock_client_instance
-        
+
         config = {
             'type': 'mqtt',
             'mqtt_broker': '192.168.1.100',
@@ -401,9 +401,9 @@ class TestMqttInverter:
             'max_soc': 90,
             'max_grid_charge_rate': 4000
         }
-        
+
         inverter = Inverter.create_inverter(config)
-        
+
         # Verify it's the right type
         assert isinstance(inverter, MqttInverter)
         assert inverter.mqtt_broker == '192.168.1.100'
@@ -414,7 +414,7 @@ class TestMqttInverter:
         """Test that invalid message payloads are handled without crashing"""
         mock_client_instance = MagicMock()
         mock_mqtt_client.return_value = mock_client_instance
-        
+
         config = {
             'mqtt_broker': '192.168.1.100',
             'mqtt_port': 1883,
@@ -422,17 +422,17 @@ class TestMqttInverter:
             'capacity': 10000,
             'max_grid_charge_rate': 5000
         }
-        
+
         inverter = MqttInverter(config)
-        
+
         # Create mock message with invalid payload
         mock_message = Mock()
         mock_message.topic = 'inverter/status/soc'
         mock_message.payload = b'not_a_number'
-        
+
         # Should not crash
         inverter._on_message(mock_client_instance, None, mock_message)
-        
+
         # SOC should still be None/0
         assert inverter.get_SOC() == 0.0
 
@@ -441,7 +441,7 @@ class TestMqttInverter:
         """Test that inherited energy calculation methods work"""
         mock_client_instance = MagicMock()
         mock_mqtt_client.return_value = mock_client_instance
-        
+
         config = {
             'mqtt_broker': '192.168.1.100',
             'mqtt_port': 1883,
@@ -451,21 +451,21 @@ class TestMqttInverter:
             'max_soc': 95,
             'max_grid_charge_rate': 5000
         }
-        
+
         inverter = MqttInverter(config)
-        
+
         # Simulate receiving SOC
         mock_message = Mock()
         mock_message.topic = 'inverter/status/soc'
         mock_message.payload = b'65'
         inverter._on_message(mock_client_instance, None, mock_message)
-        
+
         # Test inherited methods
         stored_energy = inverter.get_stored_energy()
         assert stored_energy == 6500  # 65% of 10000 Wh
-        
+
         stored_usable_energy = inverter.get_stored_usable_energy()
         assert stored_usable_energy == 5500  # (65% - 10%) of 10000 Wh
-        
+
         free_capacity = inverter.get_free_capacity()
         assert free_capacity == 3000  # (95% - 65%) of 10000 Wh

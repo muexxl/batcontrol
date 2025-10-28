@@ -191,10 +191,10 @@ class MqttInverter(InverterBaseclass):
         self.base_topic = config['base_topic']
 
         # Battery parameters (from config or defaults)
-        self.capacity = config['capacity']
+        self.capacity = config.get('capacity', None)
         self.min_soc = config.get('min_soc', 10)
         self.max_soc = config.get('max_soc', 95)
-        self.max_grid_charge_rate = config['max_grid_charge_rate']
+        self.max_grid_charge_rate = config.get('max_grid_charge_rate', None)
 
         # Cached state from MQTT
         self.soc_value = None  # Current state of charge
