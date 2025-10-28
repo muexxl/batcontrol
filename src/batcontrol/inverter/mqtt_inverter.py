@@ -387,7 +387,7 @@ class MqttInverter(InverterBaseclass):
 
         Returns:
             float: State of charge in percentage (0-100)
-        
+
         Raises:
             RuntimeError: If SOC data is not available after 180 attempts
         """
@@ -395,7 +395,7 @@ class MqttInverter(InverterBaseclass):
         soc_value = None
         max_iterations = 180
         iteration = 0
-        
+
         while soc_value is None:
             if self.soc_key and self.soc_key in self.soc_value:
                 soc_value = self.soc_value[self.soc_key]
@@ -408,7 +408,7 @@ class MqttInverter(InverterBaseclass):
                         f'(waited {max_iterations} seconds). Check MQTT connection and '
                         f'verify that {self.inverter_topic}/status/soc is being published.'
                     )
-                logger.warning('No SOC data available from MQTT, waiting... (attempt %d/%d)', 
+                logger.warning('No SOC data available from MQTT, waiting... (attempt %d/%d)',
                              iteration, max_iterations)
                 time.sleep(1)  # Wait before retrying
 

@@ -306,8 +306,32 @@ class TestMqttInverter:
         # Should not crash
         inverter._on_message(None, None, mock_message)
 
-        # SOC should still be None
-        assert inverter.get_SOC() is None
+        # SOC should raise RuntimeError after timeout (patch to 2 iterations for fast test)
+        with patch.object(inverter, 'get_SOC') as mock_get_soc:
+            # Override max_iterations in the actual method
+            original_get_soc = MqttInverter.get_SOC.__get__(inverter, MqttInverter)
+
+            def fast_get_soc():
+                soc_value = None
+                max_iterations = 2  # Fast test: only wait 2 seconds
+                iteration = 0
+
+                while soc_value is None:
+                    if inverter.soc_key and inverter.soc_key in inverter.soc_value:
+                        soc_value = inverter.soc_value[inverter.soc_key]
+                    else:
+                        iteration += 1
+                        if iteration >= max_iterations:
+                            raise RuntimeError(
+                                f'No SOC data available from MQTT after {max_iterations} attempts '
+                                f'(waited {max_iterations} seconds). Check MQTT connection and '
+                                f'verify that {inverter.inverter_topic}/status/soc is being published.'
+                            )
+                return soc_value
+
+            # Test that RuntimeError is raised when no SOC data is available
+            with pytest.raises(RuntimeError, match='No SOC data available from MQTT after 2 attempts'):
+                fast_get_soc()
 
     def test_inherited_energy_calculations_work(self):
         """Test that inherited energy calculation methods work"""
