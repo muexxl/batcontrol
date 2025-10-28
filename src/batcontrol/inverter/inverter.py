@@ -33,18 +33,22 @@ class Inverter:
                 'max_pv_charge_rate': config['max_pv_charge_rate']
             }
             inverter=FroniusWR(iv_config)
-        elif config['type'].lower() == 'testdriver':
-            from .testdriver import Testdriver
-            iv_config = {
-                'max_grid_charge_rate': config['max_grid_charge_rate']
-            }
-            inverter=Testdriver(iv_config)
         elif config['type'].lower() == 'dummy':
             from .dummy import Dummy
             iv_config = {
                 'max_grid_charge_rate': config['max_grid_charge_rate']
             }
             inverter=Dummy(iv_config)
+        elif config['type'].lower() == 'mqtt':
+            from .mqtt_inverter import MqttInverter
+            iv_config = {
+                'base_topic': config.get('base_topic', 'default'),
+                'capacity': config['capacity'],
+                'min_soc': config.get('min_soc', 5),
+                'max_soc': config.get('max_soc', 100),
+                'max_grid_charge_rate': config['max_grid_charge_rate']
+            }
+            inverter=MqttInverter(iv_config)
         else:
             raise RuntimeError(f'[Inverter] Unkown inverter type {config["type"]}')
 

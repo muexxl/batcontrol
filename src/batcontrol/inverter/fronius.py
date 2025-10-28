@@ -950,7 +950,7 @@ class FroniusWR(InverterBaseclass):
         self.em_power = power
         if self.mqtt_api:
             self.mqtt_api.generic_publish(
-                self.__get_mqtt_topic() + 'em_power', power)
+                self.get_mqtt_inverter_topic() + 'em_power', power)
 
     def set_em_mode(self, mode):
         """ Change Energy Manangement mode."""
@@ -958,7 +958,7 @@ class FroniusWR(InverterBaseclass):
         self.em_mode = mode
         if self.mqtt_api:
             self.mqtt_api.generic_publish(
-                self.__get_mqtt_topic() + 'em_mode', mode)
+                self.get_mqtt_inverter_topic() + 'em_mode', mode)
 
     def shutdown(self):
         """Change back batcontrol changes."""
@@ -986,42 +986,84 @@ class FroniusWR(InverterBaseclass):
         """
         self.mqtt_api = api_mqtt_api
         # /set is appended to the topic
-        self.mqtt_api.register_set_callback(self.__get_mqtt_topic(
+        self.mqtt_api.register_set_callback(self.get_mqtt_inverter_topic(
         ) + 'max_grid_charge_rate', self.api_set_max_grid_charge_rate, int)
-        self.mqtt_api.register_set_callback(self.__get_mqtt_topic(
+        self.mqtt_api.register_set_callback(self.get_mqtt_inverter_topic(
         ) + 'max_pv_charge_rate', self.api_set_max_pv_charge_rate, int)
-        self.mqtt_api.register_set_callback(self.__get_mqtt_topic(
+        self.mqtt_api.register_set_callback(self.get_mqtt_inverter_topic(
         ) + 'em_mode', self.api_set_em_mode, int)
-        self.mqtt_api.register_set_callback(self.__get_mqtt_topic(
+        self.mqtt_api.register_set_callback(self.get_mqtt_inverter_topic(
         ) + 'em_power', self.api_set_em_power, int)
+
+        self.publish_inverter_discovery_messages()
 
     def refresh_api_values(self):
         """ Publishes all values to mqtt."""
         if self.mqtt_api:
-            self.mqtt_api.generic_publish(
-                self.__get_mqtt_topic() + 'SOC', self.get_SOC())
-            self.mqtt_api.generic_publish(
-                self.__get_mqtt_topic() + 'stored_energy', self.get_stored_energy())
-            self.mqtt_api.generic_publish(
-                self.__get_mqtt_topic() + 'free_capacity', self.get_free_capacity())
-            self.mqtt_api.generic_publish(
-                self.__get_mqtt_topic() + 'max_capacity', self.get_max_capacity())
-            self.mqtt_api.generic_publish(self.__get_mqtt_topic(
-            ) + 'usable_capacity', self.get_usable_capacity())
-            self.mqtt_api.generic_publish(self.__get_mqtt_topic(
+            # Call parent to publish standard metrics
+            super().refresh_api_values()
+            # Publish Fronius-specific values
+            self.mqtt_api.generic_publish(self.get_mqtt_inverter_topic(
             ) + 'max_grid_charge_rate', self.max_grid_charge_rate)
-            self.mqtt_api.generic_publish(self.__get_mqtt_topic(
+            self.mqtt_api.generic_publish(self.get_mqtt_inverter_topic(
             ) + 'max_pv_charge_rate', self.max_pv_charge_rate)
             self.mqtt_api.generic_publish(
-                self.__get_mqtt_topic() + 'min_soc', self.min_soc)
+                self.get_mqtt_inverter_topic() + 'min_soc', self.min_soc)
             self.mqtt_api.generic_publish(
-                self.__get_mqtt_topic() + 'max_soc', self.max_soc)
+                self.get_mqtt_inverter_topic() + 'max_soc', self.max_soc)
             self.mqtt_api.generic_publish(
-                self.__get_mqtt_topic() + 'capacity', self.get_capacity())
+                self.get_mqtt_inverter_topic() + 'capacity', self.get_capacity())
             self.mqtt_api.generic_publish(
-                self.__get_mqtt_topic() + 'em_mode', self.em_mode)
+                self.get_mqtt_inverter_topic() + 'em_mode', self.em_mode)
             self.mqtt_api.generic_publish(
-                self.__get_mqtt_topic() + 'em_power', self.em_power)
+                self.get_mqtt_inverter_topic() + 'em_power', self.em_power)
+
+    def publish_inverter_discovery_messages(self):
+        """Publish Home Assistant MQTT Auto Discovery messages for Fronius-specific sensors"""
+        # First publish common inverter sensors
+        super().publish_inverter_discovery_messages()
+
+        # Then publish Fronius-specific configuration sensors
+        if self.mqtt_api:
+            topic = self.get_mqtt_inverter_topic()
+            base_topic = self.mqtt_api.base_topic
+
+            # Fronius-specific configuration
+            self.mqtt_api.publish_mqtt_discovery_message(
+                f"Inverter {self.inverter_num} Max Grid Charge Rate",
+                f"batcontrol_inverter_{self.inverter_num}_max_grid_charge_rate",
+                "number", "power", "W",
+                base_topic + "/" + topic + "max_grid_charge_rate",
+                base_topic + "/" + topic + "max_grid_charge_rate/set",
+                entity_category="config",
+                min_value=0, max_value=10000, initial_value=10000)
+
+            self.mqtt_api.publish_mqtt_discovery_message(
+                f"Inverter {self.inverter_num} Max PV Charge Rate",
+                f"batcontrol_inverter_{self.inverter_num}_max_pv_charge_rate",
+                "number", "power", "W",
+                base_topic + "/" + topic + "max_pv_charge_rate",
+                base_topic + "/" + topic + "max_pv_charge_rate/set",
+                entity_category="config",
+                min_value=0, max_value=10000, initial_value=10000)
+
+            self.mqtt_api.publish_mqtt_discovery_message(
+                f"Inverter {self.inverter_num} EM Mode",
+                f"batcontrol_inverter_{self.inverter_num}_em_mode",
+                "number", None, None,
+                base_topic + "/" + topic + "em_mode",
+                base_topic + "/" + topic + "em_mode/set",
+                entity_category="config",
+                min_value=0, max_value=2, initial_value=0)
+
+            self.mqtt_api.publish_mqtt_discovery_message(
+                f"Inverter {self.inverter_num} EM Power",
+                f"batcontrol_inverter_{self.inverter_num}_em_power",
+                "number", "power", "W",
+                base_topic + "/" + topic + "em_power",
+                base_topic + "/" + topic + "em_power/set",
+                entity_category="config",
+                min_value=-10000, max_value=10000, initial_value=0)
 
     def api_set_max_grid_charge_rate(self, max_grid_charge_rate: int):
         """ Set the maximum power in W that can be used to load the battery from the grid."""
@@ -1088,6 +1130,3 @@ class FroniusWR(InverterBaseclass):
         )
         self.set_em_power(em_power)
 
-    def __get_mqtt_topic(self) -> str:
-        """ Used to implement the mqtt basic topic."""
-        return f'inverters/{self.inverter_num}/'

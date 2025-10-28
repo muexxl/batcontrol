@@ -64,17 +64,87 @@ class InverterBaseclass(InverterInterface):
         return free_capa
 
     # Used to implement the mqtt basic topic.
-    def __get_mqtt_topic(self) -> str:
+    def get_mqtt_inverter_topic(self) -> str:
+        """ Used to implement the mqtt basic topic."""
         return f'inverters/{self.inverter_num}/'
 
     def refresh_api_values(self):
         if self.mqtt_api:
-            self.mqtt_api.generic_publish(self.__get_mqtt_topic() + 'SOC', self.get_SOC())
-            self.mqtt_api.generic_publish(self.__get_mqtt_topic() + 'mode', self.mode)
-            self.mqtt_api.generic_publish(self.__get_mqtt_topic() + 'stored_energy', self.get_stored_energy())
-            self.mqtt_api.generic_publish(self.__get_mqtt_topic() + 'stored_usable_energy', self.get_stored_usable_energy())
-            self.mqtt_api.generic_publish(self.__get_mqtt_topic() + 'free_capacity', self.get_free_capacity())
-            self.mqtt_api.generic_publish(self.__get_mqtt_topic() + 'max_capacity', self.get_max_capacity())
+            self.mqtt_api.generic_publish(self.get_mqtt_inverter_topic() + 'SOC', self.get_SOC())
+            self.mqtt_api.generic_publish(self.get_mqtt_inverter_topic() + 'stored_energy', self.get_stored_energy())
+            self.mqtt_api.generic_publish(self.get_mqtt_inverter_topic() + 'stored_usable_energy', self.get_stored_usable_energy())
+            self.mqtt_api.generic_publish(self.get_mqtt_inverter_topic() + 'free_capacity', self.get_free_capacity())
+            self.mqtt_api.generic_publish(self.get_mqtt_inverter_topic() + 'max_capacity', self.get_max_capacity())
+
+    def publish_inverter_discovery_messages(self):
+        """Publish Home Assistant MQTT Auto Discovery messages for common inverter sensors"""
+        if self.mqtt_api:
+            topic = self.get_mqtt_inverter_topic()
+            base_topic = self.mqtt_api.base_topic
+
+            # Common inverter sensors
+            self.mqtt_api.publish_mqtt_discovery_message(
+                f"Inverter {self.inverter_num} SOC",
+                f"batcontrol_inverter_{self.inverter_num}_SOC",
+                "sensor", "battery", "%",
+                base_topic + "/" + topic + "SOC",
+                entity_category="diagnostic")
+
+            self.mqtt_api.publish_mqtt_discovery_message(
+                f"Inverter {self.inverter_num} Stored Energy",
+                f"batcontrol_inverter_{self.inverter_num}_stored_energy",
+                "sensor", "energy", "Wh",
+                base_topic + "/" + topic + "stored_energy",
+                entity_category="diagnostic")
+
+            self.mqtt_api.publish_mqtt_discovery_message(
+                f"Inverter {self.inverter_num} Stored Usable Energy",
+                f"batcontrol_inverter_{self.inverter_num}_stored_usable_energy",
+                "sensor", "energy", "Wh",
+                base_topic + "/" + topic + "stored_usable_energy",
+                entity_category="diagnostic")
+
+            self.mqtt_api.publish_mqtt_discovery_message(
+                f"Inverter {self.inverter_num} Free Capacity",
+                f"batcontrol_inverter_{self.inverter_num}_free_capacity",
+                "sensor", "energy", "Wh",
+                base_topic + "/" + topic + "free_capacity",
+                entity_category="diagnostic")
+
+            self.mqtt_api.publish_mqtt_discovery_message(
+                f"Inverter {self.inverter_num} Max Capacity",
+                f"batcontrol_inverter_{self.inverter_num}_max_capacity",
+                "sensor", "energy", "Wh",
+                base_topic + "/" + topic + "max_capacity",
+                entity_category="diagnostic")
+
+            self.mqtt_api.publish_mqtt_discovery_message(
+                f"Inverter {self.inverter_num} Usable Capacity",
+                f"batcontrol_inverter_{self.inverter_num}_usable_capacity",
+                "sensor", "energy", "Wh",
+                base_topic + "/" + topic + "usable_capacity",
+                entity_category="diagnostic")
+
+            self.mqtt_api.publish_mqtt_discovery_message(
+                f"Inverter {self.inverter_num} Capacity",
+                f"batcontrol_inverter_{self.inverter_num}_capacity",
+                "sensor", "energy", "Wh",
+                base_topic + "/" + topic + "capacity",
+                entity_category="diagnostic")
+
+            self.mqtt_api.publish_mqtt_discovery_message(
+                f"Inverter {self.inverter_num} Min SOC",
+                f"batcontrol_inverter_{self.inverter_num}_min_soc",
+                "sensor", "battery", "%",
+                base_topic + "/" + topic + "min_soc",
+                entity_category="diagnostic")
+
+            self.mqtt_api.publish_mqtt_discovery_message(
+                f"Inverter {self.inverter_num} Max SOC",
+                f"batcontrol_inverter_{self.inverter_num}_max_soc",
+                "sensor", "battery", "%",
+                base_topic + "/" + topic + "max_soc",
+                entity_category="diagnostic")
 
     def shutdown(self):
         pass
