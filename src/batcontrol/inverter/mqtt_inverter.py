@@ -19,6 +19,8 @@ TOPIC STRUCTURE AND RETENTION REQUIREMENTS
 ===========================================
 
 All topics follow the pattern: <batcontrol_base_topic>/inverter/$num/<subtopic>
+Here, <batcontrol_base_topic> is the MQTT base topic (from configuration), and <b>$num</b> is a placeholder for the inverter number (e.g., 0, 1, 2), not the literal string "$num".
+For example, if base_topic is "batcontrol" and inverter number is 0, the topic would be: batcontrol/inverter/0/status/capacity
 
 Status Topics (Inverter -> batcontrol):
 ---------------------------------------
