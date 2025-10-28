@@ -5,6 +5,16 @@ This driver enables batcontrol to integrate with any battery/inverter system via
 It acts as a generic bridge allowing external systems to provide battery state and receive
 control commands over MQTT.
 
+ARCHITECTURE
+============
+This driver uses batcontrol's shared MQTT connection (configured in the main batcontrol MQTT API).
+It does NOT create a separate MQTT client. Instead, it subscribes to inverter-specific topics
+using the existing connection. This ensures:
+- Single MQTT connection per batcontrol instance
+- Consistent MQTT broker configuration
+- Shared connection pool and resources
+- Unified logging and error handling
+
 TOPIC STRUCTURE AND RETENTION REQUIREMENTS
 ===========================================
 
@@ -48,18 +58,26 @@ WHY RETENTION MATTERS:
 
 CONFIGURATION EXAMPLE
 =====================
+Note: MQTT connection settings (broker, port, credentials) are configured in batcontrol's
+main MQTT API section, not in the inverter configuration.
+
 ```yaml
+# Main batcontrol MQTT configuration
+mqtt:
+  broker: 192.168.1.100
+  port: 1883
+  user: batcontrol
+  password: secret
+
+# Inverter configuration
 inverter:
   type: mqtt
-  mqtt_broker: 192.168.1.100
-  mqtt_port: 1883
-  mqtt_user: batcontrol
-  mqtt_password: secret
-  base_topic: inverter
+  base_topic: inverter         # Base topic for inverter communication (required)
   capacity: 10000              # Battery capacity in Wh (required)
   min_soc: 5                   # Minimum SoC % (default: 5)
   max_soc: 100                 # Maximum SoC % (default: 100)
   max_grid_charge_rate: 5000   # Maximum charge rate in W (required)
+  cache_ttl: 120               # Cache TTL for SOC values in seconds (default: 120)
 ```
 
 EXTERNAL BRIDGE/INVERTER REQUIREMENTS
@@ -150,7 +168,6 @@ TROUBLESHOOTING
 import logging
 import time
 from cachetools import TTLCache
-import paho.mqtt.client as mqtt
 from .baseclass import InverterBaseclass
 
 logger = logging.getLogger(__name__)
@@ -169,26 +186,21 @@ class MqttInverter(InverterBaseclass):
         """
         Initialize MQTT Inverter driver.
 
+        Note: MQTT connection is provided by batcontrol's MQTT API and configured there.
+        This driver only needs inverter-specific configuration.
+
         Args:
             config (dict): Configuration dictionary containing:
-                - mqtt_broker: MQTT broker hostname/IP (required)
-                - mqtt_port: MQTT broker port (required)
-                - mqtt_user: MQTT username (optional)
-                - mqtt_password: MQTT password (optional)
                 - base_topic: Base topic for all MQTT communication (required)
                 - capacity: Battery capacity in Wh (required)
                 - min_soc: Minimum SoC in % (default: 5)
-                - max_soc: Maximum SoC in % (default: 95)
+                - max_soc: Maximum SoC in % (default: 100)
                 - max_grid_charge_rate: Maximum charge rate in W (required)
                 - cache_ttl: optional TTL for cached values in seconds (default: 120)
         """
         super().__init__(config)
 
         # Configuration
-        self.mqtt_broker = config['mqtt_broker']
-        self.mqtt_port = config['mqtt_port']
-        self.mqtt_user = config.get('mqtt_user', None)
-        self.mqtt_password = config.get('mqtt_password', None)
         self.base_topic = config['base_topic']
         self.cache_ttl = config.get('cache_ttl', 120)
 
@@ -205,46 +217,31 @@ class MqttInverter(InverterBaseclass):
         self.capacity = config.get('capacity')
         self.max_grid_charge_rate = config.get('max_grid_charge_rate')
 
+        self.last_mode = "allow_discharge"
+
         # Cached state from MQTT
         self.soc_value = TTLCache(maxsize=2, ttl=config.get('cache_ttl', 120))
         # use timestamp as key to store latest soc value
         self.soc_key = None
         self.charge_rate = 0  # Current charge rate in W
 
-        # MQTT client setup
-        self.mqtt_client = mqtt.Client()
-        if self.mqtt_user and self.mqtt_password:
-            self.mqtt_client.username_pw_set(self.mqtt_user, self.mqtt_password)
+        # MQTT client reference (will be set via activate_mqtt)
+        self.mqtt_client = None
+        self.mqtt_api = None
 
-        self.mqtt_client.on_connect = self._on_connect
-        self.mqtt_client.on_message = self._on_message
-
-        # Connect to broker
-        try:
-            logger.info('Connecting to MQTT broker %s:%d',
-                       self.mqtt_broker, self.mqtt_port)
-            self.mqtt_client.connect(self.mqtt_broker, self.mqtt_port, 60)
-            self.mqtt_client.loop_start()
-        except Exception as e:
-            logger.error('Failed to connect to MQTT broker: %s', e)
-            raise
-
-        logger.info('MQTT Inverter initialized with base topic: %s',
+        logger.info('MQTT Inverter initialized with base topic: %s (waiting for MQTT API connection)',
                    self.base_topic)
 
-    def _on_connect(self, client, userdata, flags, rc):  # pylint: disable=unused-argument
+    def _setup_subscriptions(self):
         """
-        Callback when MQTT connection is established.
-        Subscribes to all status topics.
+        Subscribe to all status topics.
+        Called after MQTT API is activated.
         """
-        if rc == 0:
-            logger.info('Connected to MQTT broker successfully')
-            # Subscribe to all status topics
+        if self.mqtt_client:
             status_topic = f'{self.base_topic}/status/#'
-            client.subscribe(status_topic)
-            logger.debug('Subscribed to %s', status_topic)
-        else:
-            logger.error('Failed to connect to MQTT broker with code: %s', rc)
+            self.mqtt_client.subscribe(status_topic)
+            self.mqtt_client.message_callback_add(f'{self.base_topic}/status/#', self._on_message)
+            logger.info('Subscribed to %s', status_topic)
 
     def _on_message(self, client, userdata, message):  # pylint: disable=unused-argument
         """
@@ -292,7 +289,7 @@ class MqttInverter(InverterBaseclass):
         Args:
             chargerate (float): Charge rate in W
         """
-        self.mode = 'force_charge'
+        self.last_mode = 'force_charge'
         logger.info('Setting mode to force_charge with rate %sW', chargerate)
 
         # Publish mode command (QoS 1, not retained)
@@ -318,7 +315,7 @@ class MqttInverter(InverterBaseclass):
 
         Publishes mode to MQTT command topic (non-retained).
         """
-        self.mode = 'allow_discharge'
+        self.last_mode = 'allow_discharge'
         logger.info('Setting mode to allow_discharge')
 
         # Publish mode command (QoS 1, not retained)
@@ -335,7 +332,7 @@ class MqttInverter(InverterBaseclass):
 
         Publishes mode to MQTT command topic (non-retained).
         """
-        self.mode = 'avoid_discharge'
+        self.last_mode = 'avoid_discharge'
         logger.info('Setting mode to avoid_discharge')
 
         # Publish mode command (QoS 1, not retained)
@@ -376,16 +373,21 @@ class MqttInverter(InverterBaseclass):
 
     def activate_mqtt(self, api_mqtt_api):
         """
-        Activate batcontrol's MQTT API for publishing inverter state.
+        Activate batcontrol's MQTT API for publishing inverter state and control.
 
-        This allows batcontrol to publish inverter state to its own MQTT topics
-        (separate from the inverter control topics).
+        Uses the shared MQTT connection from batcontrol's MQTT API for both
+        publishing inverter state and subscribing to inverter control topics.
 
         Args:
             api_mqtt_api: The MQTT API instance from batcontrol
         """
         self.mqtt_api = api_mqtt_api
-        logger.debug('MQTT API activated for MQTT inverter')
+        self.mqtt_client = api_mqtt_api.client
+
+        # Setup subscriptions for inverter control topics
+        self._setup_subscriptions()
+
+        logger.info('MQTT API activated for MQTT inverter on base topic: %s', self.base_topic)
 
     def refresh_api_values(self):
         """
@@ -401,14 +403,18 @@ class MqttInverter(InverterBaseclass):
 
     def shutdown(self):
         """
-        Cleanly shutdown the MQTT connection.
+        Cleanly shutdown the MQTT Inverter.
 
-        Disconnects from MQTT broker and stops the network loop.
+        Note: MQTT connection is managed by batcontrol's MQTT API,
+        so we don't disconnect here.
         """
         logger.info('Shutting down MQTT Inverter')
-        try:
-            self.mqtt_client.loop_stop()
-            self.mqtt_client.disconnect()
-            logger.info('MQTT Inverter shutdown complete')
-        except ConnectionError as e:
-            logger.error('Error during MQTT Inverter shutdown: %s', e)
+        # Unsubscribe from topics
+        if self.mqtt_client:
+            try:
+                status_topic = f'{self.base_topic}/status/#'
+                self.mqtt_client.unsubscribe(status_topic)
+                logger.info('Unsubscribed from %s', status_topic)
+            except Exception as e:
+                logger.error('Error during MQTT Inverter shutdown: %s', e)
+        logger.info('MQTT Inverter shutdown complete')
