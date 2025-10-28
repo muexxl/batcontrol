@@ -306,12 +306,8 @@ class TestMqttInverter:
         # Should not crash
         inverter._on_message(None, None, mock_message)
 
-        if inverter.soc_key and inverter.soc_key in inverter.soc_value:
-            soc_value = inverter.soc_value[inverter.soc_key]
-        else:
-            soc_value = None
         # SOC should still be None
-        assert soc_value is None
+        assert inverter.get_SOC() is None
 
     def test_inherited_energy_calculations_work(self):
         """Test that inherited energy calculation methods work"""
