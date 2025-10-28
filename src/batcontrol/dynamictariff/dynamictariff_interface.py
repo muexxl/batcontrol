@@ -11,3 +11,7 @@ class TariffInterface(ABC):
     @abstractmethod
     def get_prices(self) -> dict[int, float]:
         """ get prices in processable format with hours as keys """
+
+    @abstractmethod
+    def refresh_data(self) -> None:
+        """ Refresh data from provider """

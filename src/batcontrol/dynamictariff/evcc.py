@@ -23,8 +23,11 @@ Methods:
 
 """
 import datetime
+import logging
 import requests
 from .baseclass import DynamicTariffBaseclass
+
+logger = logging.getLogger(__name__)
 
 class Evcc(DynamicTariffBaseclass):
     """ Implement evcc API to get dynamic electricity prices
@@ -36,6 +39,7 @@ class Evcc(DynamicTariffBaseclass):
         self.url=url
 
     def get_raw_data_from_provider(self) -> dict:  # pylint: disable=unused-private-member
+        logger.debug('Requesting price forecast from evcc API: %s', self.url)
         try:
             response = requests.get(self.url, timeout=30)
             response.raise_for_status()
@@ -71,10 +75,10 @@ class Evcc(DynamicTariffBaseclass):
             If multiple prices are provided for the same hour (e.g., every 15 minutes),
             the hourly price is calculated as the average of all those entries.
         """
-        data=self.raw_data.get('rates', None)
+        data=self.get_raw_data().get('rates', None)
         if data is None:
             #prior to evcc 0.207.0 the rates were in the 'result' field
-            data=self.raw_data['result']['rates']
+            data=self.get_raw_data().get('result', {}).get('rates', None)
 
         now=datetime.datetime.now().astimezone(self.timezone)
         # Get the start of the current hour

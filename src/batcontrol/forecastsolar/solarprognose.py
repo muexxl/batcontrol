@@ -5,12 +5,10 @@ https://www.solarprognose.de/web/de/solarprediction/page/api
 """
 
 import datetime
-import random
-import time
 import json
 import logging
 import requests
-from .forecastsolar_interface import ForecastSolarInterface
+from .baseclass import ForecastSolarBaseclass, RateLimitException
 
 logger = logging.getLogger(__name__)
 logger.info('Loading module')
@@ -46,67 +44,29 @@ STATUS_ERROR_INVALID_ALGORITHM = -28
 STATUS_ERROR_FAILED_TO_LOAD_WEATHER_LOCATION_ITEM = -29
 
 
-class SolarPrognose(ForecastSolarInterface):
+class SolarPrognose(ForecastSolarBaseclass):
     """ Provider to get data from solarprognose API """
 
-    def __init__(self, pvinstallations, timezone,
+    def __init__(self, pvinstallations, timezone, min_time_between_api_calls,
                  delay_evaluation_by_seconds) -> None:
-        self.pvinstallations = pvinstallations
-        self.results = {}
-        self.last_update = 0
-        self.seconds_between_updates = 900
-        self.timezone = timezone
-        self.rate_limit_blackout_window = 0
-        self.delay_evaluation_by_seconds = delay_evaluation_by_seconds
+        """ Initialize the SolarPrognose class """  
+        super().__init__(pvinstallations, timezone,
+                         min_time_between_api_calls, delay_evaluation_by_seconds)
 
-    def get_forecast(self) -> dict:
+    def get_forecast_from_raw_data(self) -> dict:
         """ Get hourly forecast from provider """
-        got_error = False
-        t0 = time.time()
-        dt = t0-self.last_update
-        if dt > self.seconds_between_updates:
-            if self.rate_limit_blackout_window < t0:
-                try:
-                    if self.last_update > 0 and self.delay_evaluation_by_seconds > 0:
-                        sleeptime = random.randrange(
-                            0, self.delay_evaluation_by_seconds, 1)
-                        logger.debug(
-                            'Waiting for %d seconds before requesting new data',
-                            sleeptime)
-                        time.sleep(sleeptime)
-                    self.__get_raw_forecast()
-                    self.last_update = t0
-                except Exception as e:
-                    # Catch error here.
-                    # Check cached values below
-                    logger.error(
-                        'Error getting forecast: %s', e)
-                    logger.warning('Using cached values')
-                    got_error = True
-            else:
-                remaining_time = self.rate_limit_blackout_window - t0
-                logger.info(
-                    'Rate limit blackout window in place  until %s '
-                    '(another %d seconds)',
-                    self.rate_limit_blackout_window,
-                    remaining_time
-                )
         prediction = {}
         for hour in range(48+1):
             prediction[hour] = 0
 
         # return empty prediction if results have not been obtained
-        if not self.results:
-            logger.warning(
-                'No results from FC Solar API available')
-            raise RuntimeWarning(
-                'No results from FC Solar API available')
+        results = self.get_all_raw_data()
 
         prediction = {}
 
         now = datetime.datetime.now().astimezone(self.timezone)
         now_ts = now.timestamp()
-        for _, result in self.results.items():
+        for _, result in results.items():
             for key in result['data']:
                 timestamp = int(key)
                 value = result['data'][key][0]
@@ -122,11 +82,7 @@ class SolarPrognose(ForecastSolarInterface):
                         prediction[rel_hour] = value * 1000
 
         max_hour = max(prediction.keys())
-        if max_hour < 18 and got_error:
-            logger.error(
-                'Less than 18 hours of forecast data. Stopping.')
-            raise RuntimeError(
-                'Less than 18 hours of forecast data.')
+
         # complete hours without production with 0 values
         for h in range(max_hour+1):
             if h not in prediction:
@@ -136,83 +92,97 @@ class SolarPrognose(ForecastSolarInterface):
 
         return output
 
-    def __get_raw_forecast(self):
-        unit: dict
-        for unit in self.pvinstallations:
-            name = unit['name']
-            apikey = unit.get('apikey', None)
-            if apikey is None:
-                logger.error(
-                    "No API key provided for installation %s", name)
-                raise ValueError(
-                    f'No API key provided for installation {name}')
+    def get_raw_data_from_provider(self, pvinstallation_name) -> dict:
+        """ Get raw data from Solar Prognose API """
 
-            algorithm = unit.get('algorithm', 'mosmix')
-            # Optional
-            item_querymod = ""
-            if unit.get('item'):
-                item = unit['item']  # inverter, plant, location
-                # id is from the web interface
-                # token is from the web interface
-                item_id = unit.get('id', None)
-                item_token = unit.get('token', None)
-                item_querymod = f"&item={item}"
-                if item_id is not None:
-                    item_querymod += f"&id={item_id}"
-                elif item_token is not None:
-                    item_querymod += f"&token={item_token}"
-                else:
-                    logger.error(
-                        "No item id or token provided for installation %s",
-                        name)
-                    raise ValueError(
-                        'No item id or token provided for installation ',
-                        f'{name}')
+        unit = None
+        for installation in self.pvinstallations:
+            if installation['name'] == pvinstallation_name:
+                unit = installation
+                break
 
-            url = "https://www.solarprognose.de/web/solarprediction/api/v1"
-            url += f"?access-token={apikey}"
-            if unit.get('project', None) is not None:
-                url += f"&project={name}"
-            url += f'&algorithm={algorithm}'
-            url += f'{item_querymod}'
-            url += '&type=hourly'
-            # url += '&start_day=0&end_day=+2'
-            url += '&_format=json'
+        if unit is None:
+            raise RuntimeError(f'[FCSolar] PV Installation {pvinstallation_name} not found')
 
-            logger.info(
-                'Requesting Information for PV Installation %s', name)
+        name = unit['name']
+        apikey = unit.get('apikey', None)
+        if apikey is None:
+            logger.error(
+                "No API key provided for installation %s", name)
+            raise ValueError(
+                f'No API key provided for installation {name}')
 
-            response = requests.get(url, timeout=60)
-            if response.status_code == 200:
-                response_data = json.loads(response.text)
-                status_code = response_data['status']
-                if status_code == STATUS_OK:
-                    # ok
-                    self.results[name] = json.loads(response.text)
-                    self.__get_and_store_retry(response)
-                elif status_code == STATUS_ERROR_DAILY_QUOTA_EXCEEDED or \
-                        status_code == STATUS_ERROR_ACCESS_DENIED_TO_ITEM_DUE_TO_LIMIT:
-                    logger.error(
-                        'Limit exceeded for installation %s - %s',
-                        name, status_code)
-                    self.__get_and_store_retry(response)
-                else:
-                    logger.error(
-                        'API returned status code %s',
-                        status_code)
-                    raise RuntimeError(
-                        f'API returned status code {status_code}')
-            elif response.status_code == 401:
-                logger.error(
-                    'API returned 401 - Unauthorized , apikey correct?')
-                raise RuntimeError(
-                    'API returned 401 - Unauthorized')
-            elif response.status_code == 429:
-                self.__get_and_store_retry(response)
+        algorithm = unit.get('algorithm', 'mosmix')
+        # Optional
+        item_querymod = ""
+        if unit.get('item'):
+            item = unit['item']  # inverter, plant, location
+            # id is from the web interface
+            # token is from the web interface
+            item_id = unit.get('id', None)
+            item_token = unit.get('token', None)
+            item_querymod = f"&item={item}"
+            if item_id is not None:
+                item_querymod += f"&id={item_id}"
+            elif item_token is not None:
+                item_querymod += f"&token={item_token}"
             else:
-                logger.warning(
-                    'Forecast solar API returned %s - %s',
-                    response.status_code, response.text)
+                logger.error(
+                    "No item id or token provided for installation %s",
+                    name)
+                raise ValueError(
+                    'No item id or token provided for installation ',
+                    f'{name}')
+
+        url = "https://www.solarprognose.de/web/solarprediction/api/v1"
+        url += f"?access-token={apikey}"
+        if unit.get('project', None) is not None:
+            url += f"&project={name}"
+        url += f'&algorithm={algorithm}'
+        url += f'{item_querymod}'
+        url += '&type=hourly'
+        # url += '&start_day=0&end_day=+2'
+        url += '&_format=json'
+
+        logger.info(
+            'Requesting Information for PV Installation %s', name)
+
+        response = requests.get(url, timeout=60)
+        if response.status_code == 200:
+            response_data = json.loads(response.text)
+            status_code = response_data['status']
+            if status_code == STATUS_OK:
+                # ok
+                self.__get_and_store_retry(response)
+                return json.loads(response.text)
+
+            elif status_code == STATUS_ERROR_DAILY_QUOTA_EXCEEDED or \
+                    status_code == STATUS_ERROR_ACCESS_DENIED_TO_ITEM_DUE_TO_LIMIT:
+                logger.error(
+                    'Limit exceeded for installation %s - %s',
+                    name, status_code)
+                self.__get_and_store_retry(response)
+                raise RateLimitException(
+                    f'Limit exceeded for installation {name} - {status_code}')
+            else:
+                logger.error(
+                    'API returned status code %s',
+                    status_code)
+                raise RuntimeError(
+                    f'API returned status code {status_code}')
+        elif response.status_code == 401:
+            logger.error(
+                'API returned 401 - Unauthorized , apikey correct?')
+            raise RuntimeError(
+                'API returned 401 - Unauthorized')
+        elif response.status_code == 429:
+            self.__get_and_store_retry(response)
+            raise RateLimitException(
+                'SolarPrognose solar API rate limit exceeded')
+        else:
+            logger.warning(
+                'SolarPrognose solar API returned %s - %s',
+                response.status_code, response.text)
 
     def __get_and_store_retry(self, response):
         retry_after_timestamp = 0
@@ -221,16 +191,10 @@ class SolarPrognose(ForecastSolarInterface):
             if 'epochTimeUtc' in response_data['preferredNextApiRequestAt']:
                 retry_after_timestamp = response_data['preferredNextApiRequestAt']['epochTimeUtc']
         if retry_after_timestamp > 0:
-            self.rate_limit_blackout_window = retry_after_timestamp
-#            logger.warning(
-#                'Forecast solar API rate limit exceeded [%s]. '
-#                'Retry at %s',
-#                response.text,
-#                retry_after_timestamp
-#            )
+            self.rate_limit_blackout_window_ts = retry_after_timestamp
         else:
             logger.warning(
-                'Forecast solar API rate limit exceeded [%s]. '
+                'SolarPrognose solar API rate limit exceeded [%s]. '
                 'No retry after information available, dumping headers',
                 response.text
             )
