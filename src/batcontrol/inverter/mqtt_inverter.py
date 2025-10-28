@@ -147,7 +147,7 @@ LIMITATIONS
 TROUBLESHOOTING
 ================
 1. "No SOC data available":
-   - Check that <base_topic>/status/soc is published as RETAINED
+   - Check that <base_topic>/status/soc is published frequently, optional retain that.
    - Verify MQTT broker connectivity and credentials
    - Check topic permissions
 
