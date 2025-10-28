@@ -543,7 +543,8 @@ class MqttApi:
 
             try:
                 sw_version = importlib.metadata.version('batcontrol')
-            except (importlib.metadata.PackageNotFoundError, ImportError):
+            except Exception as e:
+                logger.exception("Failed to retrieve batcontrol package version: %s", e)
                 sw_version = "unknown"
 
             device = {
