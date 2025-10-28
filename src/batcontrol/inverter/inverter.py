@@ -42,14 +42,10 @@ class Inverter:
         elif config['type'].lower() == 'mqtt':
             from .mqtt_inverter import MqttInverter
             iv_config = {
-                'mqtt_broker': config['mqtt_broker'],
-                'mqtt_port': config['mqtt_port'],
-                'mqtt_user': config.get('mqtt_user'),
-                'mqtt_password': config.get('mqtt_password'),
                 'base_topic': config['base_topic'],
                 'capacity': config['capacity'],
-                'min_soc': config.get('min_soc', 10),
-                'max_soc': config.get('max_soc', 95),
+                'min_soc': config.get('min_soc', 5),
+                'max_soc': config.get('max_soc', 100),
                 'max_grid_charge_rate': config['max_grid_charge_rate']
             }
             inverter=MqttInverter(iv_config)
