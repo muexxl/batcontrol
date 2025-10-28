@@ -26,7 +26,7 @@ class TestMqttInverter:
         inverter = MqttInverter(config)
 
         # Check configuration
-        assert inverter.base_topic == 'inverter'
+        assert inverter.inverter_topic == 'inverter'
         assert inverter.capacity == 10000
         assert inverter.min_soc == 10
         assert inverter.max_soc == 95

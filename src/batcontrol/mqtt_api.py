@@ -39,6 +39,7 @@ The module uses the paho-mqtt library for MQTT communication and numpy for handl
 import time
 import json
 import logging
+import importlib.metadata
 import paho.mqtt.client as mqtt
 import numpy as np
 
@@ -389,101 +390,86 @@ class MqttApi:
         """
         # control
         self.send_mqtt_discovery_for_mode()
-        # sensors
-        self.publish_mqtt_discovery_message("SOC Inverter 0",
-            "batcontrol_inverter_0_SOC",
-            "sensor", "battery", "%",
-            self.base_topic + "/inverters/0/SOC")
-        self.publish_mqtt_discovery_message("Discharge Blocked",
-            "batcontrol_discharge_blocked",
-            "sensor", None, None,
-            self.base_topic + "/discharge_blocked",
-            value_template="{% if value | lower == 'True' %}blocked{% else %}not blocked{% endif %}"
-            )
-        self.publish_mqtt_discovery_message("Reserved Energy Capacity",
-            "batcontrol_reserved_energy_capacity", "sensor", "energy", "Wh",
-            self.base_topic + "/reserved_energy_capacity")
-        self.publish_mqtt_discovery_message("Stored Usable Energy Capacity",
-            "batcontrol_stored_usable_energy_capacity", "sensor", "energy", "Wh",
-            self.base_topic + "/stored_usable_energy_capacity")
-        self.publish_mqtt_discovery_message("Min Price Difference Relative",
-            "batcontrol_min_price_difference_rel", "sensor", "monetary", None,
-            self.base_topic + "/min_price_difference_rel")
-        self.publish_mqtt_discovery_message("Min Dynamic Price Difference",
-            "batcontrol_min_dynamic_price_difference", "sensor", "monetary", None,
-            self.base_topic + "/min_dynamic_price_difference")
+
         # configuration
         self.publish_mqtt_discovery_message("Charge Rate",
-            "batcontrol_charge_rate", "number", "power", "W", 
+            "batcontrol_charge_rate", "number", "power", "W",
             self.base_topic + "/charge_rate",
             self.base_topic + "/charge_rate/set",
             entity_category="config",
             min_value=0,
             max_value=10000,
             initial_value=10000)
-        self.publish_mqtt_discovery_message("Max Grid Charge Rate",
-            "batcontrol_max_grid_charge_rate", "number", "power", "W",
-            self.base_topic + "/inverters/0/max_grid_charge_rate",
-            self.base_topic + "/inverters/0/max_grid_charge_rate/set",
-            entity_category="config",min_value=0, max_value=10000,initial_value=10000)
-        self.publish_mqtt_discovery_message("Max PV Charge Rate",
-            "batcontrol_max_pv_charge_rate", "number", "power", "W",
-            self.base_topic + "/inverters/0/max_pv_charge_rate",
-            self.base_topic + "/inverters/0/max_pv_charge_rate/set",
-            entity_category="config",min_value=0, max_value=10000,initial_value=10000)
-        self.publish_mqtt_discovery_message("EM Mode",
-            "batcontrol_em_mode", "number", None, None,
-            self.base_topic + "/inverters/0/em_mode",
-            self.base_topic + "/inverters/0/em_mode/set",
-            entity_category="config",min_value=0, max_value=2,initial_value=0)
-        self.publish_mqtt_discovery_message("EM Power",
-            "batcontrol_em_power", "number", "power", "W",
-            self.base_topic + "/inverters/0/em_power",
-            self.base_topic + "/inverters/0/em_power/set",
-            entity_category="config",min_value=-10000, max_value=10000,initial_value=0)
-        # prepared for other PR regarding /fix_discharge_with_max_power_set
-        #self.publish_mqtt_discovery_message("Max Bat Discharge Rate",
-        #   "batcontrol_max_bat_discharge_rate", "number", "power", "W",
-        #   self.base_topic + "/inverters/0/max_bat_discharge_rate",
-        #   self.base_topic + "/inverters/0/max_bat_discharge_rate/set",entity_category="config",
-        #   min_value=0, max_value=10000,initial_value=10000)
+
         self.publish_mqtt_discovery_message("Always Allow Discharge Limit",
             "batcontrol_always_allow_discharge_limit", "number", None, None,
             self.base_topic + "/always_allow_discharge_limit",
             self.base_topic + "/always_allow_discharge_limit/set",
             entity_category="config",
             min_value=0.0, max_value=1.0, step_value=0.1, initial_value=0.9)
+
         self.publish_mqtt_discovery_message("Max Charging From Grid Limit",
             "batcontrol_max_charging_from_grid_limit", "number", None, None,
             self.base_topic + "/max_charging_from_grid_limit",
             self.base_topic + "/max_charging_from_grid_limit/set",
             entity_category="config",
             min_value=0.0, max_value=1.0, step_value=0.1, initial_value=0.9)
+
         self.publish_mqtt_discovery_message("Min Price Difference",
             "batcontrol_min_price_difference", "number", "monetary", None,
             self.base_topic + "/min_price_difference",
             self.base_topic + "/min_price_difference/set",
             entity_category="config",
             min_value=0, max_value=0.5, step_value=0.01, initial_value=0.05)
+
+        # sensors
+        self.publish_mqtt_discovery_message("Discharge Blocked",
+            "batcontrol_discharge_blocked",
+            "sensor", None, None,
+            self.base_topic + "/discharge_blocked",
+            value_template="{% if value | lower == 'True' %}blocked{% else %}not blocked{% endif %}"
+            )
+
+        self.publish_mqtt_discovery_message("Reserved Energy Capacity",
+            "batcontrol_reserved_energy_capacity", "sensor", "energy", "Wh",
+            self.base_topic + "/reserved_energy_capacity")
+
+        self.publish_mqtt_discovery_message("Stored Usable Energy Capacity",
+            "batcontrol_stored_usable_energy_capacity", "sensor", "energy", "Wh",
+            self.base_topic + "/stored_usable_energy_capacity")
+
+        self.publish_mqtt_discovery_message("Min Price Difference Relative",
+            "batcontrol_min_price_difference_rel", "sensor", "monetary", None,
+            self.base_topic + "/min_price_difference_rel")
+
+        self.publish_mqtt_discovery_message("Min Dynamic Price Difference",
+            "batcontrol_min_dynamic_price_difference", "sensor", "monetary", None,
+            self.base_topic + "/min_dynamic_price_difference")
+
         # diagnostic
         self.publish_mqtt_discovery_message("Status",
             "batcontrol_status", "sensor", None, None,
             self.base_topic + "/status", command_topic=None, entity_category="diagnostic")
+
         self.publish_mqtt_discovery_message("Last Evaluation",
             "batcontrol_last_evaluation", "sensor", "timestamp", None,
             self.base_topic + "/last_evaluation", command_topic=None, entity_category="diagnostic",
             options=None,
             value_template="{{ (value | int | timestamp_local) }}",command_template=None)
+
         self.publish_mqtt_discovery_message("SOC Main",
             "batcontrol_soc", "sensor", "battery", "%",
             self.base_topic + "/SOC", entity_category="diagnostic")
+
         self.publish_mqtt_discovery_message("Max Energy Capacity",
             "batcontrol_max_energy_capacity", "sensor", "energy", "Wh",
             self.base_topic + "/max_energy_capacity", entity_category="diagnostic")
+
         self.publish_mqtt_discovery_message("Always Allow Discharge Limit Capacity",
             "batcontrol_always_allow_discharge_limit_capacity", "sensor", "energy", "Wh",
             self.base_topic + "/always_allow_discharge_limit_capacity",
             entity_category="diagnostic")
+
         self.publish_mqtt_discovery_message("Stored Energy Capacity",
             "batcontrol_stored_energy_capacity", "sensor", "energy", "Wh",
             self.base_topic + "/stored_energy_capacity", entity_category="diagnostic")
@@ -505,7 +491,7 @@ class MqttApi:
                     "{% endif %}"
         )
         self.publish_mqtt_discovery_message(
-            "Batcontrol mode", "batcontrol_mode", "select", None, None, 
+            "Batcontrol mode", "batcontrol_mode", "select", None, None,
             self.base_topic + "/mode",
             self.base_topic + "/mode/set", entity_category=None,
             options=["Charge from Grid", "Avoid Discharge", "Discharge Allowed"],
@@ -550,12 +536,18 @@ class MqttApi:
                 payload["initial"] = initial_value
             if options:
                 payload["options"] = options
+
+            try:
+                sw_version = importlib.metadata.version('batcontrol')
+            except (importlib.metadata.PackageNotFoundError, ImportError):
+                sw_version = "unknown"
+
             device = {
                 "identifiers": "Batcontrol",
                 "name": "Batcontrol",
                 "manufacturer": "muexxl",
                 "model": "batcontrol",
-                "sw_version": "0.3.x"
+                "sw_version": sw_version
             }
             payload["device"] = device
             logger.debug(
