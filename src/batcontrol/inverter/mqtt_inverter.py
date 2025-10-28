@@ -245,13 +245,16 @@ class MqttInverter(InverterBaseclass):
         self.mqtt_api = api_mqtt_api
         self.mqtt_client = api_mqtt_api.client
 
-        # Setup subscriptions for inverter control topics
-        self._setup_subscriptions()
-
-        self.publish_inverter_discovery_messages()
-
-        if self.inverter_topic == 'default':
+        # Set default inverter_topic if needed, just before subscriptions and discovery
+        if self.inverter_topic == "default":
             self.inverter_topic = f'{self.mqtt_api.base_topic}/{self.get_mqtt_inverter_topic()}'
+
+        # Remove trailing slash(es) if present to avoid double slashes in topics
+        self.inverter_topic = self.inverter_topic.rstrip('/')
+
+        # Now self.inverter_topic is guaranteed to be set correctly for the following methods
+        self._setup_subscriptions()
+        self.publish_inverter_discovery_messages()
 
         logger.info('MQTT API activated for MQTT inverter on base topic: %s', self.inverter_topic)
 
@@ -283,7 +286,7 @@ class MqttInverter(InverterBaseclass):
                 new_soc_key = time.time()
                 self.soc_value[new_soc_key] = float(payload)
                 self.soc_key = new_soc_key
-                logger.debug('Updated SOC: %s%%', self.soc_value)
+                logger.debug('Updated SOC: %s%%', self.soc_value[new_soc_key])
 
             elif topic == f'{self.inverter_topic}/status/capacity':
                 self.capacity = float(payload)

@@ -64,6 +64,10 @@ class MqttApi:
 
         self.callbacks = {}
 
+        # Remove trailing slashes if present to avoid double slashes in topics
+        self.base_topic = self.base_topic.rstrip('/')
+        self.auto_discover_topic = self.auto_discover_topic.rstrip('/')
+
         self.client = mqtt.Client()
         if 'logger' in config and config['logger'] is True:
             self.client.enable_logger(logger)
