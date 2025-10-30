@@ -137,7 +137,7 @@ class ForecastConsumptionHomeAssistant(ForecastConsumptionInterface):
         end_iso = end_time.isoformat()
 
         # Build API URL for statistics endpoint
-        url = f"{self.base_url}/api/history/statistics/during_period/{start_iso}"
+        url = f"{self.base_url}/api/history/statistics/period/{start_iso}"
         params = {
             'statistic_ids': self.entity_id,
             'end': end_iso,
