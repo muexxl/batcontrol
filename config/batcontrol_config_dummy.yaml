@@ -32,10 +32,10 @@ battery_control_expert:
 #--------------------------
 #  Inverter
 #  See more Details in: https://github.com/muexxl/batcontrol/wiki/Inverter-Configuration
-#  
+#
 #  IMPORTANT: This configuration uses a "dummy" inverter for demonstration purposes.
 #  The dummy inverter returns static values to make batcontrol work out of the box.
-#  
+#
 #  For real operation, you MUST:
 #  1. Comment out the "dummy" type below
 #  2. Uncomment and configure a real inverter type (e.g., fronius_gen24)
@@ -86,7 +86,7 @@ mqtt:
 #--------------------------
 #  Forecast Solar
 #  See more Details in:  https://github.com/muexxl/batcontrol/wiki/Solar-Forecast
-#  
+#
 #  DEMO: This configuration uses a simple PV installation for demonstration.
 #  For real operation, update the values below with your actual PV system details.
 #--------------------------
@@ -94,7 +94,7 @@ solar_forecast_provider: fcsolarapi
 pvinstallations:
   - name: Demo PV System #name - update this for your system
     lat: 48.4334480    # Update with your actual latitude
-    lon: 8.7654968     # Update with your actual longitude  
+    lon: 8.7654968     # Update with your actual longitude
     declination: 30    # inclination toward horizon 0..90 0=flat 90=vertical (e.g. wallmounted)
     azimuth: 0         # -90:East, 0:South, 90:West -180..180
     kWp: 10.0          # power in kWp - update with your actual system size
@@ -104,13 +104,25 @@ pvinstallations:
 #--------------------------
 #  Forecast Consumption
 #  See more Details in: https://github.com/muexxl/batcontrol/wiki/Consumption-forecast
-#  
+#
+#  Option 1: CSV-based forecast (default)
+#  Option 2: HomeAssistant API-based forecast
 #--------------------------
 consumption_forecast:
-  type: csv
+  type: csv # Options: 'csv' or 'homeassistant-api'
   csv:
     annual_consumption: 4500 # total consumption in kWh p.a. the load profile
     load_profile: load_profile.csv #name of the load profile file within the config folder
+
+  # Uncomment to use HomeAssistant API for consumption forecasting
+  # homeassistant_api:
+  #   base_url: http://192.168.1.100:8123  # Your HomeAssistant URL
+  #   apitoken: YOUR_LONG_LIVED_ACCESS_TOKEN  # Get from HomeAssistant Profile
+  #   entity_id: sensor.energy_consumption  # Entity ID with consumption data (in Wh or kWh)
+  #   history_days: [-7, -14, -21]  # Days to look back for historical data
+  #   history_weights: [1, 1, 1]  # Weight for each history period (1-10), higher = more influence
+  #   cache_ttl_hours: 48.0  # How long to cache computed statistics (hours)
+  #   multiplier: 1.0  # Multiplier for forecast adjustment (1.0=unchanged, >1.0=increase, <1.0=decrease)
 
 #--------------------------
 # evcc connection

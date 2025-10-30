@@ -2,6 +2,7 @@
 import logging
 from .forecastconsumption_interface import ForecastConsumptionInterface
 from .forecast_csv import ForecastConsumptionCsv
+from .forecast_homeassistant import ForecastConsumptionHomeAssistant
 
 logger = logging.getLogger(__name__)
 logger.info('Loading module')
@@ -17,13 +18,15 @@ class Consumption:
             the given configuration segment consumption_forecast in the config file."""
         consumption = None
 
+        consumption_type = config.get('type', 'csv').lower()
+
         # csv is the default.
-        if config.get('type', 'csv').lower() == 'csv':
+        if consumption_type == 'csv':
             csv_config = {}
+            # Homeassistant schema validation cant handle 3rd level nesting
             if 'csv' in config:
                 csv_config = config['csv']
             else:
-                # Backwards compatibility
                 csv_config['annual_consumption'] = config.get('annual_consumption', 0)
                 csv_config['load_profile'] = config.get('load_profile', None)
 
@@ -39,5 +42,55 @@ class Consumption:
                                 tz,
                                 csv_config.get('annual_consumption', 0)
                             )
+
+        elif consumption_type == 'homeassistant-api':
+            ha_config = {}
+            # Homeassistant schema validation cant handle 3rd level nesting
+            if 'homeassistant_api' in config:
+                ha_config = config['homeassistant_api']
+            else:
+                ha_config = config
+
+
+            # Validate required parameters
+            required_params = ['base_url', 'apitoken', 'entity_id']
+            for param in required_params:
+                if param not in ha_config:
+                    raise ValueError(
+                        f"HomeAssistant consumption forecast requires '{param}' "
+                        f"in consumption_forecast.homeassistant_api configuration"
+                    )
+
+            # Get configuration with defaults
+            base_url = ha_config['base_url']
+            api_token = ha_config['apitoken']
+            entity_id = ha_config['entity_id']
+            history_days = ha_config.get('history_days', [-7, -14, -21])
+            history_weights = ha_config.get('history_weights', [1, 1, 1])
+            cache_ttl_hours = ha_config.get('cache_ttl_hours', 48.0)
+            multiplier = ha_config.get('multiplier', 1.0)
+
+            logger.info(
+                "Creating HomeAssistant consumption forecast: "
+                "entity_id=%s, history_days=%s, weights=%s, multiplier=%0.2f",
+                entity_id, history_days, history_weights, multiplier
+            )
+
+            consumption = ForecastConsumptionHomeAssistant(
+                base_url=base_url,
+                api_token=api_token,
+                entity_id=entity_id,
+                timezone=tz,
+                history_days=history_days,
+                history_weights=history_weights,
+                cache_ttl_hours=cache_ttl_hours,
+                multiplier=multiplier
+            )
+
+        else:
+            raise ValueError(
+                f"Unknown consumption forecast type: '{consumption_type}'. "
+                f"Supported types: 'csv', 'homeassistant-api'"
+            )
 
         return consumption
