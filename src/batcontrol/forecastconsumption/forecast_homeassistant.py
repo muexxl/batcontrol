@@ -1,7 +1,29 @@
 """HomeAssistant API based consumption forecasting
 
 This module provides consumption forecasting using historical data from HomeAssistant.
-It fetches historical consumption data for configured time periods (e.g., -7, -14, -21 days)
+It fetches historical consumption data for configured time periods                 data = stats_result.get("result", {})
+                logger.debug("Statistics result contains %d entities", len(data))
+
+                # HomeAssistant statistics API returns dict with entity_id as key
+                if not data or self.entity_id not in data:
+                    logger.warning(
+                        "No statistics data returned for entity %s. "
+                        "Make sure the entity has long-term statistics enabled.",
+                        self.entity_id
+                    )
+                    if data:
+                        logger.debug("Available entities in response: %s", list(data.keys()))
+                    return {}
+
+                entity_stats = data[self.entity_id]
+                logger.debug("Fetched %d hourly statistics for entity %s", 
+                           len(entity_stats), self.entity_id)
+                
+                # Log first few entries to show data format
+                if entity_stats and len(entity_stats) > 0:
+                    logger.debug("First statistic entry sample: %s", entity_stats[0])
+                    if len(entity_stats) > 1:
+                        logger.debug("Second statistic entry sample: %s", entity_stats[1])4, -21 days)
 and calculates weighted statistics for each hour to predict future consumption.
 """
 
@@ -9,13 +31,16 @@ import datetime
 import logging
 import threading
 import numpy as np
-import requests
+import json
+import asyncio
 from typing import Dict, List, Tuple, Optional
 from cachetools import TTLCache
+from websockets.asyncio.client import connect
 from .forecastconsumption_interface import ForecastConsumptionInterface
 
 logger = logging.getLogger(__name__)
 logger.info('Loading module')
+
 
 
 class ForecastConsumptionHomeAssistant(ForecastConsumptionInterface):
@@ -108,15 +133,15 @@ class ForecastConsumptionHomeAssistant(ForecastConsumptionInterface):
         """
         return f"{weekday}_{hour}"
 
-    def _fetch_hourly_statistics(
+    async def _fetch_hourly_statistics_async(
         self,
         start_time: datetime.datetime,
         end_time: datetime.datetime
     ) -> Dict[Tuple[int, int], float]:
-        """Fetch hourly statistics from HomeAssistant API
+        """Fetch hourly statistics from HomeAssistant WebSocket API
 
-        Uses the statistics API to get pre-aggregated hourly consumption data.
-        This is much more efficient than fetching raw history and processing manually.
+        Uses the WebSocket API to get pre-aggregated hourly consumption data.
+        This is the modern, more efficient way to communicate with HomeAssistant.
 
         Args:
             start_time: Start of time range (will be aligned to hour boundary)
@@ -126,7 +151,7 @@ class ForecastConsumptionHomeAssistant(ForecastConsumptionInterface):
             Dict mapping (weekday, hour) to consumption in Wh
 
         Raises:
-            RuntimeError: If API request fails
+            RuntimeError: If WebSocket connection or API request fails
         """
         # Align to hour boundaries for statistics API
         start_time = start_time.replace(minute=0, second=0, microsecond=0)
@@ -136,90 +161,196 @@ class ForecastConsumptionHomeAssistant(ForecastConsumptionInterface):
         start_iso = start_time.isoformat()
         end_iso = end_time.isoformat()
 
-        # Build API URL for statistics endpoint
-        url = f"{self.base_url}/api/history/period/{start_iso}"
-        params = {
-            'statistic_ids': self.entity_id,
-            'end': end_iso,
-            'period': 'hour'  # Get hourly aggregated data
-        }
-
-        headers = {
-            'Authorization': f'Bearer {self.api_token}',
-            'Content-Type': 'application/json'
-        }
+        # Build WebSocket URL
+        ws_url = self.base_url.replace('http://', 'ws://').replace('https://', 'wss://')
+        ws_url = f"{ws_url}/api/websocket"
 
         logger.debug(
-            "Fetching hourly statistics: entity=%s, start=%s, end=%s",
+            "Fetching hourly statistics via WebSocket: entity=%s, start=%s, end=%s",
             self.entity_id, start_iso, end_iso
         )
 
         try:
-            response = requests.get(url, params=params, headers=headers, timeout=30)
-            response.raise_for_status()
-            data = response.json()
+            async with connect(ws_url) as websocket:
+                # Step 1: Receive auth_required message
+                auth_required = await websocket.recv()
+                auth_msg = json.loads(auth_required)
+                logger.debug("Received auth_required message: %s", auth_msg)
+                
+                if auth_msg.get("type") != "auth_required":
+                    raise RuntimeError(f"Unexpected message: {auth_msg}")
 
-            # HomeAssistant statistics API returns dict with entity_id as key
-            if not data or self.entity_id not in data:
-                logger.warning(
-                    "No statistics data returned for entity %s. "
-                    "Make sure the entity has long-term statistics enabled.",
-                    self.entity_id
-                )
-                return {}
+                # Step 2: Send authentication
+                auth_payload = {
+                    "type": "auth",
+                    "access_token": self.api_token
+                }
+                logger.debug("Sending authentication message")
+                await websocket.send(json.dumps(auth_payload))
 
-            entity_stats = data[self.entity_id]
-            logger.debug("Fetched %d hourly statistics", len(entity_stats))
+                # Step 3: Receive auth response
+                auth_response = await websocket.recv()
+                auth_result = json.loads(auth_response)
+                logger.debug("Received auth response: %s", auth_result)
+                
+                if auth_result.get("type") != "auth_ok":
+                    logger.error("WebSocket authentication failed: %s", auth_result)
+                    raise RuntimeError(f"Authentication failed: {auth_result.get('message', 'Unknown error')}")
 
-            # Process statistics into hourly buckets by weekday and hour
-            hourly_data: Dict[Tuple[int, int], float] = {}
+                logger.debug("WebSocket authentication successful")
 
-            for stat in entity_stats:
-                # Parse start timestamp
-                start_ts_str = stat.get('start')
-                if not start_ts_str:
-                    continue
+                # Step 4: Request statistics
+                message_id = 1
+                stats_request = {
+                    "id": message_id,
+                    "type": "recorder/statistics_during_period",
+                    "start_time": start_iso,
+                    "end_time": end_iso,
+                    "statistic_ids": [self.entity_id],
+                    "period": "hour"
+                }
+                logger.debug("Sending statistics request: %s", stats_request)
+                await websocket.send(json.dumps(stats_request))
 
-                # Convert timestamp (milliseconds) to datetime
-                start_ts = datetime.datetime.fromtimestamp(
-                    start_ts_str / 1000.0,
-                    tz=self.timezone
-                )
+                # Step 5: Receive statistics response
+                stats_response = await websocket.recv()
+                stats_result = json.loads(stats_response)
+                logger.debug("Received statistics response: id=%s, type=%s, success=%s", 
+                           stats_result.get("id"), 
+                           stats_result.get("type"), 
+                           stats_result.get("success"))
 
-                weekday = start_ts.weekday()
-                hour = start_ts.hour
+                if not stats_result.get("success"):
+                    error_msg = stats_result.get("error", {}).get("message", "Unknown error")
+                    logger.error("Statistics request failed: %s", error_msg)
+                    raise RuntimeError(f"Statistics request failed: {error_msg}")
 
-                # Get consumption value - use 'sum' for cumulative sensors
-                # 'sum' represents the total change during this hour
-                consumption = stat.get('sum') or stat.get('state')
+                data = stats_result.get("result", {})
+                logger.debug("Statistics result contains %d entities", len(data))
 
-                if consumption is not None:
-                    try:
-                        consumption = float(consumption)
-                        if consumption < 0:
-                            logger.debug(
-                                "Skipping negative consumption at %s: %.2f Wh",
-                                start_ts, consumption
-                            )
-                            continue
+                # HomeAssistant statistics API returns dict with entity_id as key
+                if not data or self.entity_id not in data:
+                    logger.warning(
+                        "No statistics data returned for entity %s. "
+                        "Make sure the entity has long-term statistics enabled.",
+                        self.entity_id
+                    )
+                    return {}
 
-                        key = (weekday, hour)
-                        hourly_data[key] = consumption
+                entity_stats = data[self.entity_id]
+                logger.debug("Fetched %d hourly statistics", len(entity_stats))
 
-                        logger.debug(
-                            "Hour %s (%s): %.2f Wh",
-                            key, start_ts.strftime("%Y-%m-%d %H:%M"), consumption
-                        )
-                    except (ValueError, TypeError):
-                        logger.debug("Skipping non-numeric consumption: %s", consumption)
+                # Process statistics into hourly buckets by weekday and hour
+                hourly_data: Dict[Tuple[int, int], float] = {}
+
+                for stat in entity_stats:
+                    # Parse start timestamp
+                    start_ts_value = stat.get('start')
+                    if not start_ts_value:
+                        logger.debug("Skipping stat entry with no 'start' field: %s", stat)
                         continue
 
-            logger.debug("Processed %d hourly statistics buckets", len(hourly_data))
-            return hourly_data
+                    # Handle both timestamp formats: Unix timestamp (int/float) or ISO string
+                    if isinstance(start_ts_value, (int, float)):
+                        # Unix timestamp (seconds or milliseconds)
+                        if start_ts_value > 10000000000:  # Likely milliseconds
+                            start_ts = datetime.datetime.fromtimestamp(
+                                start_ts_value / 1000.0,
+                                tz=self.timezone
+                            )
+                            logger.debug("Parsed millisecond timestamp %s -> %s", 
+                                       start_ts_value, start_ts)
+                        else:  # Likely seconds
+                            start_ts = datetime.datetime.fromtimestamp(
+                                start_ts_value,
+                                tz=self.timezone
+                            )
+                            logger.debug("Parsed second timestamp %s -> %s", 
+                                       start_ts_value, start_ts)
+                    else:
+                        # ISO format string
+                        start_ts = datetime.datetime.fromisoformat(str(start_ts_value).replace('Z', '+00:00'))
+                        logger.debug("Parsed ISO timestamp '%s' -> %s", start_ts_value, start_ts)
+                        
+                        # Convert to configured timezone
+                        if start_ts.tzinfo is None:
+                            start_ts = start_ts.replace(tzinfo=self.timezone)
+                        else:
+                            start_ts = start_ts.astimezone(self.timezone)
 
-        except requests.exceptions.RequestException as e:
+                    weekday = start_ts.weekday()
+                    hour = start_ts.hour
+
+                    # Get consumption value - use 'sum' for cumulative sensors
+                    # 'sum' represents the total change during this hour
+                    consumption = stat.get('sum') or stat.get('state')
+                    logger.debug("Raw consumption value for %s: sum=%s, state=%s", 
+                               start_ts.strftime("%Y-%m-%d %H:%M"),
+                               stat.get('sum'), 
+                               stat.get('state'))
+
+                    if consumption is not None:
+                        try:
+                            consumption = float(consumption)
+                            if consumption < 0:
+                                logger.debug(
+                                    "Skipping negative consumption at %s: %.2f Wh",
+                                    start_ts, consumption
+                                )
+                                continue
+
+                            key = (weekday, hour)
+                            hourly_data[key] = consumption
+
+                            logger.debug(
+                                "Stored: weekday=%d, hour=%d (%s): %.2f Wh",
+                                weekday, hour, start_ts.strftime("%Y-%m-%d %H:%M"), consumption
+                            )
+                        except (ValueError, TypeError) as e:
+                            logger.debug("Skipping non-numeric consumption: %s (error: %s)", 
+                                       consumption, e)
+                            continue
+
+                logger.debug("Processed %d hourly statistics buckets", len(hourly_data))
+                
+                # Log summary of collected data
+                if hourly_data:
+                    values = list(hourly_data.values())
+                    logger.debug("Collected data summary: min=%.2f Wh, max=%.2f Wh, avg=%.2f Wh",
+                               min(values), max(values), sum(values)/len(values))
+                    logger.debug("Hour slots covered: %s", sorted(hourly_data.keys()))
+                
+                return hourly_data
+
+        except Exception as e:
             logger.error("Failed to fetch statistics from HomeAssistant: %s", e)
-            raise RuntimeError(f"HomeAssistant API request failed: {e}") from e
+            raise RuntimeError(f"HomeAssistant WebSocket request failed: {e}") from e
+
+    def _fetch_hourly_statistics(
+        self,
+        start_time: datetime.datetime,
+        end_time: datetime.datetime
+    ) -> Dict[Tuple[int, int], float]:
+        """Synchronous wrapper for async statistics fetch
+
+        Args:
+            start_time: Start of time range
+            end_time: End of time range
+
+        Returns:
+            Dict mapping (weekday, hour) to consumption in Wh
+        """
+        # Run async function in event loop
+        try:
+            loop = asyncio.get_event_loop()
+        except RuntimeError:
+            # No event loop in current thread, create a new one
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+        
+        return loop.run_until_complete(
+            self._fetch_hourly_statistics_async(start_time, end_time)
+        )
 
     def _update_cache_with_statistics(
         self,

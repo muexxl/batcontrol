@@ -24,8 +24,9 @@ from batcontrol.forecastconsumption.forecast_homeassistant import ForecastConsum
 
 
 # Configure logging
+# Change level to DEBUG to see detailed WebSocket communication
 logging.basicConfig(
-    level=logging.INFO,
+    level=logging.DEBUG,  # Changed from INFO to DEBUG
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
@@ -36,7 +37,7 @@ logger = logging.getLogger(__name__)
 # ============================================================
 
 # HomeAssistant connection details
-HOMEASSISTANT_URL = "http://192.168.1.100:8123"  # Your HomeAssistant URL
+HOMEASSISTANT_URL = "ws://homeassistant.local:8123"  # Your HomeAssistant URL
 HOMEASSISTANT_TOKEN = "YOUR_LONG_LIVED_ACCESS_TOKEN"  # Get from Profile -> Long-Lived Access Tokens
 
 # Entity to track (must have long-term statistics enabled)
@@ -44,18 +45,18 @@ HOMEASSISTANT_TOKEN = "YOUR_LONG_LIVED_ACCESS_TOKEN"  # Get from Profile -> Long
 #   - "sensor.energy_consumption"
 #   - "sensor.house_energy_total"
 #   - "sensor.grid_import_total"
-ENTITY_ID = "sensor.energy_consumption"
+ENTITY_ID = "sensor.house_energy_total"
 
 # Timezone
 TIMEZONE = pytz.timezone("Europe/Berlin")
 
 # History configuration
 # Which days to look back (negative values, e.g., -7 = 7 days ago)
-HISTORY_DAYS = [-7, -14, -21]
+HISTORY_DAYS = [-1]
 
 # Weights for each history period (1-10)
 # Higher weight = more influence on forecast
-HISTORY_WEIGHTS = [3, 2, 1]  # Most recent week has highest weight
+HISTORY_WEIGHTS = [1]  # Most recent week has highest weight
 
 # Cache TTL in hours
 CACHE_TTL_HOURS = 48.0

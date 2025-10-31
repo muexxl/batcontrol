@@ -3,7 +3,8 @@
 import datetime
 import pytest
 import pytz
-from unittest.mock import Mock, patch, MagicMock
+import json
+from unittest.mock import Mock, patch, MagicMock, AsyncMock
 from src.batcontrol.forecastconsumption.forecast_homeassistant import (
     ForecastConsumptionHomeAssistant
 )
@@ -96,32 +97,46 @@ class TestForecastConsumptionHomeAssistant:
         key = forecaster._get_cache_key(6, 23)
         assert key == '6_23'
 
-    @patch('src.batcontrol.forecastconsumption.forecast_homeassistant.requests.get')
-    def test_fetch_hourly_statistics_success(self, mock_get, base_config):
-        """Test successful hourly statistics fetch"""
+    @patch('src.batcontrol.forecastconsumption.forecast_homeassistant.connect')
+    def test_fetch_hourly_statistics_success(self, mock_connect, base_config):
+        """Test successful hourly statistics fetch via WebSocket"""
         forecaster = ForecastConsumptionHomeAssistant(**base_config)
 
-        # Mock successful API response from statistics endpoint
-        # Statistics API returns dict with entity_id as key
-        mock_response = MagicMock()
-        mock_response.status_code = 200
-        mock_response.json.return_value = {
-            'sensor.energy_consumption': [
-                {
-                    'start': 1698667200000,  # Monday 2023-10-30 10:00:00 UTC (milliseconds)
-                    'end': 1698670800000,
-                    'sum': 100.5,  # Consumption in Wh
-                    'state': 100.5
-                },
-                {
-                    'start': 1698670800000,  # Monday 2023-10-30 11:00:00 UTC
-                    'end': 1698674400000,
-                    'sum': 110.2,
-                    'state': 110.2
+        # Mock WebSocket connection and messages
+        mock_websocket = AsyncMock()
+        
+        # Simulate WebSocket message exchange
+        mock_websocket.recv = AsyncMock(side_effect=[
+            # 1. auth_required
+            json.dumps({"type": "auth_required"}),
+            # 2. auth_ok
+            json.dumps({"type": "auth_ok"}),
+            # 3. statistics response
+            json.dumps({
+                "id": 1,
+                "type": "result",
+                "success": True,
+                "result": {
+                    'sensor.energy_consumption': [
+                        {
+                            'start': '2023-10-30T10:00:00+00:00',
+                            'end': '2023-10-30T11:00:00+00:00',
+                            'sum': 100.5,
+                            'state': 100.5
+                        },
+                        {
+                            'start': '2023-10-30T11:00:00+00:00',
+                            'end': '2023-10-30T12:00:00+00:00',
+                            'sum': 110.2,
+                            'state': 110.2
+                        }
+                    ]
                 }
-            ]
-        }
-        mock_get.return_value = mock_response
+            })
+        ])
+        
+        mock_websocket.send = AsyncMock()
+        mock_connect.return_value.__aenter__.return_value = mock_websocket
 
         start = datetime.datetime(2025, 10, 27, 0, 0, tzinfo=pytz.UTC)
         end = datetime.datetime(2025, 10, 28, 0, 0, tzinfo=pytz.UTC)
@@ -131,40 +146,45 @@ class TestForecastConsumptionHomeAssistant:
         # Should return dict with (weekday, hour) keys
         assert isinstance(result, dict)
         assert len(result) >= 1  # At least one hour of data
-        assert mock_get.called
+        assert mock_connect.called
+        
+        # Verify WebSocket was called with correct URL
+        call_args = mock_connect.call_args
+        assert 'ws://localhost:8123/api/websocket' in str(call_args)
 
-        # Check API call parameters
-        call_args = mock_get.call_args
-        assert 'Authorization' in call_args[1]['headers']
-        assert 'Bearer test_token_12345' in call_args[1]['headers']['Authorization']
-        assert 'statistic_ids' in call_args[1]['params']
-        assert call_args[1]['params']['period'] == 'hour'
-
-    @patch('src.batcontrol.forecastconsumption.forecast_homeassistant.requests.get')
-    def test_fetch_hourly_statistics_api_error(self, mock_get, base_config):
+    @patch('src.batcontrol.forecastconsumption.forecast_homeassistant.connect')
+    def test_fetch_hourly_statistics_api_error(self, mock_connect, base_config):
         """Test handling of API errors"""
         forecaster = ForecastConsumptionHomeAssistant(**base_config)
 
-        # Mock failed API response with requests.exceptions.RequestException
-        import requests
-        mock_get.side_effect = requests.exceptions.RequestException("Connection refused")
+        # Mock WebSocket connection failure
+        mock_connect.side_effect = Exception("Connection refused")
 
         start = datetime.datetime(2025, 10, 27, 0, 0, tzinfo=pytz.UTC)
         end = datetime.datetime(2025, 10, 28, 0, 0, tzinfo=pytz.UTC)
 
-        with pytest.raises(RuntimeError, match="HomeAssistant API request failed"):
+        with pytest.raises(RuntimeError, match="HomeAssistant WebSocket request failed"):
             forecaster._fetch_hourly_statistics(start, end)
 
-    @patch('src.batcontrol.forecastconsumption.forecast_homeassistant.requests.get')
-    def test_fetch_hourly_statistics_no_data(self, mock_get, base_config):
+    @patch('src.batcontrol.forecastconsumption.forecast_homeassistant.connect')
+    def test_fetch_hourly_statistics_no_data(self, mock_connect, base_config):
         """Test handling when no statistics data is available"""
         forecaster = ForecastConsumptionHomeAssistant(**base_config)
 
-        # Mock API response with no data for entity
-        mock_response = MagicMock()
-        mock_response.status_code = 200
-        mock_response.json.return_value = {}  # Empty response
-        mock_get.return_value = mock_response
+        # Mock WebSocket with no data
+        mock_websocket = AsyncMock()
+        mock_websocket.recv = AsyncMock(side_effect=[
+            json.dumps({"type": "auth_required"}),
+            json.dumps({"type": "auth_ok"}),
+            json.dumps({
+                "id": 1,
+                "type": "result",
+                "success": True,
+                "result": {}  # Empty result
+            })
+        ])
+        mock_websocket.send = AsyncMock()
+        mock_connect.return_value.__aenter__.return_value = mock_websocket
 
         start = datetime.datetime(2025, 10, 27, 0, 0, tzinfo=pytz.UTC)
         end = datetime.datetime(2025, 10, 28, 0, 0, tzinfo=pytz.UTC)
@@ -174,31 +194,40 @@ class TestForecastConsumptionHomeAssistant:
         # Should return empty dict when no data available
         assert result == {}
 
-    @patch('src.batcontrol.forecastconsumption.forecast_homeassistant.requests.get')
-    def test_fetch_hourly_statistics_negative_consumption(self, mock_get, base_config):
+    @patch('src.batcontrol.forecastconsumption.forecast_homeassistant.connect')
+    def test_fetch_hourly_statistics_negative_consumption(self, mock_connect, base_config):
         """Test handling of negative consumption (counter resets)"""
         forecaster = ForecastConsumptionHomeAssistant(**base_config)
 
-        # Mock API response with negative consumption
-        mock_response = MagicMock()
-        mock_response.status_code = 200
-        mock_response.json.return_value = {
-            'sensor.energy_consumption': [
-                {
-                    'start': 1698667200000,
-                    'end': 1698670800000,
-                    'sum': -50.0,  # Negative consumption (counter reset)
-                    'state': -50.0
-                },
-                {
-                    'start': 1698670800000,
-                    'end': 1698674400000,
-                    'sum': 100.0,  # Valid consumption
-                    'state': 100.0
+        # Mock WebSocket with negative consumption
+        mock_websocket = AsyncMock()
+        mock_websocket.recv = AsyncMock(side_effect=[
+            json.dumps({"type": "auth_required"}),
+            json.dumps({"type": "auth_ok"}),
+            json.dumps({
+                "id": 1,
+                "type": "result",
+                "success": True,
+                "result": {
+                    'sensor.energy_consumption': [
+                        {
+                            'start': '2023-10-30T10:00:00+00:00',
+                            'end': '2023-10-30T11:00:00+00:00',
+                            'sum': -50.0,
+                            'state': -50.0
+                        },
+                        {
+                            'start': '2023-10-30T11:00:00+00:00',
+                            'end': '2023-10-30T12:00:00+00:00',
+                            'sum': 100.0,
+                            'state': 100.0
+                        }
+                    ]
                 }
-            ]
-        }
-        mock_get.return_value = mock_response
+            })
+        ])
+        mock_websocket.send = AsyncMock()
+        mock_connect.return_value.__aenter__.return_value = mock_websocket
 
         start = datetime.datetime(2025, 10, 27, 0, 0, tzinfo=pytz.UTC)
         end = datetime.datetime(2025, 10, 28, 0, 0, tzinfo=pytz.UTC)
@@ -211,6 +240,50 @@ class TestForecastConsumptionHomeAssistant:
         # Verify the valid value is present
         for value in result.values():
             assert value > 0
+
+    @patch('src.batcontrol.forecastconsumption.forecast_homeassistant.connect')
+    def test_fetch_hourly_statistics_unix_timestamps(self, mock_connect, base_config):
+        """Test handling of Unix timestamps (seconds and milliseconds)"""
+        forecaster = ForecastConsumptionHomeAssistant(**base_config)
+
+        # Mock WebSocket with Unix timestamp in seconds
+        mock_websocket = AsyncMock()
+        mock_websocket.recv = AsyncMock(side_effect=[
+            json.dumps({"type": "auth_required"}),
+            json.dumps({"type": "auth_ok"}),
+            json.dumps({
+                "id": 1,
+                "type": "result",
+                "success": True,
+                "result": {
+                    'sensor.energy_consumption': [
+                        {
+                            'start': 1698667200,  # Unix timestamp in seconds
+                            'end': 1698670800,
+                            'sum': 100.5,
+                            'state': 100.5
+                        },
+                        {
+                            'start': 1698670800000,  # Unix timestamp in milliseconds
+                            'end': 1698674400000,
+                            'sum': 110.2,
+                            'state': 110.2
+                        }
+                    ]
+                }
+            })
+        ])
+        mock_websocket.send = AsyncMock()
+        mock_connect.return_value.__aenter__.return_value = mock_websocket
+
+        start = datetime.datetime(2025, 10, 27, 0, 0, tzinfo=pytz.UTC)
+        end = datetime.datetime(2025, 10, 28, 0, 0, tzinfo=pytz.UTC)
+
+        result = forecaster._fetch_hourly_statistics(start, end)
+
+        # Should handle both timestamp formats
+        assert isinstance(result, dict)
+        assert len(result) >= 1
 
     def test_update_cache_with_statistics(self, base_config):
         """Test cache update with weighted statistics"""
