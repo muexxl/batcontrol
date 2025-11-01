@@ -134,10 +134,72 @@ class ForecastConsumptionHomeAssistant(ForecastConsumptionInterface):
         """
         return f"{weekday}_{hour}"
 
+    async def _websocket_connect(self):
+        """Connect to HomeAssistant WebSocket API and authenticate
+
+        Returns:
+            Tuple of (websocket connection, message_id counter)
+
+        Raises:
+            RuntimeError: If connection or authentication fails
+        """
+        # Build WebSocket URL
+        ws_url = self.base_url.replace('http://', 'ws://').replace('https://', 'wss://')
+        ws_url = f"{ws_url}/api/websocket"
+
+        logger.debug("Connecting to HomeAssistant WebSocket: %s", ws_url)
+
+        websocket = await connect(ws_url)
+
+        # Step 1: Receive auth_required message
+        auth_required = await websocket.recv()
+        auth_msg = json.loads(auth_required)
+        logger.debug("Received auth_required message: %s", auth_msg)
+
+        if auth_msg.get("type") != "auth_required":
+            await websocket.close()
+            raise RuntimeError(f"Unexpected message: {auth_msg}")
+
+        # Step 2: Send authentication
+        auth_payload = {
+            "type": "auth",
+            "access_token": self.api_token
+        }
+        logger.debug("Sending authentication message")
+        await websocket.send(json.dumps(auth_payload))
+
+        # Step 3: Receive auth response
+        auth_response = await websocket.recv()
+        auth_result = json.loads(auth_response)
+        logger.debug("Received auth response: %s", auth_result)
+
+        if auth_result.get("type") != "auth_ok":
+            logger.error("WebSocket authentication failed: %s", auth_result)
+            await websocket.close()
+            raise RuntimeError(f"Authentication failed: {auth_result.get('message', 'Unknown error')}")
+
+        logger.debug("WebSocket authentication successful")
+
+        return websocket, 1  # Return websocket and initial message_id
+
+    async def _websocket_disconnect(self, websocket):
+        """Disconnect from HomeAssistant WebSocket API
+
+        Args:
+            websocket: WebSocket connection to close
+        """
+        try:
+            await websocket.close()
+            logger.debug("WebSocket connection closed")
+        except Exception as e:
+            logger.warning("Error closing WebSocket connection: %s", e)
+
     async def _fetch_hourly_statistics_async(
         self,
         start_time: datetime.datetime,
-        end_time: datetime.datetime
+        end_time: datetime.datetime,
+        websocket=None,
+        message_id: int = 1
     ) -> float:
         """Fetch hourly statistics from HomeAssistant WebSocket API
 
@@ -147,6 +209,8 @@ class ForecastConsumptionHomeAssistant(ForecastConsumptionInterface):
         Args:
             start_time: Start of time range (will be aligned to hour boundary)
             end_time: End of time range (will be aligned to hour boundary)
+            websocket: Optional existing websocket connection to reuse
+            message_id: Message ID for WebSocket request (default: 1)
 
         Returns:
             Dict mapping (weekday, hour) to consumption in Wh
@@ -162,46 +226,21 @@ class ForecastConsumptionHomeAssistant(ForecastConsumptionInterface):
         start_iso = start_time.isoformat()
         end_iso = end_time.isoformat()
 
-        # Build WebSocket URL
-        ws_url = self.base_url.replace('http://', 'ws://').replace('https://', 'wss://')
-        ws_url = f"{ws_url}/api/websocket"
-
         logger.debug(
             "Fetching hourly statistics via WebSocket: entity=%s, start=%s, end=%s",
             self.entity_id, start_iso, end_iso
         )
 
+        # Track if we need to manage the websocket connection
+        should_disconnect = False
+
         try:
-            async with connect(ws_url) as websocket:
-                # Step 1: Receive auth_required message
-                auth_required = await websocket.recv()
-                auth_msg = json.loads(auth_required)
-                logger.debug("Received auth_required message: %s", auth_msg)
+            if websocket is None:
+                websocket, message_id = await self._websocket_connect()
+                should_disconnect = True
 
-                if auth_msg.get("type") != "auth_required":
-                    raise RuntimeError(f"Unexpected message: {auth_msg}")
-
-                # Step 2: Send authentication
-                auth_payload = {
-                    "type": "auth",
-                    "access_token": self.api_token
-                }
-                logger.debug("Sending authentication message")
-                await websocket.send(json.dumps(auth_payload))
-
-                # Step 3: Receive auth response
-                auth_response = await websocket.recv()
-                auth_result = json.loads(auth_response)
-                logger.debug("Received auth response: %s", auth_result)
-
-                if auth_result.get("type") != "auth_ok":
-                    logger.error("WebSocket authentication failed: %s", auth_result)
-                    raise RuntimeError(f"Authentication failed: {auth_result.get('message', 'Unknown error')}")
-
-                logger.debug("WebSocket authentication successful")
-
-                # Step 4: Request statistics
-                message_id = 1
+            try:
+                # Request statistics
                 stats_request = {
                     "id": message_id,
                     "type": "recorder/statistics_during_period",
@@ -213,15 +252,13 @@ class ForecastConsumptionHomeAssistant(ForecastConsumptionInterface):
                 logger.debug("Sending statistics request: %s", stats_request)
                 await websocket.send(json.dumps(stats_request))
 
-                # Step 5: Receive statistics response
+                # Receive statistics response
                 stats_response = await websocket.recv()
                 stats_result = json.loads(stats_response)
                 logger.debug("Received statistics response: id=%s, type=%s, success=%s",
                            stats_result.get("id"),
                            stats_result.get("type"),
                            stats_result.get("success"))
-                # dump complete response for debugging
-                # logger.debug("Complete statistics response: %s", stats_result)
 
                 if not stats_result.get("success"):
                     error_msg = stats_result.get("error", {}).get("message", "Unknown error")
@@ -322,6 +359,11 @@ class ForecastConsumptionHomeAssistant(ForecastConsumptionInterface):
                     return avg_consumption
 
                 return -1.0
+
+            finally:
+                # Only disconnect if we created the connection
+                if should_disconnect:
+                    await self._websocket_disconnect(websocket)
 
         except Exception as e:
             logger.error("Failed to fetch statistics from HomeAssistant: %s", e)
@@ -428,69 +470,90 @@ class ForecastConsumptionHomeAssistant(ForecastConsumptionInterface):
 
         if missing_periods:
             logger.info("Missing history data for hours: %s", missing_periods)
+        else:
+            logger.debug("All forecast hours present in cache, no refresh needed")
+            return
 
         # now as full hour
         now = now.replace(minute=0, second=0, microsecond=0)
 
-
-#TODO  Das Abholen der fehlenden Stunden war langsam, weil immer erneut eine Verbindung aufgemacht wurde
-#      wenn wir bei bedarf die Verbindung aufmachen und halten bis zum Ende, sind die Abfragen schneller
-#      und wir können die Logik einfacher halten.
-
         reference_slots = self._get_reference_slots()
         history_periods = []
 
-        for fetch_hour in missing_periods:
-            # start time is now + fetch_hour
-            basis_start_time = now + datetime.timedelta(hours=fetch_hour)
-            basis_end_time = basis_start_time + datetime.timedelta(hours=1)
+        # Connect to WebSocket once for all requests
+        try:
+            loop = asyncio.get_event_loop()
+        except RuntimeError:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
 
+        websocket = None
+        message_id = 1
 
-            # Now fetch each history_days as offset on basis_start + endtime
-            logger.debug("Fetching history data for hour offset %d (basis time %s)",
-                       fetch_hour, basis_start_time)
-            slot_results = {}
-            for history_day, weight in reference_slots.items():
-                start_time = basis_start_time + datetime.timedelta(days=history_day)
-                end_time = basis_end_time + datetime.timedelta(days=history_day)
+        try:
+            websocket, message_id = loop.run_until_complete(self._websocket_connect())
+            logger.debug("WebSocket connected for bulk data fetch")
 
-                try:
-                    hourly_data = self._fetch_hourly_statistics(start_time, end_time)
+            for fetch_hour in missing_periods:
+                # start time is now + fetch_hour
+                basis_start_time = now + datetime.timedelta(hours=fetch_hour)
+                basis_end_time = basis_start_time + datetime.timedelta(hours=1)
 
-                    if hourly_data > -1 :
-                        logger.debug("Fetched history data for %d days offset: %s",
-                                   history_day, hourly_data)
-                        slot_results[history_day] = hourly_data
-                    else:
-                        logger.debug("No data fetched for %d days offset", history_day)
-                except (RuntimeError, ValueError) as e:
-                    logger.error(
-                        "Failed to fetch statistics for %d days offset: %s",
-                        history_day, e
+                # Now fetch each history_days as offset on basis_start + endtime
+                logger.debug("Fetching history data for hour offset %d (basis time %s)",
+                           fetch_hour, basis_start_time)
+                slot_results = {}
+                for history_day, weight in reference_slots.items():
+                    start_time = basis_start_time + datetime.timedelta(days=history_day)
+                    end_time = basis_end_time + datetime.timedelta(days=history_day)
+
+                    try:
+                        hourly_data = loop.run_until_complete(
+                            self._fetch_hourly_statistics_async(start_time, end_time, websocket, message_id)
+                        )
+                        message_id += 1  # Increment for next request
+
+                        if hourly_data > -1 :
+                            logger.debug("Fetched history data for %d days offset: %s",
+                                       history_day, hourly_data)
+                            slot_results[history_day] = hourly_data
+                        else:
+                            logger.debug("No data fetched for %d days offset", history_day)
+                    except (RuntimeError, ValueError) as e:
+                        logger.error(
+                            "Failed to fetch statistics for %d days offset: %s",
+                            history_day, e
+                        )
+                        # Continue with other periods even if one fails
+                        continue
+
+                # Now calculate weighted statistics for this hour slot
+                if slot_results:
+                    weight_sum = 0
+                    summary_results = 0
+                    for history_day in self.history_days:
+                        if history_day in slot_results:
+                            weight_sum += reference_slots[history_day]
+                            summary_results += slot_results[history_day] * reference_slots[history_day]
+
+                    if weight_sum > 0:
+                        history_periods.append(summary_results / weight_sum)
+
+                else:
+                    # No data fetched for this hour
+                    # Stop processing further
+                    logger.warning(
+                        "No statistics data fetched for hour offset %d, ending collect",
+                        fetch_hour
                     )
-                    # Continue with other periods even if one fails
-                    continue
+                    break
 
-            # Now calculate weighted statistics for this hour slot
-            if slot_results:
-                weight_sum = 0
-                summary_results = 0
-                for history_day in self.history_days:
-                    if history_day in slot_results:
-                        weight_sum += reference_slots[history_day]
-                        summary_results += slot_results[history_day] * reference_slots[history_day]
-
-                if weight_sum > 0:
-                    history_periods.append(summary_results / weight_sum)
-
-            else:
-                # No data fetched for this hour
-                # Stop processing further
-                logger.warning(
-                    "No statistics data fetched for hour offset %d, ending collect",
-                    fetch_hour
-                )
-                break
+        except Exception as e:
+            logger.error("Error during bulk data fetch: %s", e)
+        finally:
+            # Disconnect websocket
+            if websocket is not None:
+                loop.run_until_complete(self._websocket_disconnect(websocket))
 
         if not history_periods:
             logger.error("No statistics data could be fetched, forecast unavailable")
