@@ -16,9 +16,9 @@ It fetches historical consumption data for configured time periods              
                     return {}
 
                 entity_stats = data[self.entity_id]
-                logger.debug("Fetched %d hourly statistics for entity %s", 
+                logger.debug("Fetched %d hourly statistics for entity %s",
                            len(entity_stats), self.entity_id)
-                
+
                 # Log first few entries to show data format
                 if entity_stats and len(entity_stats) > 0:
                     logger.debug("First statistic entry sample: %s", entity_stats[0])
@@ -41,6 +41,7 @@ from .forecastconsumption_interface import ForecastConsumptionInterface
 logger = logging.getLogger(__name__)
 logger.info('Loading module')
 
+MAX_FORECAST_HOURS = 48
 
 
 class ForecastConsumptionHomeAssistant(ForecastConsumptionInterface):
@@ -137,7 +138,7 @@ class ForecastConsumptionHomeAssistant(ForecastConsumptionInterface):
         self,
         start_time: datetime.datetime,
         end_time: datetime.datetime
-    ) -> Dict[Tuple[int, int], float]:
+    ) -> float:
         """Fetch hourly statistics from HomeAssistant WebSocket API
 
         Uses the WebSocket API to get pre-aggregated hourly consumption data.
@@ -176,7 +177,7 @@ class ForecastConsumptionHomeAssistant(ForecastConsumptionInterface):
                 auth_required = await websocket.recv()
                 auth_msg = json.loads(auth_required)
                 logger.debug("Received auth_required message: %s", auth_msg)
-                
+
                 if auth_msg.get("type") != "auth_required":
                     raise RuntimeError(f"Unexpected message: {auth_msg}")
 
@@ -192,7 +193,7 @@ class ForecastConsumptionHomeAssistant(ForecastConsumptionInterface):
                 auth_response = await websocket.recv()
                 auth_result = json.loads(auth_response)
                 logger.debug("Received auth response: %s", auth_result)
-                
+
                 if auth_result.get("type") != "auth_ok":
                     logger.error("WebSocket authentication failed: %s", auth_result)
                     raise RuntimeError(f"Authentication failed: {auth_result.get('message', 'Unknown error')}")
@@ -215,10 +216,12 @@ class ForecastConsumptionHomeAssistant(ForecastConsumptionInterface):
                 # Step 5: Receive statistics response
                 stats_response = await websocket.recv()
                 stats_result = json.loads(stats_response)
-                logger.debug("Received statistics response: id=%s, type=%s, success=%s", 
-                           stats_result.get("id"), 
-                           stats_result.get("type"), 
+                logger.debug("Received statistics response: id=%s, type=%s, success=%s",
+                           stats_result.get("id"),
+                           stats_result.get("type"),
                            stats_result.get("success"))
+                # dump complete response for debugging
+                # logger.debug("Complete statistics response: %s", stats_result)
 
                 if not stats_result.get("success"):
                     error_msg = stats_result.get("error", {}).get("message", "Unknown error")
@@ -235,7 +238,7 @@ class ForecastConsumptionHomeAssistant(ForecastConsumptionInterface):
                         "Make sure the entity has long-term statistics enabled.",
                         self.entity_id
                     )
-                    return {}
+                    return -1
 
                 entity_stats = data[self.entity_id]
                 logger.debug("Fetched %d hourly statistics", len(entity_stats))
@@ -258,20 +261,20 @@ class ForecastConsumptionHomeAssistant(ForecastConsumptionInterface):
                                 start_ts_value / 1000.0,
                                 tz=self.timezone
                             )
-                            logger.debug("Parsed millisecond timestamp %s -> %s", 
+                            logger.debug("Parsed millisecond timestamp %s -> %s",
                                        start_ts_value, start_ts)
                         else:  # Likely seconds
                             start_ts = datetime.datetime.fromtimestamp(
                                 start_ts_value,
                                 tz=self.timezone
                             )
-                            logger.debug("Parsed second timestamp %s -> %s", 
+                            logger.debug("Parsed second timestamp %s -> %s",
                                        start_ts_value, start_ts)
                     else:
                         # ISO format string
                         start_ts = datetime.datetime.fromisoformat(str(start_ts_value).replace('Z', '+00:00'))
                         logger.debug("Parsed ISO timestamp '%s' -> %s", start_ts_value, start_ts)
-                        
+
                         # Convert to configured timezone
                         if start_ts.tzinfo is None:
                             start_ts = start_ts.replace(tzinfo=self.timezone)
@@ -283,11 +286,10 @@ class ForecastConsumptionHomeAssistant(ForecastConsumptionInterface):
 
                     # Get consumption value - use 'sum' for cumulative sensors
                     # 'sum' represents the total change during this hour
-                    consumption = stat.get('sum') or stat.get('state')
-                    logger.debug("Raw consumption value for %s: sum=%s, state=%s", 
+                    consumption = stat.get('change')
+                    logger.debug("Raw consumption value for %s: change=%s",
                                start_ts.strftime("%Y-%m-%d %H:%M"),
-                               stat.get('sum'), 
-                               stat.get('state'))
+                               stat.get('change'))
 
                     if consumption is not None:
                         try:
@@ -307,20 +309,19 @@ class ForecastConsumptionHomeAssistant(ForecastConsumptionInterface):
                                 weekday, hour, start_ts.strftime("%Y-%m-%d %H:%M"), consumption
                             )
                         except (ValueError, TypeError) as e:
-                            logger.debug("Skipping non-numeric consumption: %s (error: %s)", 
+                            logger.debug("Skipping non-numeric consumption: %s (error: %s)",
                                        consumption, e)
                             continue
 
                 logger.debug("Processed %d hourly statistics buckets", len(hourly_data))
-                
-                # Log summary of collected data
+
+                # Log summary of collected data and return average
                 if hourly_data:
                     values = list(hourly_data.values())
-                    logger.debug("Collected data summary: min=%.2f Wh, max=%.2f Wh, avg=%.2f Wh",
-                               min(values), max(values), sum(values)/len(values))
-                    logger.debug("Hour slots covered: %s", sorted(hourly_data.keys()))
-                
-                return hourly_data
+                    avg_consumption = sum(values) / len(values)
+                    return avg_consumption
+
+                return -1.0
 
         except Exception as e:
             logger.error("Failed to fetch statistics from HomeAssistant: %s", e)
@@ -330,7 +331,7 @@ class ForecastConsumptionHomeAssistant(ForecastConsumptionInterface):
         self,
         start_time: datetime.datetime,
         end_time: datetime.datetime
-    ) -> Dict[Tuple[int, int], float]:
+    ) ->  float:
         """Synchronous wrapper for async statistics fetch
 
         Args:
@@ -338,7 +339,7 @@ class ForecastConsumptionHomeAssistant(ForecastConsumptionInterface):
             end_time: End of time range
 
         Returns:
-            Dict mapping (weekday, hour) to consumption in Wh
+            Float
         """
         # Run async function in event loop
         try:
@@ -347,53 +348,60 @@ class ForecastConsumptionHomeAssistant(ForecastConsumptionInterface):
             # No event loop in current thread, create a new one
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
-        
+
         return loop.run_until_complete(
             self._fetch_hourly_statistics_async(start_time, end_time)
         )
 
     def _update_cache_with_statistics(
         self,
-        history_periods: List[Dict[Tuple[int, int], float]]
+        timestamp: datetime.datetime,
+        history_periods: List[float]
     ) -> int:
         """Calculate weighted statistics and update cache
 
         Args:
             history_periods: List of hourly data dicts from different time periods
-                           Each dict maps (weekday, hour) -> consumption in Wh
 
         Returns:
             Number of cache entries updated
         """
-        # Collect all unique (weekday, hour) combinations
-        all_keys = set()
-        for period_data in history_periods:
-            all_keys.update(period_data.keys())
 
-        updated_count = 0
 
         # Calculate weighted average for each hour and store in cache
         with self._cache_lock:
-            for weekday, hour in all_keys:
-                weighted_sum = 0.0
-                total_weight = 0
+            logger.debug("Updating cache with calculated statistics for %d periods", len(history_periods))
+            updated_count = 0
+            for hour_offset, consumption in enumerate(history_periods):
+                future_time = timestamp + datetime.timedelta(hours=hour_offset)
+                weekday = future_time.weekday()
+                hour = future_time.hour
+                cache_key = self._get_cache_key(weekday, hour)
 
-                for period_data, weight in zip(history_periods, self.history_weights):
-                    if (weekday, hour) in period_data:
-                        consumption = period_data[(weekday, hour)]
-                        weighted_sum += consumption * weight
-                        total_weight += weight
+                # Apply multiplier
+                adjusted_consumption = consumption * self.multiplier
 
-                if total_weight > 0:
-                    avg_consumption = weighted_sum / total_weight
-                    # Apply multiplier to adjust forecast up or down
-                    avg_consumption *= self.multiplier
-                    cache_key = self._get_cache_key(weekday, hour)
-                    self.consumption_cache[cache_key] = avg_consumption
-                    updated_count += 1
+                # Update cache
+                self.consumption_cache[cache_key] = adjusted_consumption
+                updated_count += 1
+
+                logger.debug(
+                    "Updated cache: key=%s (weekday=%d, hour=%d), "
+                    "consumption=%.2f Wh (adjusted: %.2f Wh)",
+                    cache_key, weekday, hour, consumption, adjusted_consumption
+                )
 
         logger.debug("Updated %d cache entries", updated_count)
         return updated_count
+
+    def _get_reference_slots(self) -> Dict[int, int]:
+        """Returns a dict, which is a mapping against
+                  self.history_days and self.history_weights
+        """
+        reference_slots = {}
+        for idx, day_offset in enumerate(self.history_days):
+            reference_slots[day_offset] = self.history_weights[idx]
+        return reference_slots
 
     def refresh_data(self) -> None:
         """Refresh historical data and update cache
@@ -404,37 +412,92 @@ class ForecastConsumptionHomeAssistant(ForecastConsumptionInterface):
         logger.info("Refreshing consumption forecast data from HomeAssistant")
 
         now = datetime.datetime.now(tz=self.timezone)
+
+        # always have the next 48 hours in the forecast
+        # Create a list of cache_keys to ensure they are present
+        cache_keys = [
+            self._get_cache_key((now + datetime.timedelta(hours=h)).weekday(), (now + datetime.timedelta(hours=h)).hour)
+            for h in range(MAX_FORECAST_HOURS)
+        ]
+
+        # Create a list of missing history data periods
+        missing_periods = []
+        for h in range(MAX_FORECAST_HOURS):
+            if cache_keys[h] not in self.consumption_cache:
+                missing_periods.append(h)
+
+        if missing_periods:
+            logger.info("Missing history data for hours: %s", missing_periods)
+
+        # now as full hour
+        now = now.replace(minute=0, second=0, microsecond=0)
+
+
+#TODO  Das Abholen der fehlenden Stunden war langsam, weil immer erneut eine Verbindung aufgemacht wurde
+#      wenn wir bei bedarf die Verbindung aufmachen und halten bis zum Ende, sind die Abfragen schneller
+#      und wir können die Logik einfacher halten.
+
+        reference_slots = self._get_reference_slots()
         history_periods = []
 
-        # Fetch data for each configured history period
-        for days_offset in self.history_days:
-            # Calculate time range for this period (24 hours)
-            end_time = now + datetime.timedelta(days=days_offset)
-            start_time = end_time - datetime.timedelta(hours=24)
+        for fetch_hour in missing_periods:
+            # start time is now + fetch_hour
+            basis_start_time = now + datetime.timedelta(hours=fetch_hour)
+            basis_end_time = basis_start_time + datetime.timedelta(hours=1)
 
-            try:
-                hourly_data = self._fetch_hourly_statistics(start_time, end_time)
-                if hourly_data:
-                    history_periods.append(hourly_data)
-                else:
-                    logger.warning(
-                        "No statistics data for %d days offset",
-                        days_offset
+
+            # Now fetch each history_days as offset on basis_start + endtime
+            logger.debug("Fetching history data for hour offset %d (basis time %s)",
+                       fetch_hour, basis_start_time)
+            slot_results = {}
+            for history_day, weight in reference_slots.items():
+                start_time = basis_start_time + datetime.timedelta(days=history_day)
+                end_time = basis_end_time + datetime.timedelta(days=history_day)
+
+                try:
+                    hourly_data = self._fetch_hourly_statistics(start_time, end_time)
+
+                    if hourly_data > -1 :
+                        logger.debug("Fetched history data for %d days offset: %s",
+                                   history_day, hourly_data)
+                        slot_results[history_day] = hourly_data
+                    else:
+                        logger.debug("No data fetched for %d days offset", history_day)
+                except (RuntimeError, ValueError) as e:
+                    logger.error(
+                        "Failed to fetch statistics for %d days offset: %s",
+                        history_day, e
                     )
-            except (RuntimeError, ValueError) as e:
-                logger.error(
-                    "Failed to fetch statistics for %d days offset: %s",
-                    days_offset, e
+                    # Continue with other periods even if one fails
+                    continue
+
+            # Now calculate weighted statistics for this hour slot
+            if slot_results:
+                weight_sum = 0
+                summary_results = 0
+                for history_day in self.history_days:
+                    if history_day in slot_results:
+                        weight_sum += reference_slots[history_day]
+                        summary_results += slot_results[history_day] * reference_slots[history_day]
+
+                if weight_sum > 0:
+                    history_periods.append(summary_results / weight_sum)
+
+            else:
+                # No data fetched for this hour
+                # Stop processing further
+                logger.warning(
+                    "No statistics data fetched for hour offset %d, ending collect",
+                    fetch_hour
                 )
-                # Continue with other periods even if one fails
-                continue
+                break
 
         if not history_periods:
             logger.error("No statistics data could be fetched, forecast unavailable")
             return
 
         # Calculate weighted statistics and update cache
-        updated_count = self._update_cache_with_statistics(history_periods)
+        updated_count = self._update_cache_with_statistics(now, history_periods)
 
         logger.info(
             "Successfully updated consumption forecast cache with %d hour slots",
@@ -461,7 +524,6 @@ class ForecastConsumptionHomeAssistant(ForecastConsumptionInterface):
         # Generate forecast for requested hours
         prediction = {}
         now = datetime.datetime.now(tz=self.timezone)
-        missing_keys = []
 
         for h in range(hours):
             future_time = now + datetime.timedelta(hours=h)
@@ -476,25 +538,13 @@ class ForecastConsumptionHomeAssistant(ForecastConsumptionInterface):
             if consumption is not None:
                 prediction[h] = consumption
             else:
-                # Cache miss - collect for later
-                missing_keys.append((h, weekday, hour, cache_key))
-
-        # Handle missing keys: use average of available values as fallback
-        if missing_keys:
-            with self._cache_lock:
-                if len(self.consumption_cache) > 0:
-                    # Average is already multiplied in cache, no need to apply multiplier again
-                    avg_consumption = float(np.mean(list(self.consumption_cache.values())))
-                else:
-                    avg_consumption = 0.0
-                    logger.warning("No cached data available for forecast")
-
-            for h, weekday, hour, cache_key in missing_keys:
-                prediction[h] = avg_consumption
                 logger.debug(
-                    "No data for %s (weekday=%d, hour=%d), using average: %.1f Wh",
-                    cache_key, weekday, hour, avg_consumption
+                    "No cached data for %s (weekday=%d, hour=%d)",
+                    cache_key, weekday, hour
                 )
+                # Break here.
+                # Cache miss - we will handle missing keys later
+                break
 
         if prediction:
             logger.debug(
