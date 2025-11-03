@@ -9,6 +9,7 @@ logger.info('Loading module')
 
 DEFAULT_CSV_FILE = 'default_load_profile.csv'
 
+# pylint: disable=too-few-public-methods
 class Consumption:
     """ Factory for consumption forecast providers """
 
@@ -23,7 +24,7 @@ class Consumption:
         # csv is the default.
         if consumption_type == 'csv':
             csv_config = {}
-            # Homeassistant schema validation cant handle 3rd level nesting
+            # Homeassistant schema validation can't handle 3rd level nesting
             if 'csv' in config:
                 csv_config = config['csv']
             else:
@@ -45,7 +46,7 @@ class Consumption:
 
         elif consumption_type == 'homeassistant-api':
             ha_config = {}
-            # Homeassistant schema validation cant handle 3rd level nesting
+            # HomeAssistant schema validation can't handle 3rd level nesting
             if 'homeassistant_api' in config:
                 ha_config = config['homeassistant_api']
             else:

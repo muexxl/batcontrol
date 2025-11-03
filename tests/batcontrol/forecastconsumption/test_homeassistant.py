@@ -1,10 +1,10 @@
 """Tests for HomeAssistant consumption forecasting"""
 
 import datetime
-import pytest
-import pytz
 import json
-from unittest.mock import Mock, patch, MagicMock, AsyncMock
+from unittest.mock import patch, AsyncMock
+import pytz
+import pytest
 from src.batcontrol.forecastconsumption.forecast_homeassistant import (
     ForecastConsumptionHomeAssistant
 )
