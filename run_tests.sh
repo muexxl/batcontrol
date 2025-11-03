@@ -1,8 +1,8 @@
 #!/bin/bash
 
 # Activate virtual environment if it exists (if running outside of container)
-if [ -f "bin/activate" ]; then
-    source bin/activate
+if [ -f "./venv/activate" ]; then
+    source ./venv/activate
 fi
 
 # Install pytest dependencies if not already installed
