@@ -116,7 +116,7 @@ consumption_forecast:
 
   # Uncomment to use HomeAssistant API for consumption forecasting
   # homeassistant_api:
-  #   base_url: http://192.168.1.100:8123  # Your HomeAssistant URL
+  #   base_url: ws://homeassistant:8123  # Your HomeAssistant URL
   #   apitoken: YOUR_LONG_LIVED_ACCESS_TOKEN  # Get from HomeAssistant Profile
   #   entity_id: sensor.energy_consumption  # Entity ID with consumption data (in Wh or kWh)
   #   history_days: [-7, -14, -21]  # Days to look back for historical data
