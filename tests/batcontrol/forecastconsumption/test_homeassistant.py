@@ -30,10 +30,17 @@ def base_config(timezone):
     }
 
 
+@pytest.fixture
+def mock_unit_check():
+    """Mock the _check_sensor_unit method to avoid WebSocket connections in tests"""
+    with patch.object(ForecastConsumptionHomeAssistant, '_check_sensor_unit', return_value=1.0):
+        yield
+
+
 class TestForecastConsumptionHomeAssistant:
     """Test cases for ForecastConsumptionHomeAssistant"""
 
-    def test_initialization_default_params(self, timezone):
+    def test_initialization_default_params(self, timezone, mock_unit_check):
         """Test initialization with default parameters"""
         forecaster = ForecastConsumptionHomeAssistant(
             base_url='http://localhost:8123',
@@ -49,7 +56,7 @@ class TestForecastConsumptionHomeAssistant:
         assert forecaster.history_weights == [1, 1, 1]
         assert forecaster.cache_ttl_hours == 48.0
 
-    def test_initialization_custom_params(self, base_config):
+    def test_initialization_custom_params(self, base_config, mock_unit_check):
         """Test initialization with custom parameters"""
         forecaster = ForecastConsumptionHomeAssistant(**base_config)
 
@@ -57,7 +64,7 @@ class TestForecastConsumptionHomeAssistant:
         assert forecaster.history_weights == [2, 1]
         assert forecaster.cache_ttl_hours == 24.0
 
-    def test_initialization_mismatched_lengths(self, timezone):
+    def test_initialization_mismatched_lengths(self, timezone, mock_unit_check):
         """Test that mismatched history_days and weights raises error"""
         with pytest.raises(ValueError, match="Length of history_days"):
             ForecastConsumptionHomeAssistant(
@@ -69,7 +76,7 @@ class TestForecastConsumptionHomeAssistant:
                 history_weights=[1, 1]  # Wrong length
             )
 
-    def test_initialization_invalid_weights(self, timezone):
+    def test_initialization_invalid_weights(self, timezone, mock_unit_check):
         """Test that invalid weight values raise error"""
         with pytest.raises(ValueError, match="History weights must be between 1 and 10"):
             ForecastConsumptionHomeAssistant(
@@ -81,7 +88,7 @@ class TestForecastConsumptionHomeAssistant:
                 history_weights=[15]  # Invalid weight
             )
 
-    def test_get_cache_key(self, base_config):
+    def test_get_cache_key(self, base_config, mock_unit_check):
         """Test cache key generation"""
         forecaster = ForecastConsumptionHomeAssistant(**base_config)
 
@@ -98,8 +105,8 @@ class TestForecastConsumptionHomeAssistant:
         assert key == '6_23'
 
     @patch('src.batcontrol.forecastconsumption.forecast_homeassistant.connect')
-    def test_fetch_hourly_statistics_success(self, mock_connect, base_config):
-        """Test successful hourly statistics fetch via WebSocket"""
+    def test_fetch_hourly_statistics_success(self, mock_connect, base_config, mock_unit_check):
+        """Test successful fetch and processing of hourly statistics"""
         forecaster = ForecastConsumptionHomeAssistant(**base_config)
 
         # Mock WebSocket connection and messages
@@ -157,7 +164,7 @@ class TestForecastConsumptionHomeAssistant:
         assert 'ws://localhost:8123/api/websocket' in str(call_args)
 
     @patch('src.batcontrol.forecastconsumption.forecast_homeassistant.connect')
-    def test_fetch_hourly_statistics_api_error(self, mock_connect, base_config):
+    def test_fetch_hourly_statistics_api_error(self, mock_connect, base_config, mock_unit_check):
         """Test handling of API errors"""
         forecaster = ForecastConsumptionHomeAssistant(**base_config)
 
@@ -174,7 +181,7 @@ class TestForecastConsumptionHomeAssistant:
             forecaster._fetch_hourly_statistics(start, end)
 
     @patch('src.batcontrol.forecastconsumption.forecast_homeassistant.connect')
-    def test_fetch_hourly_statistics_no_data(self, mock_connect, base_config):
+    def test_fetch_hourly_statistics_no_data(self, mock_connect, base_config, mock_unit_check):
         """Test handling when no statistics data is available"""
         forecaster = ForecastConsumptionHomeAssistant(**base_config)
 
@@ -208,7 +215,7 @@ class TestForecastConsumptionHomeAssistant:
         assert result == -1.0
 
     @patch('src.batcontrol.forecastconsumption.forecast_homeassistant.connect')
-    def test_fetch_hourly_statistics_negative_consumption(self, mock_connect, base_config):
+    def test_fetch_hourly_statistics_negative_consumption(self, mock_connect, base_config, mock_unit_check):
         """Test handling of negative consumption (counter resets)"""
         forecaster = ForecastConsumptionHomeAssistant(**base_config)
 
@@ -256,7 +263,7 @@ class TestForecastConsumptionHomeAssistant:
         assert result > 0  # Should only include the 100.0 value
 
     @patch('src.batcontrol.forecastconsumption.forecast_homeassistant.connect')
-    def test_fetch_hourly_statistics_unix_timestamps(self, mock_connect, base_config):
+    def test_fetch_hourly_statistics_unix_timestamps(self, mock_connect, base_config, mock_unit_check):
         """Test handling of Unix timestamps (seconds and milliseconds)"""
         forecaster = ForecastConsumptionHomeAssistant(**base_config)
 
@@ -303,7 +310,7 @@ class TestForecastConsumptionHomeAssistant:
         assert isinstance(result, float)
         assert result > 0  # Should have positive consumption average
 
-    def test_update_cache_with_statistics(self, base_config):
+    def test_update_cache_with_statistics(self, base_config, mock_unit_check):
         """Test cache update with weighted statistics"""
         forecaster = ForecastConsumptionHomeAssistant(**base_config)
 
@@ -334,7 +341,7 @@ class TestForecastConsumptionHomeAssistant:
             assert abs(forecaster.consumption_cache['0_12'] - 150.0) < 0.1
 
     @patch('src.batcontrol.forecastconsumption.forecast_homeassistant.connect')
-    def test_refresh_data(self, mock_connect, base_config):
+    def test_refresh_data(self, mock_connect, base_config, mock_unit_check):
         """Test data refresh functionality"""
         forecaster = ForecastConsumptionHomeAssistant(**base_config)
 
@@ -375,7 +382,7 @@ class TestForecastConsumptionHomeAssistant:
             assert cache_size > 0, "Cache should have been updated"
 
     @patch.object(ForecastConsumptionHomeAssistant, 'refresh_data')
-    def test_get_forecast_with_cache(self, mock_refresh, base_config, timezone):
+    def test_get_forecast_with_cache(self, mock_refresh, base_config, timezone, mock_unit_check):
         """Test forecast generation with cached data"""
         forecaster = ForecastConsumptionHomeAssistant(**base_config)
 
@@ -401,7 +408,7 @@ class TestForecastConsumptionHomeAssistant:
             assert forecast[h] >= 0
 
     @patch.object(ForecastConsumptionHomeAssistant, 'refresh_data')
-    def test_get_forecast_cache_miss(self, mock_refresh, base_config, timezone):
+    def test_get_forecast_cache_miss(self, mock_refresh, base_config, timezone, mock_unit_check):
         """Test forecast generation triggers refresh on cache miss"""
         forecaster = ForecastConsumptionHomeAssistant(**base_config)
 
@@ -421,7 +428,7 @@ class TestForecastConsumptionHomeAssistant:
         assert mock_refresh.called
         assert len(forecast) == 1
 
-    def test_get_forecast_fallback_on_missing_key(self, base_config, timezone):
+    def test_get_forecast_fallback_on_missing_key(self, base_config, timezone, mock_unit_check):
         """Test forecast stops when specific hour not in cache"""
         forecaster = ForecastConsumptionHomeAssistant(**base_config)
 
@@ -443,3 +450,240 @@ class TestForecastConsumptionHomeAssistant:
         # All values should be reasonable (not 0)
         for value in forecast.values():
             assert value > 0
+
+    @patch('src.batcontrol.forecastconsumption.forecast_homeassistant.connect')
+    def test_check_sensor_unit_wh(self, mock_connect, timezone):
+        """Test unit check for sensor with Wh unit"""
+        # Mock WebSocket connection
+        mock_websocket = AsyncMock()
+        mock_websocket.recv = AsyncMock(side_effect=[
+            json.dumps({"type": "auth_required"}),
+            json.dumps({"type": "auth_ok"}),
+            json.dumps({
+                "id": 1,
+                "type": "result",
+                "success": True,
+                "result": [
+                    {
+                        "entity_id": "sensor.energy_consumption",
+                        "state": "1234.5",
+                        "attributes": {
+                            "unit_of_measurement": "Wh",
+                            "friendly_name": "Energy Consumption"
+                        }
+                    }
+                ]
+            })
+        ])
+        mock_websocket.send = AsyncMock()
+        mock_websocket.close = AsyncMock()
+
+        async def mock_connect_coro(*args, **kwargs):
+            return mock_websocket
+
+        mock_connect.side_effect = mock_connect_coro
+
+        forecaster = ForecastConsumptionHomeAssistant(
+            base_url='http://localhost:8123',
+            api_token='test_token',
+            entity_id='sensor.energy_consumption',
+            timezone=timezone
+        )
+
+        # Should have conversion factor of 1.0 for Wh
+        assert forecaster.unit_conversion_factor == 1.0
+
+    @patch('src.batcontrol.forecastconsumption.forecast_homeassistant.connect')
+    def test_check_sensor_unit_kwh(self, mock_connect, timezone):
+        """Test unit check for sensor with kWh unit"""
+        # Mock WebSocket connection
+        mock_websocket = AsyncMock()
+        mock_websocket.recv = AsyncMock(side_effect=[
+            json.dumps({"type": "auth_required"}),
+            json.dumps({"type": "auth_ok"}),
+            json.dumps({
+                "id": 1,
+                "type": "result",
+                "success": True,
+                "result": [
+                    {
+                        "entity_id": "sensor.energy_consumption",
+                        "state": "1.234",
+                        "attributes": {
+                            "unit_of_measurement": "kWh",
+                            "friendly_name": "Energy Consumption"
+                        }
+                    }
+                ]
+            })
+        ])
+        mock_websocket.send = AsyncMock()
+        mock_websocket.close = AsyncMock()
+
+        async def mock_connect_coro(*args, **kwargs):
+            return mock_websocket
+
+        mock_connect.side_effect = mock_connect_coro
+
+        forecaster = ForecastConsumptionHomeAssistant(
+            base_url='http://localhost:8123',
+            api_token='test_token',
+            entity_id='sensor.energy_consumption',
+            timezone=timezone
+        )
+
+        # Should have conversion factor of 1000.0 for kWh
+        assert forecaster.unit_conversion_factor == 1000.0
+
+    @patch('src.batcontrol.forecastconsumption.forecast_homeassistant.connect')
+    def test_check_sensor_unit_invalid(self, mock_connect, timezone):
+        """Test unit check for sensor with invalid unit"""
+        # Mock WebSocket connection
+        mock_websocket = AsyncMock()
+        mock_websocket.recv = AsyncMock(side_effect=[
+            json.dumps({"type": "auth_required"}),
+            json.dumps({"type": "auth_ok"}),
+            json.dumps({
+                "id": 1,
+                "type": "result",
+                "success": True,
+                "result": [
+                    {
+                        "entity_id": "sensor.energy_consumption",
+                        "state": "1234.5",
+                        "attributes": {
+                            "unit_of_measurement": "MWh",
+                            "friendly_name": "Energy Consumption"
+                        }
+                    }
+                ]
+            })
+        ])
+        mock_websocket.send = AsyncMock()
+        mock_websocket.close = AsyncMock()
+
+        async def mock_connect_coro(*args, **kwargs):
+            return mock_websocket
+
+        mock_connect.side_effect = mock_connect_coro
+
+        # Should raise ValueError for unsupported unit
+        with pytest.raises(ValueError, match="Unsupported unit_of_measurement 'MWh'"):
+            ForecastConsumptionHomeAssistant(
+                base_url='http://localhost:8123',
+                api_token='test_token',
+                entity_id='sensor.energy_consumption',
+                timezone=timezone
+            )
+
+    @patch('src.batcontrol.forecastconsumption.forecast_homeassistant.connect')
+    def test_check_sensor_unit_entity_not_found(self, mock_connect, timezone):
+        """Test unit check when entity is not found"""
+        # Mock WebSocket connection
+        mock_websocket = AsyncMock()
+        mock_websocket.recv = AsyncMock(side_effect=[
+            json.dumps({"type": "auth_required"}),
+            json.dumps({"type": "auth_ok"}),
+            json.dumps({
+                "id": 1,
+                "type": "result",
+                "success": True,
+                "result": [
+                    {
+                        "entity_id": "sensor.other_sensor",
+                        "state": "100",
+                        "attributes": {
+                            "unit_of_measurement": "Wh"
+                        }
+                    }
+                ]
+            })
+        ])
+        mock_websocket.send = AsyncMock()
+        mock_websocket.close = AsyncMock()
+
+        async def mock_connect_coro(*args, **kwargs):
+            return mock_websocket
+
+        mock_connect.side_effect = mock_connect_coro
+
+        # Should raise RuntimeError when entity not found
+        with pytest.raises(RuntimeError, match="Entity 'sensor.energy_consumption' not found"):
+            ForecastConsumptionHomeAssistant(
+                base_url='http://localhost:8123',
+                api_token='test_token',
+                entity_id='sensor.energy_consumption',
+                timezone=timezone
+            )
+
+    @patch('src.batcontrol.forecastconsumption.forecast_homeassistant.connect')
+    def test_fetch_with_kwh_conversion(self, mock_connect, timezone):
+        """Test that kWh values are correctly converted to Wh"""
+        # Mock WebSocket connection for unit check
+        mock_websocket = AsyncMock()
+        mock_websocket.recv = AsyncMock(side_effect=[
+            # Unit check
+            json.dumps({"type": "auth_required"}),
+            json.dumps({"type": "auth_ok"}),
+            json.dumps({
+                "id": 1,
+                "type": "result",
+                "success": True,
+                "result": [
+                    {
+                        "entity_id": "sensor.energy_consumption",
+                        "state": "1.5",
+                        "attributes": {
+                            "unit_of_measurement": "kWh"
+                        }
+                    }
+                ]
+            }),
+            # Statistics fetch
+            json.dumps({"type": "auth_required"}),
+            json.dumps({"type": "auth_ok"}),
+            json.dumps({
+                "id": 1,
+                "type": "result",
+                "success": True,
+                "result": {
+                    'sensor.energy_consumption': [
+                        {
+                            'start': '2023-10-30T10:00:00+00:00',
+                            'end': '2023-10-30T11:00:00+00:00',
+                            'change': 1.5  # 1.5 kWh should become 1500 Wh
+                        },
+                        {
+                            'start': '2023-10-30T11:00:00+00:00',
+                            'end': '2023-10-30T12:00:00+00:00',
+                            'change': 2.0  # 2.0 kWh should become 2000 Wh
+                        }
+                    ]
+                }
+            })
+        ])
+        mock_websocket.send = AsyncMock()
+        mock_websocket.close = AsyncMock()
+
+        async def mock_connect_coro(*args, **kwargs):
+            return mock_websocket
+
+        mock_connect.side_effect = mock_connect_coro
+
+        forecaster = ForecastConsumptionHomeAssistant(
+            base_url='http://localhost:8123',
+            api_token='test_token',
+            entity_id='sensor.energy_consumption',
+            timezone=timezone
+        )
+
+        # Verify conversion factor is set
+        assert forecaster.unit_conversion_factor == 1000.0
+
+        start = datetime.datetime(2025, 10, 27, 0, 0, tzinfo=pytz.UTC)
+        end = datetime.datetime(2025, 10, 28, 0, 0, tzinfo=pytz.UTC)
+
+        result = forecaster._fetch_hourly_statistics(start, end)
+
+        # Average of 1500 and 2000 Wh = 1750 Wh
+        assert result == 1750.0

@@ -38,7 +38,7 @@ logger = logging.getLogger(__name__)
 
 # HomeAssistant connection details
 HOMEASSISTANT_URL = "ws://homeassistant.local:8123"  # Your HomeAssistant URL
-HOMEASSISTANT_TOKEN = "YOUR_LONG_LIVED_ACCESS_TOKEN"  # Get from Profile -> Long-Lived Access Tokens
+HOMEASSISTANT_TOKEN = "YOUR_LONG_LIVED_ACCESS_TOKEN" # Get from Profile -> Long-Lived Access Tokens
 
 # Entity to track (must have long-term statistics enabled)
 # Examples:

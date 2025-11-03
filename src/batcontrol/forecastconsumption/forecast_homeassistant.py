@@ -1,7 +1,7 @@
 """HomeAssistant API based consumption forecasting
 
 This module provides consumption forecasting using historical data from HomeAssistant.
-It fetches historical consumption data for configured time periods and calculates weighted 
+It fetches historical consumption data for configured time periods and calculates weighted
 statistics for each hour to predict future consumption.
 """
 
@@ -97,13 +97,113 @@ class ForecastConsumptionHomeAssistant(ForecastConsumptionInterface):
         self.consumption_cache: TTLCache = TTLCache(maxsize=168, ttl=cache_ttl_seconds)
         self._cache_lock = threading.Lock()
 
+        # Query sensor to determine unit and set conversion factor
+        self.unit_conversion_factor = self._check_sensor_unit()
+
         logger.info(
             "Initialized HomeAssistant consumption forecaster: "
             "entity_id=%s, history_days=%s, weights=%s, cache_ttl=%0.1fh, "
-            "multiplier=%0.2f",
+            "multiplier=%0.2f, unit_conversion_factor=%0.1f",
             entity_id, self.history_days, self.history_weights,
-            cache_ttl_hours, multiplier
+            cache_ttl_hours, multiplier, self.unit_conversion_factor
         )
+
+    def _check_sensor_unit(self) -> float:
+        """Check sensor's unit_of_measurement and return conversion factor
+
+        Queries the sensor via WebSocket to get its unit_of_measurement attribute.
+        Returns the appropriate conversion factor to convert to Wh.
+
+        Returns:
+            float: Conversion factor (1.0 for Wh, 1000.0 for kWh)
+
+        Raises:
+            ValueError: If unit_of_measurement is neither Wh nor kWh
+            RuntimeError: If sensor cannot be queried
+        """
+        try:
+            loop = asyncio.get_event_loop()
+        except RuntimeError:
+            # No event loop in current thread, create a new one
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+
+        return loop.run_until_complete(self._check_sensor_unit_async())
+
+    async def _check_sensor_unit_async(self) -> float:
+        """Async implementation of sensor unit check
+
+        Returns:
+            float: Conversion factor (1.0 for Wh, 1000.0 for kWh)
+
+        Raises:
+            ValueError: If unit_of_measurement is neither Wh nor kWh
+            RuntimeError: If sensor cannot be queried
+        """
+        logger.debug("Checking unit_of_measurement for entity: %s", self.entity_id)
+
+        websocket, message_id = await self._websocket_connect()
+
+        try:
+            # Request all states to find our entity
+            states_request = {
+                "id": message_id,
+                "type": "get_states"
+            }
+            logger.debug("Sending get_states request: %s", states_request)
+            await websocket.send(json.dumps(states_request))
+
+            # Receive states response
+            states_response = await websocket.recv()
+            states_result = json.loads(states_response)
+            logger.debug("Received states response: id=%s, type=%s, success=%s",
+                       states_result.get("id"),
+                       states_result.get("type"),
+                       states_result.get("success"))
+
+            if not states_result.get("success"):
+                error_msg = states_result.get("error", {}).get("message", "Unknown error")
+                logger.error("get_states request failed: %s", error_msg)
+                raise RuntimeError(f"Failed to get sensor states: {error_msg}")
+
+            # Find our entity in the results
+            states = states_result.get("result", [])
+            entity_state = None
+            for state in states:
+                if state.get("entity_id") == self.entity_id:
+                    entity_state = state
+                    break
+
+            if entity_state is None:
+                raise RuntimeError(
+                    f"Entity '{self.entity_id}' not found in HomeAssistant. "
+                    f"Please check the entity_id."
+                )
+
+            # Get unit_of_measurement from attributes
+            attributes = entity_state.get("attributes", {})
+            unit = attributes.get("unit_of_measurement")
+
+            logger.info(
+                "Entity '%s' has unit_of_measurement: %s",
+                self.entity_id, unit
+            )
+
+            # Determine conversion factor based on unit
+            if unit == "Wh":
+                logger.debug("Unit is Wh, no conversion needed")
+                return 1.0
+            elif unit == "kWh":
+                logger.info("Unit is kWh, will multiply values by 1000 to convert to Wh")
+                return 1000.0
+            else:
+                raise ValueError(
+                    f"Unsupported unit_of_measurement '{unit}' for entity '{self.entity_id}'. "
+                    f"Only 'Wh' and 'kWh' are supported."
+                )
+
+        finally:
+            await self._websocket_disconnect(websocket)
 
     def _get_cache_key(self, weekday: int, hour: int) -> str:
         """Generate cache key from weekday and hour
@@ -334,6 +434,10 @@ class ForecastConsumptionHomeAssistant(ForecastConsumptionInterface):
                     if consumption is not None:
                         try:
                             consumption = float(consumption)
+
+                            # Apply unit conversion factor (e.g., kWh -> Wh)
+                            consumption = consumption * self.unit_conversion_factor
+
                             if consumption < 0:
                                 logger.debug(
                                     "Skipping negative consumption at %s: %.2f Wh",
