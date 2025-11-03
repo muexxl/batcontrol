@@ -104,7 +104,7 @@ class TestForecastConsumptionHomeAssistant:
 
         # Mock WebSocket connection and messages
         mock_websocket = AsyncMock()
-        
+
         # Simulate WebSocket message exchange
         mock_websocket.recv = AsyncMock(side_effect=[
             # 1. auth_required
@@ -113,7 +113,7 @@ class TestForecastConsumptionHomeAssistant:
             json.dumps({"type": "auth_ok"}),
             # 3. statistics response
             json.dumps({
-                "id": 1,
+                "id": 1,#
                 "type": "result",
                 "success": True,
                 "result": {
@@ -132,14 +132,14 @@ class TestForecastConsumptionHomeAssistant:
                 }
             })
         ])
-        
+
         mock_websocket.send = AsyncMock()
         mock_websocket.close = AsyncMock()
-        
+
         # Make connect return an awaitable that resolves to the websocket
         async def mock_connect_coro(*args, **kwargs):
             return mock_websocket
-        
+
         mock_connect.side_effect = mock_connect_coro
 
         start = datetime.datetime(2025, 10, 27, 0, 0, tzinfo=pytz.UTC)
@@ -151,7 +151,7 @@ class TestForecastConsumptionHomeAssistant:
         assert isinstance(result, float)
         assert result > 0  # Should have positive consumption value
         assert mock_connect.called
-        
+
         # Verify WebSocket was called with correct URL
         call_args = mock_connect.call_args
         assert 'ws://localhost:8123/api/websocket' in str(call_args)
@@ -164,7 +164,7 @@ class TestForecastConsumptionHomeAssistant:
         # Mock WebSocket connection failure
         async def raise_error(*args, **kwargs):
             raise Exception("Connection refused")
-        
+
         mock_connect.side_effect = raise_error
 
         start = datetime.datetime(2025, 10, 27, 0, 0, tzinfo=pytz.UTC)
@@ -192,11 +192,11 @@ class TestForecastConsumptionHomeAssistant:
         ])
         mock_websocket.send = AsyncMock()
         mock_websocket.close = AsyncMock()
-        
+
         # Make connect return an awaitable that resolves to the websocket
         async def mock_connect_coro(*args, **kwargs):
             return mock_websocket
-        
+
         mock_connect.side_effect = mock_connect_coro
 
         start = datetime.datetime(2025, 10, 27, 0, 0, tzinfo=pytz.UTC)
@@ -239,11 +239,11 @@ class TestForecastConsumptionHomeAssistant:
         ])
         mock_websocket.send = AsyncMock()
         mock_websocket.close = AsyncMock()
-        
+
         # Make connect return an awaitable that resolves to the websocket
         async def mock_connect_coro(*args, **kwargs):
             return mock_websocket
-        
+
         mock_connect.side_effect = mock_connect_coro
 
         start = datetime.datetime(2025, 10, 27, 0, 0, tzinfo=pytz.UTC)
@@ -287,11 +287,11 @@ class TestForecastConsumptionHomeAssistant:
         ])
         mock_websocket.send = AsyncMock()
         mock_websocket.close = AsyncMock()
-        
+
         # Make connect return an awaitable that resolves to the websocket
         async def mock_connect_coro(*args, **kwargs):
             return mock_websocket
-        
+
         mock_connect.side_effect = mock_connect_coro
 
         start = datetime.datetime(2025, 10, 27, 0, 0, tzinfo=pytz.UTC)
@@ -360,11 +360,11 @@ class TestForecastConsumptionHomeAssistant:
         ] * 100)  # Repeat for multiple fetches
         mock_websocket.send = AsyncMock()
         mock_websocket.close = AsyncMock()
-        
+
         # Make connect return an awaitable that resolves to the websocket
         async def mock_connect_coro(*args, **kwargs):
             return mock_websocket
-        
+
         mock_connect.side_effect = mock_connect_coro
 
         forecaster.refresh_data()
@@ -381,7 +381,7 @@ class TestForecastConsumptionHomeAssistant:
 
         # Get current time to populate cache with appropriate keys
         now = datetime.datetime.now(tz=timezone)
-        
+
         # Populate cache with test data for the next few hours from now
         with forecaster._cache_lock:
             for h in range(5):
@@ -427,7 +427,7 @@ class TestForecastConsumptionHomeAssistant:
 
         # Get current time
         now = datetime.datetime.now(tz=timezone)
-        
+
         # Cache with limited data - only first 2 hours from now
         with forecaster._cache_lock:
             for h in range(2):
