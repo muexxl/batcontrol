@@ -68,6 +68,13 @@ class Consumption:
             entity_id = ha_config['entity_id']
             history_days = ha_config.get('history_days', [-7, -14, -21])
             history_weights = ha_config.get('history_weights', [1, 1, 1])
+
+            # Convert string lists to int/float lists (HomeAssistant config quirk)
+            if isinstance(history_days, list):
+                history_days = [int(x) for x in history_days]
+            if isinstance(history_weights, list):
+                history_weights = [int(x) for x in history_weights]
+
             cache_ttl_hours = ha_config.get('cache_ttl_hours', 48.0)
             multiplier = ha_config.get('multiplier', 1.0)
 
