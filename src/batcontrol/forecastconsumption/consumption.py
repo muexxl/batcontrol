@@ -71,7 +71,9 @@ class Consumption:
 
             # Convert string lists to int/float lists (HomeAssistant config quirk)
             if isinstance(history_days, list):
+                logger.debug("history_days: %s", history_days)
                 history_days = [int(x) for x in history_days]
+                logger.debug("history_days: %s", history_days)
             if isinstance(history_weights, list):
                 history_weights = [int(x) for x in history_weights]
 
