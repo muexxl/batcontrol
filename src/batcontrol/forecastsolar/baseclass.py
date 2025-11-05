@@ -96,7 +96,8 @@ class ForecastSolarBaseclass(ForecastSolarInterface):
 
     def get_forecast(self) -> dict[int, float]:
         """ Get forecast from provider """
-        self.refresh_data()
+        if not self._refresh_data_lock.locked():
+            self.refresh_data()
         forecast = self.get_forecast_from_raw_data()
 
         max_hour=max(forecast.keys())

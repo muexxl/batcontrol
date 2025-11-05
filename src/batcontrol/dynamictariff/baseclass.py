@@ -51,7 +51,8 @@ class DynamicTariffBaseclass(TariffInterface):
 
     def get_prices(self) -> dict[int, float]:
         """ Get prices from provider """
-        self.refresh_data()
+        if not self._refresh_data_lock.locked():
+            self.refresh_data()
         prices = self.get_prices_from_raw_data()
         return prices
 
