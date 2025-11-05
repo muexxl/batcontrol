@@ -23,84 +23,9 @@ class Consumption:
 
         # csv is the default.
         if consumption_type == 'csv':
-            csv_config = {}
-            # Homeassistant schema validation can't handle 3rd level nesting
-            if 'csv' in config:
-                csv_config = config['csv']
-            else:
-                csv_config['annual_consumption'] = config.get('annual_consumption', 0)
-                csv_config['load_profile'] = config.get('load_profile', None)
-
-            if csv_config.get('load_profile', None) is None:
-                logger.error(
-                    "No load profile specified, using default: %s",
-                    DEFAULT_CSV_FILE
-                )
-                csv_config['load_profile'] = DEFAULT_CSV_FILE
-
-            consumption = ForecastConsumptionCsv(
-                                'config/' + csv_config['load_profile'],
-                                tz,
-                                csv_config.get('annual_consumption', 0)
-                            )
-
+            consumption = _create_csv_forecast(tz, config)
         elif consumption_type == 'homeassistant-api':
-            ha_config = {}
-            # HomeAssistant schema validation can't handle 3rd level nesting
-            if 'homeassistant_api' in config:
-                ha_config = config['homeassistant_api']
-            else:
-                ha_config = config
-
-
-            # Validate required parameters
-            required_params = ['base_url', 'apitoken', 'entity_id']
-            for param in required_params:
-                if param not in ha_config:
-                    raise ValueError(
-                        f"HomeAssistant consumption forecast requires '{param}' "
-                        f"in consumption_forecast.homeassistant_api configuration"
-                    )
-
-            # Get configuration with defaults
-            base_url = ha_config['base_url']
-            api_token = ha_config['apitoken']
-            entity_id = ha_config['entity_id']
-            history_days = ha_config.get('history_days', [-7, -14, -21])
-            history_weights = ha_config.get('history_weights', [1, 1, 1])
-
-            # Configure String -1;-2;-3 to a list and remove spaces
-            if isinstance(history_days, str):
-                history_days = [x.strip() for x in history_days.split(';')]
-            if isinstance(history_weights, str):
-                history_weights = [x.strip() for x in history_weights.split(';')]
-
-            # Convert string lists to int/float lists (HomeAssistant config quirk)
-            if isinstance(history_days, list):
-                history_days = [int(x) for x in history_days]
-            if isinstance(history_weights, list):
-                history_weights = [int(x) for x in history_weights]
-
-            cache_ttl_hours = ha_config.get('cache_ttl_hours', 48.0)
-            multiplier = ha_config.get('multiplier', 1.0)
-
-            logger.info(
-                "Creating HomeAssistant consumption forecast: "
-                "entity_id=%s, history_days=%s, weights=%s, multiplier=%0.2f",
-                entity_id, history_days, history_weights, multiplier
-            )
-
-            consumption = ForecastConsumptionHomeAssistant(
-                base_url=base_url,
-                api_token=api_token,
-                entity_id=entity_id,
-                timezone=tz,
-                history_days=history_days,
-                history_weights=history_weights,
-                cache_ttl_hours=cache_ttl_hours,
-                multiplier=multiplier
-            )
-
+            consumption = _create_homeassistant_forecast(tz, config)
         else:
             raise ValueError(
                 f"Unknown consumption forecast type: '{consumption_type}'. "
@@ -108,3 +33,86 @@ class Consumption:
             )
 
         return consumption
+
+def _create_homeassistant_forecast(tz, config) -> ForecastConsumptionInterface:
+    """ Create and configure HomeAssistant consumption forecast provider """
+    ha_config = {}
+    # HomeAssistant schema validation can't handle 3rd level nesting
+    if 'homeassistant_api' in config:
+        ha_config = config['homeassistant_api']
+    else:
+        ha_config = config
+
+
+    # Validate required parameters
+    required_params = ['base_url', 'apitoken', 'entity_id']
+    for param in required_params:
+        if param not in ha_config:
+            raise ValueError(
+                f"HomeAssistant consumption forecast requires '{param}' "
+                f"in consumption_forecast.homeassistant_api configuration"
+            )
+
+    # Get configuration with defaults
+    base_url = ha_config['base_url']
+    api_token = ha_config['apitoken']
+    entity_id = ha_config['entity_id']
+    history_days = ha_config.get('history_days', [-7, -14, -21])
+    history_weights = ha_config.get('history_weights', [1, 1, 1])
+
+    # Configure String -1;-2;-3 to a list and remove spaces
+    if isinstance(history_days, str):
+        history_days = [x.strip() for x in history_days.split(';')]
+    if isinstance(history_weights, str):
+        history_weights = [x.strip() for x in history_weights.split(';')]
+
+    # Convert string lists to int/float lists (HomeAssistant config quirk)
+    if isinstance(history_days, list):
+        history_days = [int(x) for x in history_days]
+    if isinstance(history_weights, list):
+        history_weights = [int(x) for x in history_weights]
+
+    cache_ttl_hours = ha_config.get('cache_ttl_hours', 48.0)
+    multiplier = ha_config.get('multiplier', 1.0)
+
+    logger.info(
+        "Creating HomeAssistant consumption forecast: "
+        "entity_id=%s, history_days=%s, weights=%s, multiplier=%0.2f",
+        entity_id, history_days, history_weights, multiplier
+    )
+
+    consumption = ForecastConsumptionHomeAssistant(
+        base_url=base_url,
+        api_token=api_token,
+        entity_id=entity_id,
+        timezone=tz,
+        history_days=history_days,
+        history_weights=history_weights,
+        cache_ttl_hours=cache_ttl_hours,
+        multiplier=multiplier
+    )
+    return consumption
+
+def _create_csv_forecast(tz, config) -> ForecastConsumptionInterface:
+    """ Create and configure CSV consumption forecast provider """
+    csv_config = {}
+    # Homeassistant schema validation can't handle 3rd level nesting
+    if 'csv' in config:
+        csv_config = config['csv']
+    else:
+        csv_config['annual_consumption'] = config.get('annual_consumption', 0)
+        csv_config['load_profile'] = config.get('load_profile', None)
+
+    if csv_config.get('load_profile', None) is None:
+        logger.error(
+            "No load profile specified, using default: %s",
+            DEFAULT_CSV_FILE
+        )
+        csv_config['load_profile'] = DEFAULT_CSV_FILE
+
+    consumption = ForecastConsumptionCsv(
+                        'config/' + csv_config['load_profile'],
+                        tz,
+                        csv_config.get('annual_consumption', 0)
+                    )
+    return consumption

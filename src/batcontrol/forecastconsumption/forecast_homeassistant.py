@@ -23,10 +23,10 @@ logger.info('Loading module')
 MAX_FORECAST_HOURS = 48
 
 
-logger_ha_details = logging.getLogger("batcontrol.forecastconsumption.forecast_homeassistant.details")
-logger_ha_communication = logging.getLogger("batcontrol.forecastconsumption.forecast_homeassistant.communication")
-
-
+logger_ha_details = logging.getLogger(
+                             "batcontrol.forecastconsumption.forecast_homeassistant.details")
+logger_ha_communication = logging.getLogger(
+                             "batcontrol.forecastconsumption.forecast_homeassistant.communication")
 
 
 # pylint: disable=too-many-instance-attributes
@@ -202,11 +202,11 @@ class ForecastConsumptionHomeAssistant(ForecastConsumptionInterface):
             elif unit == "kWh":
                 logger.info("Unit is kWh, will multiply values by 1000 to convert to Wh")
                 return 1000.0
-            else:
-                raise ValueError(
-                    f"Unsupported unit_of_measurement '{unit}' for entity '{self.entity_id}'. "
-                    f"Only 'Wh' and 'kWh' are supported."
-                )
+
+            raise ValueError(
+                f"Unsupported unit_of_measurement '{unit}' for entity '{self.entity_id}'. "
+                f"Only 'Wh' and 'kWh' are supported."
+            )
 
         finally:
             await self._websocket_disconnect(websocket)
@@ -387,7 +387,8 @@ class ForecastConsumptionHomeAssistant(ForecastConsumptionInterface):
                     # Parse start timestamp
                     start_ts_value = stat.get('start')
                     if not start_ts_value:
-                        logger_ha_details.debug("Skipping stat entry with no 'start' field: %s", stat)
+                        logger_ha_details.debug(
+                                       "Skipping stat entry with no 'start' field: %s", stat)
                         continue
 
                     # Handle both timestamp formats: Unix timestamp (int/float) or ISO string
@@ -459,13 +460,16 @@ class ForecastConsumptionHomeAssistant(ForecastConsumptionInterface):
                                 weekday, hour, start_ts.strftime("%Y-%m-%d %H:%M"), consumption
                             )
                         except (ValueError, TypeError) as e:
-                            logger_ha_details.debug("Skipping non-numeric consumption: %s (error: %s)",
-                                       consumption, e)
+                            logger_ha_details.debug(
+                                "Skipping non-numeric consumption: %s (error: %s)",
+                                consumption, e
+                            )
                             continue
 
                 logger_ha_details.debug("Processed %d hourly statistics buckets", len(hourly_data))
 
-                # Summary of collected data and return average
+                # Store summary of collected hourly consumption data and return average consumption
+                # value.
                 if hourly_data:
                     values = list(hourly_data.values())
                     avg_consumption = sum(values) / len(values)
@@ -644,7 +648,10 @@ class ForecastConsumptionHomeAssistant(ForecastConsumptionInterface):
                                        history_day, hourly_data)
                             slot_results[history_day] = hourly_data
                         else:
-                            logger_ha_details.warning("No data fetched for hour %d (offset %d days)", fetch_hour, history_day)
+                            logger_ha_details.warning(
+                                "No data fetched for hour offset %d with day offset %d",
+                                fetch_hour, history_day
+                            )
                     except (RuntimeError, ValueError) as e:
                         logger.error(
                             "Failed to fetch statistics for %d days offset: %s",
