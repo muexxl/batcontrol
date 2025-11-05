@@ -69,7 +69,7 @@ class Consumption:
             history_days = ha_config.get('history_days', [-7, -14, -21])
             history_weights = ha_config.get('history_weights', [1, 1, 1])
 
-            # Configer String -1;-2;-3 to a list and remove spaces
+            # Configure String -1;-2;-3 to a list and remove spaces
             if isinstance(history_days, str):
                 history_days = [x.strip() for x in history_days.split(';')]
             if isinstance(history_weights, str):
