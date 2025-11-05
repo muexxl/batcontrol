@@ -23,6 +23,12 @@ logger.info('Loading module')
 MAX_FORECAST_HOURS = 48
 
 
+logger_ha_details = logging.getLogger(
+                             "batcontrol.forecastconsumption.forecast_homeassistant.details")
+logger_ha_communication = logging.getLogger(
+                             "batcontrol.forecastconsumption.forecast_homeassistant.communication")
+
+
 # pylint: disable=too-many-instance-attributes
 class ForecastConsumptionHomeAssistant(ForecastConsumptionInterface):
     """Forecasts consumption based on historical data from HomeAssistant API
@@ -150,13 +156,13 @@ class ForecastConsumptionHomeAssistant(ForecastConsumptionInterface):
                 "id": message_id,
                 "type": "get_states"
             }
-            logger.debug("Sending get_states request: %s", states_request)
+            logger_ha_communication.debug("Sending get_states request: %s", states_request)
             await websocket.send(json.dumps(states_request))
 
             # Receive states response
             states_response = await websocket.recv()
             states_result = json.loads(states_response)
-            logger.debug("Received states response: id=%s, type=%s, success=%s",
+            logger_ha_communication.debug("Received states response: id=%s, type=%s, success=%s",
                        states_result.get("id"),
                        states_result.get("type"),
                        states_result.get("success"))
@@ -196,11 +202,11 @@ class ForecastConsumptionHomeAssistant(ForecastConsumptionInterface):
             elif unit == "kWh":
                 logger.info("Unit is kWh, will multiply values by 1000 to convert to Wh")
                 return 1000.0
-            else:
-                raise ValueError(
-                    f"Unsupported unit_of_measurement '{unit}' for entity '{self.entity_id}'. "
-                    f"Only 'Wh' and 'kWh' are supported."
-                )
+
+            raise ValueError(
+                f"Unsupported unit_of_measurement '{unit}' for entity '{self.entity_id}'. "
+                f"Only 'Wh' and 'kWh' are supported."
+            )
 
         finally:
             await self._websocket_disconnect(websocket)
@@ -230,14 +236,14 @@ class ForecastConsumptionHomeAssistant(ForecastConsumptionInterface):
         ws_url = self.base_url.replace('http://', 'ws://').replace('https://', 'wss://')
         ws_url = f"{ws_url}/api/websocket"
 
-        logger.debug("Connecting to HomeAssistant WebSocket: %s", ws_url)
+        logger_ha_communication.debug("Connecting to HomeAssistant WebSocket: %s", ws_url)
 
         websocket = await connect(ws_url)
 
         # Step 1: Receive auth_required message
         auth_required = await websocket.recv()
         auth_msg = json.loads(auth_required)
-        logger.debug("Received auth_required message: %s", auth_msg)
+        logger_ha_communication.debug("Received auth_required message: %s", auth_msg)
 
         if auth_msg.get("type") != "auth_required":
             await websocket.close()
@@ -248,13 +254,13 @@ class ForecastConsumptionHomeAssistant(ForecastConsumptionInterface):
             "type": "auth",
             "access_token": self.api_token
         }
-        logger.debug("Sending authentication message")
+        logger_ha_communication.debug("Sending authentication message")
         await websocket.send(json.dumps(auth_payload))
 
         # Step 3: Receive auth response
         auth_response = await websocket.recv()
         auth_result = json.loads(auth_response)
-        logger.debug("Received auth response: %s", auth_result)
+        logger_ha_communication.debug("Received auth response: %s", auth_result)
 
         if auth_result.get("type") != "auth_ok":
             logger.error(
@@ -266,7 +272,7 @@ class ForecastConsumptionHomeAssistant(ForecastConsumptionInterface):
                 f"{auth_result.get('message', 'Unknown error')}"
             )
 
-        logger.debug("WebSocket authentication successful")
+        logger_ha_communication.debug("WebSocket authentication successful")
 
         return websocket, 1  # Return websocket and initial message_id
 
@@ -278,9 +284,9 @@ class ForecastConsumptionHomeAssistant(ForecastConsumptionInterface):
         """
         try:
             await websocket.close()
-            logger.debug("WebSocket connection closed")
+            logger_ha_communication.debug("WebSocket connection closed")
         except Exception as e:  # pylint: disable=broad-exception-caught
-            logger.warning("Error closing WebSocket connection: %s", e)
+            logger_ha_communication.warning("Error closing WebSocket connection: %s", e)
 
     # pylint: disable=too-many-locals,too-many-branches,too-many-statements
     # pylint: disable=too-many-nested-blocks
@@ -316,7 +322,7 @@ class ForecastConsumptionHomeAssistant(ForecastConsumptionInterface):
         start_iso = start_time.isoformat()
         end_iso = end_time.isoformat()
 
-        logger.debug(
+        logger_ha_details.debug(
             "Fetching hourly statistics via WebSocket: entity=%s, start=%s, end=%s",
             self.entity_id, start_iso, end_iso
         )
@@ -339,13 +345,13 @@ class ForecastConsumptionHomeAssistant(ForecastConsumptionInterface):
                     "statistic_ids": [self.entity_id],
                     "period": "hour"
                 }
-                logger.debug("Sending statistics request: %s", stats_request)
+                logger_ha_details.debug("Sending statistics request: %s", stats_request)
                 await websocket.send(json.dumps(stats_request))
 
                 # Receive statistics response
                 stats_response = await websocket.recv()
                 stats_result = json.loads(stats_response)
-                logger.debug("Received statistics response: id=%s, type=%s, success=%s",
+                logger_ha_details.debug("Received statistics response: id=%s, type=%s, success=%s",
                            stats_result.get("id"),
                            stats_result.get("type"),
                            stats_result.get("success"))
@@ -360,11 +366,11 @@ class ForecastConsumptionHomeAssistant(ForecastConsumptionInterface):
                     )
 
                 data = stats_result.get("result", {})
-                logger.debug("Statistics result contains %d entities", len(data))
+                logger_ha_details.debug("Statistics result contains %d entities", len(data))
 
                 # HomeAssistant statistics API returns dict with entity_id as key
                 if not data or self.entity_id not in data:
-                    logger.warning(
+                    logger_ha_details.warning(
                         "No statistics data returned for entity %s. "
                         "Make sure the entity has long-term statistics enabled.",
                         self.entity_id
@@ -372,7 +378,7 @@ class ForecastConsumptionHomeAssistant(ForecastConsumptionInterface):
                     return -1
 
                 entity_stats = data[self.entity_id]
-                logger.debug("Fetched %d hourly statistics", len(entity_stats))
+                logger_ha_details.debug("Fetched %d hourly statistics", len(entity_stats))
 
                 # Process statistics into hourly buckets by weekday and hour
                 hourly_data: Dict[Tuple[int, int], float] = {}
@@ -381,7 +387,8 @@ class ForecastConsumptionHomeAssistant(ForecastConsumptionInterface):
                     # Parse start timestamp
                     start_ts_value = stat.get('start')
                     if not start_ts_value:
-                        logger.debug("Skipping stat entry with no 'start' field: %s", stat)
+                        logger_ha_details.debug(
+                                       "Skipping stat entry with no 'start' field: %s", stat)
                         continue
 
                     # Handle both timestamp formats: Unix timestamp (int/float) or ISO string
@@ -392,7 +399,7 @@ class ForecastConsumptionHomeAssistant(ForecastConsumptionInterface):
                                 start_ts_value / 1000.0,
                                 tz=self.timezone
                             )
-                            logger.debug(
+                            logger_ha_details.debug(
                                 "Parsed millisecond timestamp %s -> %s",
                                 start_ts_value, start_ts
                             )
@@ -401,7 +408,7 @@ class ForecastConsumptionHomeAssistant(ForecastConsumptionInterface):
                                 start_ts_value,
                                 tz=self.timezone
                             )
-                            logger.debug(
+                            logger_ha_details.debug(
                                 "Parsed second timestamp %s -> %s",
                                 start_ts_value, start_ts
                             )
@@ -410,7 +417,7 @@ class ForecastConsumptionHomeAssistant(ForecastConsumptionInterface):
                         start_ts = datetime.datetime.fromisoformat(
                             str(start_ts_value).replace('Z', '+00:00')
                         )
-                        logger.debug(
+                        logger_ha_details.debug(
                             "Parsed ISO timestamp '%s' -> %s",
                             start_ts_value, start_ts
                         )
@@ -427,7 +434,7 @@ class ForecastConsumptionHomeAssistant(ForecastConsumptionInterface):
                     # Get consumption value - use 'sum' for cumulative sensors
                     # 'sum' represents the total change during this hour
                     consumption = stat.get('change')
-                    logger.debug("Raw consumption value for %s: change=%s",
+                    logger_ha_details.debug("Raw consumption value for %s: change=%s",
                                start_ts.strftime("%Y-%m-%d %H:%M"),
                                stat.get('change'))
 
@@ -448,18 +455,21 @@ class ForecastConsumptionHomeAssistant(ForecastConsumptionInterface):
                             key = (weekday, hour)
                             hourly_data[key] = consumption
 
-                            logger.debug(
+                            logger_ha_details.debug(
                                 "Stored: weekday=%d, hour=%d (%s): %.2f Wh",
                                 weekday, hour, start_ts.strftime("%Y-%m-%d %H:%M"), consumption
                             )
                         except (ValueError, TypeError) as e:
-                            logger.debug("Skipping non-numeric consumption: %s (error: %s)",
-                                       consumption, e)
+                            logger_ha_details.debug(
+                                "Skipping non-numeric consumption: %s (error: %s)",
+                                consumption, e
+                            )
                             continue
 
-                logger.debug("Processed %d hourly statistics buckets", len(hourly_data))
+                logger_ha_details.debug("Processed %d hourly statistics buckets", len(hourly_data))
 
-                # Log summary of collected data and return average
+                # Store summary of collected hourly consumption data and return average consumption
+                # value.
                 if hourly_data:
                     values = list(hourly_data.values())
                     avg_consumption = sum(values) / len(values)
@@ -543,7 +553,7 @@ class ForecastConsumptionHomeAssistant(ForecastConsumptionInterface):
                     cache_key, weekday, hour, consumption, adjusted_consumption
                 )
 
-        logger.debug("Updated %d cache entries", updated_count)
+        logger.info("Updated %d cache entries", updated_count)
         return updated_count
 
     def _get_reference_slots(self) -> Dict[int, int]:
@@ -583,7 +593,7 @@ class ForecastConsumptionHomeAssistant(ForecastConsumptionInterface):
                 missing_periods.append(h)
 
         if missing_periods:
-            logger.info("Missing history data for hours: %s", missing_periods)
+            logger.info("Collecting data for missing hours: %s", missing_periods)
         else:
             logger.debug("All forecast hours present in cache, no refresh needed")
             return
@@ -606,7 +616,7 @@ class ForecastConsumptionHomeAssistant(ForecastConsumptionInterface):
 
         try:
             websocket, message_id = loop.run_until_complete(self._websocket_connect())
-            logger.debug("WebSocket connected for bulk data fetch")
+            logger_ha_communication.debug("WebSocket connected for bulk data fetch")
 
             for fetch_hour in missing_periods:
                 # start time is now + fetch_hour
@@ -614,7 +624,7 @@ class ForecastConsumptionHomeAssistant(ForecastConsumptionInterface):
                 basis_end_time = basis_start_time + datetime.timedelta(hours=1)
 
                 # Now fetch each history_days as offset on basis_start + endtime
-                logger.debug("Fetching history data for hour offset %d (basis time %s)",
+                logger_ha_details.debug("Fetching history data for hour offset %d (basis time %s)",
                            fetch_hour, basis_start_time)
                 slot_results = {}
                 for history_day in reference_slots:
@@ -634,11 +644,14 @@ class ForecastConsumptionHomeAssistant(ForecastConsumptionInterface):
                         message_id += 1  # Increment for next request
 
                         if hourly_data > -1:
-                            logger.debug("Fetched history data for %d days offset: %s",
+                            logger_ha_details.debug("Fetched history data for %d days offset: %s",
                                        history_day, hourly_data)
                             slot_results[history_day] = hourly_data
                         else:
-                            logger.debug("No data fetched for %d days offset", history_day)
+                            logger_ha_details.warning(
+                                "No data fetched for hour offset %d with day offset %d",
+                                fetch_hour, history_day
+                            )
                     except (RuntimeError, ValueError) as e:
                         logger.error(
                             "Failed to fetch statistics for %d days offset: %s",
@@ -703,8 +716,8 @@ class ForecastConsumptionHomeAssistant(ForecastConsumptionInterface):
         with self._cache_lock:
             cache_size = len(self.consumption_cache)
 
-        if cache_size == 0:
-            logger.info("Cache empty, refreshing consumption forecast data")
+        if cache_size == 0 or cache_size < hours:
+            logger.info("Cache empty or insufficient, refreshing consumption forecast data")
             self.refresh_data()
 
         # Generate forecast for requested hours
@@ -724,7 +737,7 @@ class ForecastConsumptionHomeAssistant(ForecastConsumptionInterface):
             if consumption is not None:
                 prediction[h] = consumption
             else:
-                logger.debug(
+                logger_ha_details.warning(
                     "No cached data for %s (weekday=%d, hour=%d)",
                     cache_key, weekday, hour
                 )
@@ -741,6 +754,7 @@ class ForecastConsumptionHomeAssistant(ForecastConsumptionInterface):
                 max(prediction.values())
             )
         else:
-            logger.warning("Generated empty forecast")
+            logger.error("Generated empty forecast")
+            raise RuntimeError("No consumption forecast data available")
 
         return prediction

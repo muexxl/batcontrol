@@ -40,7 +40,8 @@ DELAY_EVALUATION_BY_SECONDS = 15  # Delay evaluation for x seconds at every trig
 # Interval between evaluations in seconds
 TIME_BETWEEN_EVALUATIONS = EVALUATIONS_EVERY_MINUTES * 60
 TIME_BETWEEN_UTILITY_API_CALLS = 900  # 15 Minutes
-
+MIN_FORECAST_HOURS = 1  # Minimum required forecast hours
+FORECAST_TOLERANCE = 3  # Acceptable tolerance for forecast hours
 
 MODE_ALLOW_DISCHARGING = 10
 MODE_AVOID_DISCHARGING = 0
@@ -296,6 +297,15 @@ class Batcontrol:
                             max(production_forecast.keys()))
             consumption_forecast = self.fc_consumption.get_forecast(
                 fc_period+1)
+            if len(consumption_forecast) < fc_period+1:
+                # Accept a shorter forecast horizon if not enough data is available
+                if len(consumption_forecast) < max(fc_period-FORECAST_TOLERANCE,MIN_FORECAST_HOURS):
+                    raise RuntimeError(f"Not enough consumption forecast data available, "
+                                       f"requested {fc_period}, got {len(consumption_forecast)}"
+                            )
+                logger.warning("Insufficient consumption forecast data available, reducing "
+                               "forecast to %d hours", len(consumption_forecast))
+                fc_period = len(consumption_forecast)-1
         except Exception as e:
             logger.warning(
                 'Following Exception occurred when trying to get forecasts: %s', e,
