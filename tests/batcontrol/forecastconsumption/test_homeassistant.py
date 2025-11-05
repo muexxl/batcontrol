@@ -407,13 +407,13 @@ class TestForecastConsumptionHomeAssistant:
             assert h in forecast
             assert forecast[h] >= 0
 
-    @patch.object(ForecastConsumptionHomeAssistant, 'refresh_data')
+    @patch.object(ForecastConsumptionHomeAssistant, 'refresh_data_with_limit')
     def test_get_forecast_cache_miss(self, mock_refresh, base_config, timezone, mock_unit_check):
         """Test forecast generation triggers refresh on cache miss"""
         forecaster = ForecastConsumptionHomeAssistant(**base_config)
 
         # Set up mock to populate cache when called
-        def populate_cache():
+        def populate_cache(hours):
             now = datetime.datetime.now(tz=timezone)
             with forecaster._cache_lock:
                 key = forecaster._get_cache_key(now.weekday(), now.hour)

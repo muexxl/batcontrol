@@ -501,16 +501,18 @@ class ForecastConsumptionHomeAssistant(ForecastConsumptionInterface):
             Float
         """
         # Run async function in event loop
+        # Use asyncio.run() for Python 3.10+ compatibility
         try:
-            loop = asyncio.get_event_loop()
+            loop = asyncio.get_running_loop()
+            # If we're already in an async context, we can't use asyncio.run()
+            # This shouldn't happen in practice for this method
+            raise RuntimeError("Cannot call _fetch_hourly_statistics from async context")
         except RuntimeError:
-            # No event loop in current thread, create a new one
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-
-        return loop.run_until_complete(
-            self._fetch_hourly_statistics_async(start_time, end_time)
-        )
+            # No running loop - this is the expected case
+            # asyncio.run() creates a new event loop, runs the coroutine, and closes it
+            return asyncio.run(
+                self._fetch_hourly_statistics_async(start_time, end_time)
+            )
 
     def _update_cache_with_statistics(
         self,
@@ -565,12 +567,11 @@ class ForecastConsumptionHomeAssistant(ForecastConsumptionInterface):
             reference_slots[day_offset] = self.history_weights[idx]
         return reference_slots
 
-    # pylint: disable=too-many-locals,too-many-branches,too-many-statements
-    def refresh_data(self) -> None:
-        """Refresh historical data and update cache
+    def refresh_data_with_limit(self, hours: int) -> None:
+        """Refresh historical data with specified hour limit
 
-        Fetches hourly statistics from HomeAssistant for configured time periods,
-        calculates weighted averages, and updates the cache.
+        Args:
+            hours: Number of hours to refresh (typically up to 48)
         """
         logger.info("Refreshing consumption forecast data from HomeAssistant")
 
@@ -583,12 +584,12 @@ class ForecastConsumptionHomeAssistant(ForecastConsumptionInterface):
                 (now + datetime.timedelta(hours=h)).weekday(),
                 (now + datetime.timedelta(hours=h)).hour
             )
-            for h in range(MAX_FORECAST_HOURS)
+            for h in range(hours)
         ]
 
         # Create a list of missing history data periods
         missing_periods = []
-        for h in range(MAX_FORECAST_HOURS):
+        for h in range(hours):
             if cache_keys[h] not in self.consumption_cache:
                 missing_periods.append(h)
 
@@ -703,6 +704,16 @@ class ForecastConsumptionHomeAssistant(ForecastConsumptionInterface):
             updated_count
         )
 
+
+    # pylint: disable=too-many-locals,too-many-branches,too-many-statements
+    def refresh_data(self) -> None:
+        """Refresh historical data and update cache
+
+        Fetches hourly statistics from HomeAssistant for configured time periods,
+        calculates weighted averages, and updates the cache.
+        """
+        self.refresh_data_with_limit(MAX_FORECAST_HOURS)
+
     def get_forecast(self, hours: int) -> Dict[int, float]:
         """Get consumption forecast for the next N hours
 
@@ -718,7 +729,7 @@ class ForecastConsumptionHomeAssistant(ForecastConsumptionInterface):
 
         if cache_size == 0 or cache_size < hours:
             logger.info("Cache empty or insufficient, refreshing consumption forecast data")
-            self.refresh_data()
+            self.refresh_data_with_limit(hours)
 
         # Generate forecast for requested hours
         prediction = {}
