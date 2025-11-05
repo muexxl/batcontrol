@@ -463,9 +463,9 @@ class ForecastConsumptionHomeAssistant(ForecastConsumptionInterface):
                                        consumption, e)
                             continue
 
-                logger.debug("Processed %d hourly statistics buckets", len(hourly_data))
+                logger_ha_details.debug("Processed %d hourly statistics buckets", len(hourly_data))
 
-                # Log summary of collected data and return average
+                # Summary of collected data and return average
                 if hourly_data:
                     values = list(hourly_data.values())
                     avg_consumption = sum(values) / len(values)
@@ -589,7 +589,7 @@ class ForecastConsumptionHomeAssistant(ForecastConsumptionInterface):
                 missing_periods.append(h)
 
         if missing_periods:
-            logger.info("Missing history data for hours: %s", missing_periods)
+            logger.info("Collecting data for missing hours: %s", missing_periods)
         else:
             logger.debug("All forecast hours present in cache, no refresh needed")
             return
@@ -644,7 +644,7 @@ class ForecastConsumptionHomeAssistant(ForecastConsumptionInterface):
                                        history_day, hourly_data)
                             slot_results[history_day] = hourly_data
                         else:
-                            logger_ha_details.warning("No data fetched for %d days offset", history_day)
+                            logger_ha_details.warning("No data fetched for hour %d (offset %d days)", fetch_hour, history_day)
                     except (RuntimeError, ValueError) as e:
                         logger.error(
                             "Failed to fetch statistics for %d days offset: %s",
