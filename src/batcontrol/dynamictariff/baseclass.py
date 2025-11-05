@@ -1,4 +1,5 @@
 """ Parent Class for implementing different tariffs"""
+import threading
 import time
 import random
 import logging
@@ -19,6 +20,7 @@ class DynamicTariffBaseclass(TariffInterface):
         self.timezone=timezone
         self.delay_evaluation_by_seconds=delay_evaluation_by_seconds
         self.cache = RelaxedCaching()
+        self._refresh_data_lock = threading.Lock()
 
     def get_raw_data(self) -> dict:
         """ Get raw data from cache or provider """
@@ -30,21 +32,22 @@ class DynamicTariffBaseclass(TariffInterface):
 
     def refresh_data(self) -> None:
         """ Refresh data from provider if needed """
-        now = time.time()
-        if now  > self.next_update_ts:
-            # Not on initial call
-            if self.next_update_ts > 0 and self.delay_evaluation_by_seconds > 0:
-                sleeptime = random.randrange(0, self.delay_evaluation_by_seconds, 1)
-                logger.debug(
-                    'Waiting for %d seconds before requesting new data',
-                    sleeptime)
-                time.sleep(sleeptime)
-            try:
-                self.store_raw_data(self.get_raw_data_from_provider())
-                self.next_update_ts = now + self.min_time_between_updates
-            except (ConnectionError, TimeoutError) as e:
-                logger.error('Error getting raw tariff data: %s', e)
-                logger.warning('Using cached raw tariff data')
+        with self._refresh_data_lock:
+            now = time.time()
+            if now  > self.next_update_ts:
+                # Not on initial call
+                if self.next_update_ts > 0 and self.delay_evaluation_by_seconds > 0:
+                    sleeptime = random.randrange(0, self.delay_evaluation_by_seconds, 1)
+                    logger.debug(
+                        'Waiting for %d seconds before requesting new data',
+                        sleeptime)
+                    time.sleep(sleeptime)
+                try:
+                    self.store_raw_data(self.get_raw_data_from_provider())
+                    self.next_update_ts = now + self.min_time_between_updates
+                except (ConnectionError, TimeoutError) as e:
+                    logger.error('Error getting raw tariff data: %s', e)
+                    logger.warning('Using cached raw tariff data')
 
     def get_prices(self) -> dict[int, float]:
         """ Get prices from provider """

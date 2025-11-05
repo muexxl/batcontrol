@@ -147,4 +147,5 @@ if __name__ == '__main__':
                            'azimuth': '7',
                            'kWp': '25.030'}]
     fcs=FCSolar( test_pvinstallations, 'Europe/Berlin' , 10)
+    fcs.refresh_data()
     print (fcs.get_forecast())

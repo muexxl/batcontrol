@@ -1,7 +1,9 @@
 """ Parent Class for implementing different solar forecast providers"""
+import threading
 import time
 import random
 import logging
+import schedule
 from .forecastsolar_interface import ForecastSolarInterface
 from ..fetcher.relaxed_caching import RelaxedCaching, CacheMissError
 
@@ -29,6 +31,7 @@ class ForecastSolarBaseclass(ForecastSolarInterface):
         self.delay_evaluation_by_seconds = delay_evaluation_by_seconds
         self.cache_list = {}
         self.rate_limit_blackout_window_ts = 0
+        self._refresh_data_lock = threading.Lock()
 
         try:
             for unit in pvinstallations:
@@ -55,40 +58,41 @@ class ForecastSolarBaseclass(ForecastSolarInterface):
 
     def refresh_data(self) -> None:
         """ Refresh data from provider if needed """
-        now = time.time()
+        with self._refresh_data_lock:
+            now = time.time()
 
-        if now > self.next_update_ts:
-            if self.rate_limit_blackout_window_ts > now:
-                logger.info(
-                    'Rate limit blackout window in place until %s (another %d seconds)',
-                    self.rate_limit_blackout_window_ts,
-                    self.rate_limit_blackout_window_ts - now
-                )
-                self.next_update_ts = self.rate_limit_blackout_window_ts
-                return
+            if now > self.next_update_ts:
+                if self.rate_limit_blackout_window_ts > now:
+                    logger.info(
+                        'Rate limit blackout window in place until %s (another %d seconds)',
+                        self.rate_limit_blackout_window_ts,
+                        self.rate_limit_blackout_window_ts - now
+                    )
+                    self.next_update_ts = self.rate_limit_blackout_window_ts
+                    return
 
-            # Not on initial call
-            if self.next_update_ts > 0 and self.delay_evaluation_by_seconds > 0:
-                sleeptime = random.randrange(0, self.delay_evaluation_by_seconds, 1)
-                logger.debug(
-                    'Waiting for %d seconds before requesting new data',
-                    sleeptime)
-                time.sleep(sleeptime)
-            try:
-                for unit in self.pvinstallations:
-                    name = unit['name']
-                    result = self.get_raw_data_from_provider(name)
-                    try:
-                        # Store raw data only if no CacheMissError occurred
-                        self.store_raw_data(name, result)
-                    except RateLimitException:
-                        logger.warning(
-                            'Rate limit exceeded. Setting blackout window until %s',
-                            self.rate_limit_blackout_window_ts)
-                self.next_update_ts = now + self.min_time_between_updates
-            except (ConnectionError, TimeoutError, ProviderError) as e:
-                logger.error('Error getting raw solar forecast data: %s', e)
-                logger.warning('Using cached raw solar forecast data')
+                # Not on initial call
+                if self.next_update_ts > 0 and self.delay_evaluation_by_seconds > 0:
+                    sleeptime = random.randrange(0, self.delay_evaluation_by_seconds, 1)
+                    logger.debug(
+                        'Waiting for %d seconds before requesting new data',
+                        sleeptime)
+                    time.sleep(sleeptime)
+                try:
+                    for unit in self.pvinstallations:
+                        name = unit['name']
+                        result = self.get_raw_data_from_provider(name)
+                        try:
+                            # Store raw data only if no CacheMissError occurred
+                            self.store_raw_data(name, result)
+                        except RateLimitException:
+                            logger.warning(
+                                'Rate limit exceeded. Setting blackout window until %s',
+                                self.rate_limit_blackout_window_ts)
+                    self.next_update_ts = now + self.min_time_between_updates
+                except (ConnectionError, TimeoutError, ProviderError) as e:
+                    logger.error('Error getting raw solar forecast data: %s', e)
+                    logger.warning('Using cached raw solar forecast data')
 
     def get_forecast(self) -> dict[int, float]:
         """ Get forecast from provider """

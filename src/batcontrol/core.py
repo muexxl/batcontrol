@@ -16,6 +16,7 @@ import time
 import os
 import logging
 import platform
+from typing import Callable
 
 import pytz
 import numpy as np
@@ -23,6 +24,7 @@ import platform
 
 from .mqtt_api import MqttApi
 from .evcc_api import EvccApi
+from .scheduler import SchedulerThread
 
 from .logic import Logic as LogicFactory
 from .logic import CalculationInput, CalculationParameters
@@ -223,10 +225,23 @@ class Batcontrol:
                 self.evcc_api.wait_ready()
                 logger.info('evcc Connection ready')
 
+        # Initialize scheduler thread
+        self.scheduler = SchedulerThread()
+        logger.info('Scheduler thread initialized')
+        self.scheduler.start()
+        self.schedule_task(10, 'minutes', self.fc_solar.refresh_data, 'forecast-solar')
+        self.schedule_task(10, 'minutes', self.fc_consumption.refresh_data, 'forecast-consumption')
+        self.schedule_task(10, 'minutes', self.dynamic_tariff.refresh_data, 'utility-tariff')
+
     def shutdown(self):
         """ Shutdown Batcontrol and dependend modules (inverter..) """
         logger.info('Shutting down Batcontrol')
         try:
+            # Stop scheduler thread
+            if hasattr(self, 'scheduler') and self.scheduler is not None:
+                self.scheduler.stop()
+                del self.scheduler
+
             self.inverter.shutdown()
             del self.inverter
             if self.evcc_api is not None:
@@ -234,6 +249,38 @@ class Batcontrol:
                 del self.evcc_api
         except:
             pass
+
+    # Scheduler helper methods
+    def schedule_task(self, interval: int, unit: str, task: Callable, task_name: str = ""):
+        """
+        Schedule a task to run at regular intervals using the scheduler thread.
+
+        Args:
+            interval: The interval value (e.g., 5 for "every 5 minutes")
+            unit: The unit of time ('seconds', 'minutes', 'hours', 'days', 'weeks')
+            task: The callable function to execute
+            task_name: Optional name for the task (for logging purposes)
+        """
+        if not hasattr(self, 'scheduler') or self.scheduler is None:
+            logger.error("Scheduler not initialized, cannot schedule task")
+            return
+
+        return self.scheduler.schedule_every(interval, unit, task, task_name)
+
+    def schedule_task_at_time(self, time_str: str, task: Callable, task_name: str = ""):
+        """
+        Schedule a task to run at a specific time each day.
+
+        Args:
+            time_str: Time string in HH:MM format (e.g., "14:30")
+            task: The callable function to execute
+            task_name: Optional name for the task (for logging purposes)
+        """
+        if not hasattr(self, 'scheduler') or self.scheduler is None:
+            logger.error("Scheduler not initialized, cannot schedule task")
+            return
+
+        return self.scheduler.schedule_at(time_str, task, task_name)
 
     def reset_forecast_error(self):
         """ Reset the forecast error timer """
@@ -337,7 +384,7 @@ class Batcontrol:
                          consumption.round(1))
             logger.debug('Net Consumption Forecast: %s',
                          net_consumption.round(1))
-            logger.debug('Prices: %s', 
+            logger.debug('Prices: %s',
                          prices.round(self.round_price_digits))
         # negative = charging or feed in
         # positive = dis-charging or grid consumption
