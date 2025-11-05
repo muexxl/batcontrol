@@ -748,5 +748,6 @@ class ForecastConsumptionHomeAssistant(ForecastConsumptionInterface):
             )
         else:
             logger.error("Generated empty forecast")
+            raise RuntimeError("No consumption forecast data available")
 
         return prediction
