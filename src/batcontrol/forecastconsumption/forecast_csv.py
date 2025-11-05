@@ -98,6 +98,14 @@ class ForecastConsumptionCsv(ForecastConsumptionInterface):
                 )
         return prediction
 
+    def refresh_data(self) -> None:
+        """Refresh forecast data - No-op for CSV-based forecasts
+
+        CSV forecasts use static load profiles and don't require data refresh.
+        This method is provided to comply with the ForecastConsumptionInterface.
+        """
+        pass
+
     def create_loadprofile(self, datafile, path_to_profile='load_profile.csv'):
         df=self.load_data_file(datafile)
         a=[]

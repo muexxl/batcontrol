@@ -69,11 +69,15 @@ class Consumption:
             history_days = ha_config.get('history_days', [-7, -14, -21])
             history_weights = ha_config.get('history_weights', [1, 1, 1])
 
+            # Configure String -1;-2;-3 to a list and remove spaces
+            if isinstance(history_days, str):
+                history_days = [x.strip() for x in history_days.split(';')]
+            if isinstance(history_weights, str):
+                history_weights = [x.strip() for x in history_weights.split(';')]
+
             # Convert string lists to int/float lists (HomeAssistant config quirk)
             if isinstance(history_days, list):
-                logger.debug("history_days: %s", history_days)
                 history_days = [int(x) for x in history_days]
-                logger.debug("history_days: %s", history_days)
             if isinstance(history_weights, list):
                 history_weights = [int(x) for x in history_weights]
 

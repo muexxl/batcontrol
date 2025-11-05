@@ -20,7 +20,7 @@ import pytz
 # Add parent directory to path to import batcontrol modules
 sys.path.insert(0, '../src')
 
-from batcontrol.forecastconsumption.forecast_homeassistant import ForecastConsumptionHomeAssistant
+from batcontrol.forecastconsumption.consumption import Consumption
 
 
 # Configure logging
@@ -52,11 +52,13 @@ TIMEZONE = pytz.timezone("Europe/Berlin")
 
 # History configuration
 # Which days to look back (negative values, e.g., -7 = 7 days ago)
-HISTORY_DAYS = [-1]
+#HISTORY_DAYS = [-1,-2,-3]
+HISTORY_DAYS = "-1;-2;-3"
 
 # Weights for each history period (1-10)
 # Higher weight = more influence on forecast
-HISTORY_WEIGHTS = [1]  # Most recent week has highest weight
+#HISTORY_WEIGHTS = [1]  # Most recent week has highest weight
+HISTORY_WEIGHTS = "1;1;1"  # Most recent week has highest weight
 
 # Cache TTL in hours
 CACHE_TTL_HOURS = 48.0
@@ -116,20 +118,6 @@ def main():
     print("HomeAssistant Consumption Forecast Test")
     print("=" * 80)
 
-    # Check configuration
-    if HOMEASSISTANT_TOKEN == "YOUR_LONG_LIVED_ACCESS_TOKEN":
-        logger.error(
-            "Please update HOMEASSISTANT_TOKEN in the script configuration!\n"
-            "Get a token from HomeAssistant: Profile -> Long-Lived Access Tokens"
-        )
-        return 1
-
-    if HOMEASSISTANT_URL == "http://192.168.1.100:8123":
-        logger.warning(
-            "You're using the default HomeAssistant URL. "
-            "Please update HOMEASSISTANT_URL if needed."
-        )
-
     # Print configuration
     print(f"\nConfiguration:")
     print(f"  HomeAssistant URL: {HOMEASSISTANT_URL}")
@@ -142,18 +130,21 @@ def main():
     print(f"  Forecast Hours:    {FORECAST_HOURS}")
 
     try:
-        # Initialize the forecaster
-        logger.info("Initializing ForecastConsumptionHomeAssistant...")
-        forecaster = ForecastConsumptionHomeAssistant(
-            base_url=HOMEASSISTANT_URL,
-            api_token=HOMEASSISTANT_TOKEN,
-            entity_id=ENTITY_ID,
-            timezone=TIMEZONE,
-            history_days=HISTORY_DAYS,
-            history_weights=HISTORY_WEIGHTS,
-            cache_ttl_hours=CACHE_TTL_HOURS,
-            multiplier=MULTIPLIER
-        )
+        # Build configuration dict for factory
+        config = {
+            'type': 'homeassistant-api',
+            'base_url': HOMEASSISTANT_URL,
+            'apitoken': HOMEASSISTANT_TOKEN,
+            'entity_id': ENTITY_ID,
+            'history_days': HISTORY_DAYS,
+            'history_weights': HISTORY_WEIGHTS,
+            'cache_ttl_hours': CACHE_TTL_HOURS,
+            'multiplier': MULTIPLIER
+        }
+
+        # Initialize the forecaster using factory
+        logger.info("Initializing forecaster via factory...")
+        forecaster = Consumption.create_consumption(TIMEZONE, config)
         logger.info("Forecaster initialized successfully")
 
         # Fetch historical data and update cache
