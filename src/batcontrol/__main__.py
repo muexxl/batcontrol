@@ -45,8 +45,12 @@ def main() -> int:
 
     # Reduce the default loglevel for urllib3.connectionpool
     if not log_everything:
+        logging.getLogger("websockets.protocol").setLevel(logging.WARNING)
+        logging.getLogger("asyncio").setLevel(logging.WARNING)
         logging.getLogger("urllib3.connectionpool").setLevel(logging.WARNING)
         logging.getLogger("batcontrol.inverter.fronius.auth").setLevel(logging.INFO)
+        logging.getLogger("batcontrol.forecastconsumption.forecast_homeassistant.details").setLevel(logging.INFO)
+        logging.getLogger("batcontrol.forecastconsumption.forecast_homeassistant.communication").setLevel(logging.INFO)
 
     bc = Batcontrol(config)
     try:
