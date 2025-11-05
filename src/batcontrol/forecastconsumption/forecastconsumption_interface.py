@@ -8,3 +8,7 @@ class ForecastConsumptionInterface(ABC):
     @abstractmethod
     def get_forecast(self, hours) -> dict[int, float]:
         """ Get consumption forecast up to next 48 hours """
+
+    @abstractmethod
+    def refresh_data(self) -> None:
+        """ Refresh/update forecast data from source """
