@@ -16,6 +16,7 @@ import time
 import os
 import logging
 import platform
+from typing import Callable
 
 import pytz
 import numpy as np
@@ -23,6 +24,7 @@ import platform
 
 from .mqtt_api import MqttApi
 from .evcc_api import EvccApi
+from .scheduler import SchedulerThread
 
 from .logic import Logic as LogicFactory
 from .logic import CalculationInput, CalculationParameters
@@ -223,10 +225,31 @@ class Batcontrol:
                 self.evcc_api.wait_ready()
                 logger.info('evcc Connection ready')
 
+        # Initialize scheduler thread
+        self.scheduler = SchedulerThread()
+        logger.info('Scheduler thread initialized')
+        self.scheduler.start()
+        # Schedule periodic checks as fail-safe variant
+        self.scheduler.schedule_every(1, 'hours', self.fc_solar.refresh_data, 'forecast-solar-every')
+        self.scheduler.schedule_every(1, 'hours', self.dynamic_tariff.refresh_data, 'utility-tariff-every')
+        self.scheduler.schedule_every(2, 'hours', self.fc_consumption.refresh_data, 'forecast-consumption-every')
+        # Run initial data fetch
+        try:
+            self.fc_solar.refresh_data()
+            self.dynamic_tariff.refresh_data()
+            self.fc_consumption.refresh_data()
+        except Exception as e:
+            logger.error("Error during initial data fetch: %s", e)
+
     def shutdown(self):
         """ Shutdown Batcontrol and dependend modules (inverter..) """
         logger.info('Shutting down Batcontrol')
         try:
+            # Stop scheduler thread
+            if hasattr(self, 'scheduler') and self.scheduler is not None:
+                self.scheduler.stop()
+                del self.scheduler
+
             self.inverter.shutdown()
             del self.inverter
             if self.evcc_api is not None:
@@ -337,7 +360,7 @@ class Batcontrol:
                          consumption.round(1))
             logger.debug('Net Consumption Forecast: %s',
                          net_consumption.round(1))
-            logger.debug('Prices: %s', 
+            logger.debug('Prices: %s',
                          prices.round(self.round_price_digits))
         # negative = charging or feed in
         # positive = dis-charging or grid consumption
