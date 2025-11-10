@@ -5,6 +5,7 @@ import random
 import logging
 from .dynamictariff_interface import TariffInterface
 from ..fetcher.relaxed_caching import RelaxedCaching, CacheMissError
+from ..scheduler import schedule_once
 
 
 logger = logging.getLogger(__name__)
@@ -21,6 +22,11 @@ class DynamicTariffBaseclass(TariffInterface):
         self.delay_evaluation_by_seconds=delay_evaluation_by_seconds
         self.cache = RelaxedCaching()
         self._refresh_data_lock = threading.Lock()
+
+    def schedule_next_refresh(self) -> None:
+        """ Schedule the next data refresh just after next_update_ts """
+        hhmm = time.strftime('%H:%M:%S', time.localtime(self.next_update_ts+10))
+        schedule_once(hhmm, self.refresh_data, 'utility-tariff-refresh')
 
     def get_raw_data(self) -> dict:
         """ Get raw data from cache or provider """
@@ -45,6 +51,7 @@ class DynamicTariffBaseclass(TariffInterface):
                 try:
                     self.store_raw_data(self.get_raw_data_from_provider())
                     self.next_update_ts = now + self.min_time_between_updates
+                    self.schedule_next_refresh()
                 except (ConnectionError, TimeoutError) as e:
                     logger.error('Error getting raw tariff data: %s', e)
                     logger.warning('Using cached raw tariff data')

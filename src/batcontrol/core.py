@@ -229,9 +229,17 @@ class Batcontrol:
         self.scheduler = SchedulerThread()
         logger.info('Scheduler thread initialized')
         self.scheduler.start()
-        self.schedule_task(10, 'minutes', self.fc_solar.refresh_data, 'forecast-solar')
-        self.schedule_task(10, 'minutes', self.fc_consumption.refresh_data, 'forecast-consumption')
-        self.schedule_task(10, 'minutes', self.dynamic_tariff.refresh_data, 'utility-tariff')
+        # Schedule periodic checks as fail-safe variant
+        self.scheduler.schedule_every(1, 'hours', self.fc_solar.refresh_data, 'forecast-solar-every')
+        self.scheduler.schedule_every(1, 'hours', self.dynamic_tariff.refresh_data, 'utility-tariff-every')
+        self.scheduler.schedule_every(2, 'hours', self.fc_consumption.refresh_data, 'forecast-consumption-every')
+        # Run initial data fetch
+        try:
+            self.fc_solar.refresh_data()
+            self.dynamic_tariff.refresh_data()
+            self.fc_consumption.refresh_data()
+        except Exception as e:
+            logger.error("Error during initial data fetch: %s", e)
 
     def shutdown(self):
         """ Shutdown Batcontrol and dependend modules (inverter..) """
@@ -249,38 +257,6 @@ class Batcontrol:
                 del self.evcc_api
         except:
             pass
-
-    # Scheduler helper methods
-    def schedule_task(self, interval: int, unit: str, task: Callable, task_name: str = ""):
-        """
-        Schedule a task to run at regular intervals using the scheduler thread.
-
-        Args:
-            interval: The interval value (e.g., 5 for "every 5 minutes")
-            unit: The unit of time ('seconds', 'minutes', 'hours', 'days', 'weeks')
-            task: The callable function to execute
-            task_name: Optional name for the task (for logging purposes)
-        """
-        if not hasattr(self, 'scheduler') or self.scheduler is None:
-            logger.error("Scheduler not initialized, cannot schedule task")
-            return
-
-        return self.scheduler.schedule_every(interval, unit, task, task_name)
-
-    def schedule_task_at_time(self, time_str: str, task: Callable, task_name: str = ""):
-        """
-        Schedule a task to run at a specific time each day.
-
-        Args:
-            time_str: Time string in HH:MM format (e.g., "14:30")
-            task: The callable function to execute
-            task_name: Optional name for the task (for logging purposes)
-        """
-        if not hasattr(self, 'scheduler') or self.scheduler is None:
-            logger.error("Scheduler not initialized, cannot schedule task")
-            return
-
-        return self.scheduler.schedule_at(time_str, task, task_name)
 
     def reset_forecast_error(self):
         """ Reset the forecast error timer """

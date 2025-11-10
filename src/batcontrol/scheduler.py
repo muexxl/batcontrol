@@ -2,9 +2,15 @@
 
 This module provides a scheduler thread that runs alongside the main control loop.
 It uses the schedule library to run periodic tasks at specific intervals.
+
+The module exposes global functions for scheduling jobs that can be called from any context:
+- schedule_every(): Schedule a job to run at regular intervals
+- schedule_at(): Schedule a job to run at a specific time each day
+- schedule_once(): Schedule a job to run once at a specific date and time
+- clear_jobs(): Clear all scheduled jobs
+- get_jobs(): Get all currently scheduled jobs
 """
 
-import datetime
 import threading
 import time
 import logging
@@ -15,8 +21,117 @@ from typing import Callable, Optional
 logger = logging.getLogger(__name__)
 
 
+# Global scheduling functions that can be called from any context
+
+def schedule_every(interval: int, unit: str, job: Callable, job_name: str = ""):
+    """
+    Schedule a job to run at regular intervals (globally accessible)
+
+    Args:
+        interval: The interval value (e.g., 5 for "every 5 minutes")
+        unit: The unit of time ('seconds', 'minutes', 'hours', 'days', 'weeks')
+        job: The callable function to execute
+        job_name: Optional name for the job (for logging purposes)
+
+    Returns:
+        The scheduled job object
+    """
+    name = job_name or job.__name__
+    logger.info("Scheduling job '%s' to run every %d %s", name, interval, unit)
+
+    # Create the scheduler based on the unit
+    task = schedule.every(interval)
+
+    if unit not in ['seconds', 'minutes', 'hours', 'days', 'weeks']:
+        raise ValueError(f"Invalid unit '{unit}'. Must be one of: ['seconds', 'minutes', 'hours', 'days', 'weeks']")
+
+    obtained_unit = task.__getattribute__(unit)
+
+    # Wrap the job to catch exceptions and add logging
+    def wrapped_job():
+        try:
+            logger.info("Running scheduled job: %s", name)
+            job()
+            logger.info("Completed scheduled job: %s", name)
+        except Exception as e:
+            logger.error("Error in scheduled job '%s': %s", name, e, exc_info=True)
+
+    wrapped_job.__name__ = name
+    x = obtained_unit.do(wrapped_job)
+    return x
+
+
+def schedule_at(time_str: str, job: Callable, job_name: str = ""):
+    """
+    Schedule a job to run at a specific time each day (globally accessible)
+
+    Args:
+        time_str: Time string in HH:MM format (e.g., "14:30")
+        job: The callable function to execute
+        job_name: Optional name for the job (for logging purposes)
+
+    Returns:
+        The scheduled job object
+    """
+    name = job_name or job.__name__
+    logger.info("Scheduling job '%s' to run daily at %s", name, time_str)
+
+    # Wrap the job to catch exceptions and add logging
+    def wrapped_job():
+        try:
+            logger.debug("Running scheduled job: %s", name)
+            job()
+            logger.debug("Completed scheduled job: %s", name)
+        except Exception as e:
+            logger.error("Error in scheduled job '%s': %s", name, e, exc_info=True)
+
+    return schedule.every().day.at(time_str).do(wrapped_job)
+
+
+def schedule_once(time: str, job: Callable, job_name: str = ""):
+    """
+    Schedule a job to run once at a specific date and time (globally accessible)
+
+    Args:
+        time: The date and time to run the job
+        job: The callable function to execute
+        job_name: Optional name for the job (for logging purposes)
+
+    Returns:
+        The scheduled job object
+    """
+    name = job_name or job.__name__
+    logger.info("Scheduling job '%s' to run once at %s", name, time)
+
+    # Wrap the job to catch exceptions and add logging
+    def wrapped_job():
+        try:
+            logger.info("Running scheduled one-time job: %s", name)
+            job()
+            logger.info("Completed scheduled one-time job: %s", name)
+            return schedule.CancelJob
+        except Exception as e:
+            logger.error("Error in scheduled one-time job '%s': %s", name, e, exc_info=True)
+
+    return schedule.every().day.at(time).do(wrapped_job).tag(f"one_time_{name}")
+
+
+def clear_jobs():
+    """Clear all scheduled jobs (globally accessible)"""
+    logger.info("Clearing all scheduled jobs")
+    schedule.clear()
+
+
+def get_jobs():
+    """Get all currently scheduled jobs (globally accessible)"""
+    return schedule.get_jobs()
+
 class SchedulerThread:
-    """Thread-based scheduler that runs periodic tasks using the schedule library"""
+    """Thread-based scheduler that runs periodic tasks using the schedule library.
+
+    This class manages the scheduler thread that executes the scheduled jobs.
+    For scheduling jobs, use the global functions schedule_every(), schedule_at(), etc.
+    """
 
     def __init__(self):
         self._thread: Optional[threading.Thread] = None
@@ -69,7 +184,8 @@ class SchedulerThread:
                 if n is None:
                     n = 10  # Default sleep time if no jobs are scheduled
                 if n > 0:
-                    logger.debug("Scheduler thread sleeping for %d seconds until next job", n)
+                    n=min(n,300) # Cap sleep time to 300 seconds
+                    logger.debug("Scheduler thread sleeping for %d seconds.", n)
                     time.sleep(n)
             except Exception as e:
                 logger.error("Error in scheduler thread: %s", e, exc_info=True)
@@ -80,9 +196,15 @@ class SchedulerThread:
         """Check if the scheduler thread is running"""
         return self._running
 
+    # Convenience methods that delegate to the global functions
+    # These methods are kept for backward compatibility
+
     def schedule_every(self, interval: int, unit: str, job: Callable, job_name: str = ""):
         """
         Schedule a job to run at regular intervals
+
+        Note: This method delegates to the global schedule_every() function.
+        You can also call schedule_every() directly from any context.
 
         Args:
             interval: The interval value (e.g., 5 for "every 5 minutes")
@@ -93,34 +215,14 @@ class SchedulerThread:
         Returns:
             The scheduled job object
         """
-        name = job_name or job.__name__
-        logger.info("Scheduling job '%s' to run every %d %s", name, interval, unit)
-
-        # Create the scheduler based on the unit
-        task = schedule.every(interval)
-
-        if unit not in ['seconds', 'minutes', 'hours', 'days', 'weeks']:
-            raise ValueError(f"Invalid unit '{unit}'. Must be one of: ['seconds', 'minutes', 'hours', 'days', 'weeks']")
-
-
-        obtained_unit = task.__getattribute__(unit)
-
-        # Wrap the job to catch exceptions and add logging
-        def wrapped_job():
-            try:
-                logger.info("Running scheduled job: %s", name)
-                job()
-                logger.info("Completed scheduled job: %s", name)
-            except Exception as e:
-                logger.error("Error in scheduled job '%s': %s", name, e, exc_info=True)
-
-        wrapped_job.__name__ = name
-        x = obtained_unit.do(wrapped_job)
-        return x
+        return schedule_every(interval, unit, job, job_name)
 
     def schedule_at(self, time_str: str, job: Callable, job_name: str = ""):
         """
         Schedule a job to run at a specific time each day
+
+        Note: This method delegates to the global schedule_at() function.
+        You can also call schedule_at() directly from any context.
 
         Args:
             time_str: Time string in HH:MM format (e.g., "14:30")
@@ -130,23 +232,14 @@ class SchedulerThread:
         Returns:
             The scheduled job object
         """
-        name = job_name or job.__name__
-        logger.info("Scheduling job '%s' to run daily at %s", name, time_str)
-
-        # Wrap the job to catch exceptions and add logging
-        def wrapped_job():
-            try:
-                logger.debug("Running scheduled job: %s", name)
-                job()
-                logger.debug("Completed scheduled job: %s", name)
-            except Exception as e:
-                logger.error("Error in scheduled job '%s': %s", name, e, exc_info=True)
-
-        return schedule.every().day.at(time_str).do(wrapped_job)
+        return schedule_at(time_str, job, job_name)
 
     def schedule_once(self, time: str, job: Callable, job_name: str = ""):
         """
         Schedule a job to run once at a specific date and time
+
+        Note: This method delegates to the global schedule_once() function.
+        You can also call schedule_once() directly from any context.
 
         Args:
             time: The date and time to run the job
@@ -156,26 +249,23 @@ class SchedulerThread:
         Returns:
             The scheduled job object
         """
-        name = job_name or job.__name__
-        logger.info("Scheduling job '%s' to run once at %s", name, time)
-
-        # Wrap the job to catch exceptions and add logging
-        def wrapped_job():
-            try:
-                logger.info("Running scheduled one-time job: %s", name)
-                job()
-                logger.info("Completed scheduled one-time job: %s", name)
-                return schedule.CancelJob
-            except Exception as e:
-                logger.error("Error in scheduled one-time job '%s': %s", name, e, exc_info=True)
-
-        return schedule.every().day.at(time).do(wrapped_job).tag(f"one_time_{name}")
+        return schedule_once(time, job, job_name)
 
     def clear_jobs(self):
-        """Clear all scheduled jobs"""
-        logger.info("Clearing all scheduled jobs")
-        schedule.clear()
+        """
+        Clear all scheduled jobs
+
+        Note: This method delegates to the global clear_jobs() function.
+        You can also call clear_jobs() directly from any context.
+        """
+        return clear_jobs()
 
     def get_jobs(self):
-        """Get all currently scheduled jobs"""
-        return schedule.get_jobs()
+        """
+        Get all currently scheduled jobs
+
+        Note: This method delegates to the global get_jobs() function.
+        You can also call get_jobs() directly from any context.
+        """
+        return get_jobs()
+

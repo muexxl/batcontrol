@@ -1,12 +1,12 @@
 """ Parent Class for implementing different solar forecast providers"""
+from abc import ABCMeta
 import threading
 import time
 import random
 import logging
-import schedule
 from .forecastsolar_interface import ForecastSolarInterface
 from ..fetcher.relaxed_caching import RelaxedCaching, CacheMissError
-
+from ..scheduler import schedule_once
 
 logger = logging.getLogger(__name__)
 
@@ -56,6 +56,11 @@ class ForecastSolarBaseclass(ForecastSolarInterface):
         """ Store raw data in cache """
         self.cache_list[pvinstallation_name].store_new_entry(data)
 
+    def schedule_next_refresh(self) -> None:
+        """ Schedule the next data refresh just after next_update_ts """
+        hhmm = time.strftime('%H:%M:%S', time.localtime(self.next_update_ts+10))
+        schedule_once(hhmm, self.refresh_data, 'solar-forecast-refresh')
+
     def refresh_data(self) -> None:
         """ Refresh data from provider if needed """
         with self._refresh_data_lock:
@@ -69,6 +74,7 @@ class ForecastSolarBaseclass(ForecastSolarInterface):
                         self.rate_limit_blackout_window_ts - now
                     )
                     self.next_update_ts = self.rate_limit_blackout_window_ts
+                    self.schedule_next_refresh()
                     return
 
                 # Not on initial call
@@ -90,6 +96,7 @@ class ForecastSolarBaseclass(ForecastSolarInterface):
                                 'Rate limit exceeded. Setting blackout window until %s',
                                 self.rate_limit_blackout_window_ts)
                     self.next_update_ts = now + self.min_time_between_updates
+                    self.schedule_next_refresh()
                 except (ConnectionError, TimeoutError, ProviderError) as e:
                     logger.error('Error getting raw solar forecast data: %s', e)
                     logger.warning('Using cached raw solar forecast data')

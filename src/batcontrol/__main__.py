@@ -54,6 +54,7 @@ def main() -> int:
         logging.getLogger("batcontrol.forecastconsumption.forecast_homeassistant.communication").setLevel(logging.INFO)
 
     bc = Batcontrol(config)
+
     try:
         while True:
             logger.info("Starting batcontrol")
