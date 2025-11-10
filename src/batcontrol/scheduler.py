@@ -4,6 +4,7 @@ This module provides a scheduler thread that runs alongside the main control loo
 It uses the schedule library to run periodic tasks at specific intervals.
 """
 
+import datetime
 import threading
 import time
 import logging
@@ -142,6 +143,33 @@ class SchedulerThread:
                 logger.error("Error in scheduled job '%s': %s", name, e, exc_info=True)
 
         return schedule.every().day.at(time_str).do(wrapped_job)
+
+    def schedule_once(self, time: str, job: Callable, job_name: str = ""):
+        """
+        Schedule a job to run once at a specific date and time
+
+        Args:
+            time: The date and time to run the job
+            job: The callable function to execute
+            job_name: Optional name for the job (for logging purposes)
+
+        Returns:
+            The scheduled job object
+        """
+        name = job_name or job.__name__
+        logger.info("Scheduling job '%s' to run once at %s", name, time)
+
+        # Wrap the job to catch exceptions and add logging
+        def wrapped_job():
+            try:
+                logger.info("Running scheduled one-time job: %s", name)
+                job()
+                logger.info("Completed scheduled one-time job: %s", name)
+                return schedule.CancelJob
+            except Exception as e:
+                logger.error("Error in scheduled one-time job '%s': %s", name, e, exc_info=True)
+
+        return schedule.every().day.at(time).do(wrapped_job).tag(f"one_time_{name}")
 
     def clear_jobs(self):
         """Clear all scheduled jobs"""
