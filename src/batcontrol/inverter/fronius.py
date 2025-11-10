@@ -273,7 +273,6 @@ class FroniusWR(InverterBaseclass):
         # Check if we have a cached value
         cache_key = "soc"
         if cache_key in self._soc_cache:
-            logger.debug("Returning cached SOC value")
             return self._soc_cache[cache_key]
 
         # Fetch fresh SOC value from inverter
@@ -291,7 +290,6 @@ class FroniusWR(InverterBaseclass):
         # Cache the result
         self._soc_cache[cache_key] = soc
         logger.debug("Cached SOC value: %s", soc)
-
         return soc
 
     def get_battery_config(self):
