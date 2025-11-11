@@ -56,10 +56,10 @@ inverter:
 #  See more Details in: https://github.com/muexxl/batcontrol/wiki/Dynamic-tariff-provider
 #--------------------------
 utility:
-  type: awattar_at # [tibber, awattar_at, awattar_de, evcc]
-  vat: 0.20 # only required for awattar
-  fees: 0.015 # only required for awattar
-  markup: 0.03 # only required for awattar
+  type: awattar_at # [tibber, awattar_at, awattar_de, evcc, energyforecast]
+  vat: 0.20 # only required for awattar and energyforecast
+  fees: 0.015 # only required for awattar and energyforecast
+  markup: 0.03 # only required for awattar and energyforecast
 
 #--------------------------
 #  MQTT API

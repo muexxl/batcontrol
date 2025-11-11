@@ -17,6 +17,7 @@ Raises:
 from .awattar import Awattar
 from .tibber import Tibber
 from .evcc import Evcc
+from .energyforecast import Energyforecast
 from .dynamictariff_interface import TariffInterface
 
 class DynamicTariff:
@@ -83,6 +84,23 @@ class DynamicTariff:
                     'like http://evcc.local/api/tariff/grid'
                     )
             selected_tariff= Evcc(timezone,config.get('url'),min_time_between_api_calls)
+
+        elif provider.lower()=='energyforecast':
+            required_fields=['vat', 'markup', 'fees']
+            for field in required_fields:
+                if not field in config.keys():
+                    raise RuntimeError(
+                        f'[DynTariff] Please include {field} in your configuration file'
+                    )
+            vat = float(config.get('vat',0))
+            markup = float(config.get('markup',0))
+            fees = float(config.get('fees',0))
+            selected_tariff= Energyforecast(timezone,
+                                           min_time_between_api_calls,
+                                           delay_evaluation_by_seconds
+                                           )
+            selected_tariff.set_price_parameters(vat,fees,markup)
+
         else:
             raise RuntimeError(f'[DynamicTariff] Unkown provider {provider}')
         return selected_tariff
