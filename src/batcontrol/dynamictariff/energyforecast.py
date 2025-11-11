@@ -39,10 +39,12 @@ class Energyforecast(DynamicTariffBaseclass):
         # min_time_between_API_calls: Minimum time between API calls in seconds
     """
 
-    def __init__(self, timezone, min_time_between_API_calls=0, delay_evaluation_by_seconds=0):
+    def __init__(self, timezone, token, min_time_between_API_calls=0,
+                 delay_evaluation_by_seconds=0):
         """ Initialize Energyforecast class with parameters """
         super().__init__(timezone, min_time_between_API_calls, delay_evaluation_by_seconds)
         self.url = 'https://www.energyforecast.de/api/v1/predictions/next_48_hours'
+        self.token = token
         self.vat = 0
         self.price_fees = 0
         self.price_markup = 0
@@ -56,8 +58,10 @@ class Energyforecast(DynamicTariffBaseclass):
     def get_raw_data_from_provider(self):
         """ Get raw data from energyforecast.de API and return parsed json """
         logger.debug('Requesting price forecast from energyforecast.de API')
+        if not self.token:
+            raise RuntimeError('[Energyforecast] API token is required')
         try:
-            params = {'resolution': 'hourly'}
+            params = {'resolution': 'hourly', 'token': self.token}
             response = requests.get(self.url, params=params, timeout=30)
             response.raise_for_status()
             if response.status_code != 200:

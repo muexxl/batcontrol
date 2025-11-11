@@ -86,7 +86,7 @@ class DynamicTariff:
             selected_tariff= Evcc(timezone,config.get('url'),min_time_between_api_calls)
 
         elif provider.lower()=='energyforecast':
-            required_fields=['vat', 'markup', 'fees']
+            required_fields=['vat', 'markup', 'fees', 'apikey']
             for field in required_fields:
                 if not field in config.keys():
                     raise RuntimeError(
@@ -95,7 +95,9 @@ class DynamicTariff:
             vat = float(config.get('vat',0))
             markup = float(config.get('markup',0))
             fees = float(config.get('fees',0))
+            token = config.get('apikey')
             selected_tariff= Energyforecast(timezone,
+                                           token,
                                            min_time_between_api_calls,
                                            delay_evaluation_by_seconds
                                            )

@@ -1,4 +1,5 @@
 import unittest
+import unittest.mock
 import datetime
 import pytz
 from unittest.mock import patch
@@ -9,13 +10,14 @@ class TestEnergyforecast(unittest.TestCase):
     def setUp(self):
         """Set up test fixtures"""
         self.timezone = pytz.timezone('Europe/Berlin')
+        self.token = 'test_token'
         self.vat = 0.20
         self.fees = 0.015
         self.markup = 0.03
 
     def test_basic_price_extraction(self):
         """Test basic price extraction from API response"""
-        energyforecast = Energyforecast(self.timezone)
+        energyforecast = Energyforecast(self.timezone, self.token)
         energyforecast.set_price_parameters(self.vat, self.fees, self.markup)
 
         # Mock raw data matching the API format
@@ -67,7 +69,7 @@ class TestEnergyforecast(unittest.TestCase):
 
     def test_48_hour_window(self):
         """Test that 48-hour forecast window is supported"""
-        energyforecast = Energyforecast(self.timezone)
+        energyforecast = Energyforecast(self.timezone, self.token)
         energyforecast.set_price_parameters(self.vat, self.fees, self.markup)
 
         # Create 48 hours of data - use timezone-aware timestamps matching Berlin timezone
@@ -107,7 +109,7 @@ class TestEnergyforecast(unittest.TestCase):
 
     def test_timezone_handling_utc(self):
         """Test correct timezone handling with UTC timestamps"""
-        energyforecast = Energyforecast(self.timezone)
+        energyforecast = Energyforecast(self.timezone, self.token)
         energyforecast.set_price_parameters(self.vat, self.fees, self.markup)
 
         # Use UTC timestamp with 'Z' suffix
@@ -140,7 +142,7 @@ class TestEnergyforecast(unittest.TestCase):
 
     def test_filter_past_prices(self):
         """Test that past prices are not included in the result"""
-        energyforecast = Energyforecast(self.timezone)
+        energyforecast = Energyforecast(self.timezone, self.token)
         energyforecast.set_price_parameters(self.vat, self.fees, self.markup)
 
         raw_data = {
@@ -191,7 +193,7 @@ class TestEnergyforecast(unittest.TestCase):
 
     def test_price_calculation_formula(self):
         """Test that the price calculation formula is correct"""
-        energyforecast = Energyforecast(self.timezone)
+        energyforecast = Energyforecast(self.timezone, self.token)
         vat = 0.19
         fees = 0.01
         markup = 0.05
@@ -226,7 +228,7 @@ class TestEnergyforecast(unittest.TestCase):
 
     def test_empty_forecast_data(self):
         """Test handling of empty forecast data"""
-        energyforecast = Energyforecast(self.timezone)
+        energyforecast = Energyforecast(self.timezone, self.token)
         energyforecast.set_price_parameters(self.vat, self.fees, self.markup)
 
         raw_data = {
@@ -249,7 +251,7 @@ class TestEnergyforecast(unittest.TestCase):
 
     def test_missing_forecast_key(self):
         """Test handling when forecast key is missing"""
-        energyforecast = Energyforecast(self.timezone)
+        energyforecast = Energyforecast(self.timezone, self.token)
         energyforecast.set_price_parameters(self.vat, self.fees, self.markup)
 
         raw_data = {}
@@ -264,6 +266,38 @@ class TestEnergyforecast(unittest.TestCase):
 
         # Should return empty dict without crashing
         self.assertEqual(len(prices), 0)
+
+    def test_token_required(self):
+        """Test that API token is required"""
+        energyforecast = Energyforecast(self.timezone, None)
+        energyforecast.set_price_parameters(self.vat, self.fees, self.markup)
+
+        # Should raise RuntimeError when trying to get data without token
+        with self.assertRaises(RuntimeError) as context:
+            energyforecast.get_raw_data_from_provider()
+
+        self.assertIn('token is required', str(context.exception).lower())
+
+    def test_token_in_request(self):
+        """Test that token is included in API request"""
+        energyforecast = Energyforecast(self.timezone, 'test_api_key')
+        energyforecast.set_price_parameters(self.vat, self.fees, self.markup)
+
+        # Mock the requests.get call to verify parameters
+        with patch('batcontrol.dynamictariff.energyforecast.requests.get') as mock_get:
+            mock_response = unittest.mock.Mock()
+            mock_response.status_code = 200
+            mock_response.json.return_value = {'forecast': {'state': 0, 'data': []}}
+            mock_get.return_value = mock_response
+
+            energyforecast.get_raw_data_from_provider()
+
+            # Verify that requests.get was called with correct parameters
+            mock_get.assert_called_once()
+            call_args = mock_get.call_args
+            self.assertIn('params', call_args.kwargs)
+            self.assertEqual(call_args.kwargs['params']['token'], 'test_api_key')
+            self.assertEqual(call_args.kwargs['params']['resolution'], 'hourly')
 
 
 if __name__ == '__main__':

@@ -60,6 +60,7 @@ utility:
   vat: 0.20 # only required for awattar and energyforecast
   fees: 0.015 # only required for awattar and energyforecast
   markup: 0.03 # only required for awattar and energyforecast
+  # apikey: YOUR_API_KEY # required for tibber and energyforecast
 
 #--------------------------
 #  MQTT API
