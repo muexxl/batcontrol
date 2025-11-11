@@ -61,7 +61,14 @@ class Energyforecast(DynamicTariffBaseclass):
         if not self.token:
             raise RuntimeError('[Energyforecast] API token is required')
         try:
-            params = {'resolution': 'hourly', 'token': self.token}
+            # Request base prices without provider-side calculations
+            # We apply vat, fees, and markup locally
+            params = {
+                'resolution': 'hourly',
+                'token': self.token,
+                'vat': 0,
+                'fixed_cost_cent': 0
+            }
             response = requests.get(self.url, params=params, timeout=30)
             response.raise_for_status()
             if response.status_code != 200:

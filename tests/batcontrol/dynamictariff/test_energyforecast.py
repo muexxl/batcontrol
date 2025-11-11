@@ -10,7 +10,7 @@ class TestEnergyforecast(unittest.TestCase):
     def setUp(self):
         """Set up test fixtures"""
         self.timezone = pytz.timezone('Europe/Berlin')
-        self.token = 'test_token'
+        self.token = 'demo_token'
         self.vat = 0.20
         self.fees = 0.015
         self.markup = 0.03
@@ -279,7 +279,7 @@ class TestEnergyforecast(unittest.TestCase):
         self.assertIn('token is required', str(context.exception).lower())
 
     def test_token_in_request(self):
-        """Test that token is included in API request"""
+        """Test that token and provider calculation parameters are included in API request"""
         energyforecast = Energyforecast(self.timezone, 'test_api_key')
         energyforecast.set_price_parameters(self.vat, self.fees, self.markup)
 
@@ -298,6 +298,9 @@ class TestEnergyforecast(unittest.TestCase):
             self.assertIn('params', call_args.kwargs)
             self.assertEqual(call_args.kwargs['params']['token'], 'test_api_key')
             self.assertEqual(call_args.kwargs['params']['resolution'], 'hourly')
+            # Verify that we request base prices without provider-side calculations
+            self.assertEqual(call_args.kwargs['params']['vat'], 0)
+            self.assertEqual(call_args.kwargs['params']['fixed_cost_cent'], 0)
 
 
 if __name__ == '__main__':
