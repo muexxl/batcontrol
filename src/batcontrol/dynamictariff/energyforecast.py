@@ -4,7 +4,8 @@ This module implements the energyforecast.de API to retrieve dynamic electricity
 It inherits from the DynamicTariffBaseclass.
 
 Classes:
-    Energyforecast: A class to interact with the energyforecast.de API and process electricity prices.
+    Energyforecast: A class to interact with the energyforecast.de API
+                    and process electricity prices.
 
 Methods:
     __init__(self,
@@ -90,21 +91,22 @@ class Energyforecast(DynamicTariffBaseclass):
         data = forecast.get('data', [])
         now = datetime.datetime.now().astimezone(self.timezone)
         prices = {}
-        
+
         for item in data:
             # Parse ISO format timestamp
             timestamp = datetime.datetime.fromisoformat(
                 item['start'].replace('Z', '+00:00')
             ).astimezone(self.timezone)
-            
+
             diff = timestamp - now
             rel_hour = math.ceil(diff.total_seconds() / 3600)
-            
+
             if rel_hour >= 0:
-                # Price is in EUR/MWh, convert to EUR/kWh and apply fees/markup/vat
+                # Apply fees/markup/vat to the base price
                 # The price field should already be in the correct unit (EUR/kWh)
                 base_price = item['price']
-                end_price = (base_price * (1 + self.price_markup) + self.price_fees) * (1 + self.vat)
+                end_price = ((base_price * (1 + self.price_markup) + self.price_fees)
+                            * (1 + self.vat))
                 prices[rel_hour] = end_price
-                
+
         return prices
