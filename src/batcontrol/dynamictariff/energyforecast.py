@@ -105,6 +105,8 @@ class Energyforecast(DynamicTariffBaseclass):
 
         for item in data:
             # Parse ISO format timestamp
+            # Python <3.11 does not support 'Z' (UTC) in fromisoformat(), so we replace it with '+00:00'.
+            # Remove this workaround if only supporting Python 3.11+.
             timestamp = datetime.datetime.fromisoformat(
                 item['start'].replace('Z', '+00:00')
             ).astimezone(self.timezone)
