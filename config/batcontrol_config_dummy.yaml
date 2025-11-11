@@ -60,7 +60,15 @@ utility:
   vat: 0.20 # only required for awattar and energyforecast
   fees: 0.015 # only required for awattar and energyforecast
   markup: 0.03 # only required for awattar and energyforecast
-  # apikey: YOUR_API_KEY # required for tibber and energyforecast
+  # apikey: YOUR_API_KEY # MANDATORY for energyforecast and tibber. Uncomment and set if using those providers.
+
+# Example configuration for energyforecast provider (apikey is required!):
+# utility:
+#   type: energyforecast
+#   vat: 0.20
+#   fees: 0.015
+#   markup: 0.03
+#   apikey: YOUR_API_KEY
 
 #--------------------------
 #  MQTT API
