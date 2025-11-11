@@ -100,7 +100,7 @@ class Energyforecast(DynamicTariffBaseclass):
         raw_data = self.get_raw_data()
         forecast = raw_data.get('forecast', {})
         data = forecast.get('data', [])
-        now = datetime.datetime.now().astimezone(self.timezone)
+        now = datetime.datetime.now(self.timezone)
         prices = {}
 
         for item in data:
