@@ -80,17 +80,14 @@ class Energyforecast(DynamicTariffBaseclass):
         except requests.exceptions.RequestException as e:
             raise ConnectionError(f'[Energyforecast] API request failed: {e}') from e
 
-        raw_data = response.json()
-        return raw_data
+        response_json = response.json()
+        return {'data': response_json}
 
     def get_prices_from_raw_data(self):
         """ Extract prices from raw data to internal data structure based on hours 
 
         Expected API response format:
-        {
-          "forecast": {
-            "state": 0,
-            "data": [
+           data: [
               {
                 "start": "2025-11-11T06:00:35.531Z",
                 "end": "2025-11-11T06:00:35.531Z",
@@ -98,16 +95,17 @@ class Energyforecast(DynamicTariffBaseclass):
                 "price_origin": "string"
               }
             ]
-          }
-        }
+
         """
-        data = self.get_raw_data()
+        raw_data = self.get_raw_data()
+        data = raw_data.get('data', [])
         now = datetime.datetime.now(self.timezone)
         prices = {}
 
         for item in data:
             # Parse ISO format timestamp
-            # Python <3.11 does not support 'Z' (UTC) in fromisoformat(), so we replace it with '+00:00'.
+            # Python <3.11 does not support 'Z' (UTC) in fromisoformat(),
+            # so we replace it with '+00:00'.
             # Remove this workaround if only supporting Python 3.11+.
             timestamp = datetime.datetime.fromisoformat(
                 item['start'].replace('Z', '+00:00')

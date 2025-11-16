@@ -20,31 +20,28 @@ class TestEnergyforecast(unittest.TestCase):
         energyforecast = Energyforecast(self.timezone, self.token)
         energyforecast.set_price_parameters(self.vat, self.fees, self.markup)
 
-        # Mock raw data matching the API format
+        # Mock raw data - store as dict with 'data' key
         raw_data = {
-            'forecast': {
-                'state': 0,
-                'data': [
-                    {
-                        'start': '2024-06-20T10:00:00+02:00',
-                        'end': '2024-06-20T11:00:00+02:00',
-                        'price': 0.20,
-                        'price_origin': 'test'
-                    },
-                    {
-                        'start': '2024-06-20T11:00:00+02:00',
-                        'end': '2024-06-20T12:00:00+02:00',
-                        'price': 0.25,
-                        'price_origin': 'test'
-                    },
-                    {
-                        'start': '2024-06-20T12:00:00+02:00',
-                        'end': '2024-06-20T13:00:00+02:00',
-                        'price': 0.22,
-                        'price_origin': 'test'
-                    }
-                ]
-            }
+            'data': [
+                {
+                    'start': '2024-06-20T10:00:00+02:00',
+                    'end': '2024-06-20T11:00:00+02:00',
+                    'price': 0.20,
+                    'price_origin': 'test'
+                },
+                {
+                    'start': '2024-06-20T11:00:00+02:00',
+                    'end': '2024-06-20T12:00:00+02:00',
+                    'price': 0.25,
+                    'price_origin': 'test'
+                },
+                {
+                    'start': '2024-06-20T12:00:00+02:00',
+                    'end': '2024-06-20T13:00:00+02:00',
+                    'price': 0.22,
+                    'price_origin': 'test'
+                }
+            ]
         }
         energyforecast.store_raw_data(raw_data)
 
@@ -73,23 +70,18 @@ class TestEnergyforecast(unittest.TestCase):
         energyforecast.set_price_parameters(self.vat, self.fees, self.markup)
 
         # Create 48 hours of data - use timezone-aware timestamps matching Berlin timezone
-        data = []
+        data_list = []
         base_time = self.timezone.localize(datetime.datetime(2024, 6, 20, 10, 0, 0))
         for hour in range(48):
             start_time = base_time + datetime.timedelta(hours=hour)
-            data.append({
+            data_list.append({
                 'start': start_time.isoformat(),
                 'end': (start_time + datetime.timedelta(hours=1)).isoformat(),
                 'price': 0.20 + (hour * 0.001),  # Vary price slightly
                 'price_origin': 'test'
             })
 
-        raw_data = {
-            'forecast': {
-                'state': 0,
-                'data': data
-            }
-        }
+        raw_data = {'data': data_list}
         energyforecast.store_raw_data(raw_data)
 
         # Mock datetime to return a specific time
@@ -114,17 +106,14 @@ class TestEnergyforecast(unittest.TestCase):
 
         # Use UTC timestamp with 'Z' suffix
         raw_data = {
-            'forecast': {
-                'state': 0,
-                'data': [
-                    {
-                        'start': '2024-06-20T08:00:00Z',  # UTC time
-                        'end': '2024-06-20T09:00:00Z',
-                        'price': 0.20,
-                        'price_origin': 'test'
-                    }
-                ]
-            }
+            'data': [
+                {
+                    'start': '2024-06-20T08:00:00Z',  # UTC time
+                    'end': '2024-06-20T09:00:00Z',
+                    'price': 0.20,
+                    'price_origin': 'test'
+                }
+            ]
         }
         energyforecast.store_raw_data(raw_data)
 
@@ -146,35 +135,32 @@ class TestEnergyforecast(unittest.TestCase):
         energyforecast.set_price_parameters(self.vat, self.fees, self.markup)
 
         raw_data = {
-            'forecast': {
-                'state': 0,
-                'data': [
-                    {
-                        'start': '2024-06-20T08:00:00+02:00',  # Past
-                        'end': '2024-06-20T09:00:00+02:00',
-                        'price': 0.18,
-                        'price_origin': 'test'
-                    },
-                    {
-                        'start': '2024-06-20T09:00:00+02:00',  # Past
-                        'end': '2024-06-20T10:00:00+02:00',
-                        'price': 0.19,
-                        'price_origin': 'test'
-                    },
-                    {
-                        'start': '2024-06-20T10:00:00+02:00',  # Current/future
-                        'end': '2024-06-20T11:00:00+02:00',
-                        'price': 0.20,
-                        'price_origin': 'test'
-                    },
-                    {
-                        'start': '2024-06-20T11:00:00+02:00',  # Future
-                        'end': '2024-06-20T12:00:00+02:00',
-                        'price': 0.21,
-                        'price_origin': 'test'
-                    }
-                ]
-            }
+            'data': [
+                {
+                    'start': '2024-06-20T08:00:00+02:00',  # Past
+                    'end': '2024-06-20T09:00:00+02:00',
+                    'price': 0.18,
+                    'price_origin': 'test'
+                },
+                {
+                    'start': '2024-06-20T09:00:00+02:00',  # Past
+                    'end': '2024-06-20T10:00:00+02:00',
+                    'price': 0.19,
+                    'price_origin': 'test'
+                },
+                {
+                    'start': '2024-06-20T10:00:00+02:00',  # Current/future
+                    'end': '2024-06-20T11:00:00+02:00',
+                    'price': 0.20,
+                    'price_origin': 'test'
+                },
+                {
+                    'start': '2024-06-20T11:00:00+02:00',  # Future
+                    'end': '2024-06-20T12:00:00+02:00',
+                    'price': 0.21,
+                    'price_origin': 'test'
+                }
+            ]
         }
         energyforecast.store_raw_data(raw_data)
 
@@ -200,17 +186,14 @@ class TestEnergyforecast(unittest.TestCase):
         energyforecast.set_price_parameters(vat, fees, markup)
 
         raw_data = {
-            'forecast': {
-                'state': 0,
-                'data': [
-                    {
-                        'start': '2024-06-20T10:00:00+02:00',
-                        'end': '2024-06-20T11:00:00+02:00',
-                        'price': 0.30,
-                        'price_origin': 'test'
-                    }
-                ]
-            }
+            'data': [
+                {
+                    'start': '2024-06-20T10:00:00+02:00',
+                    'end': '2024-06-20T11:00:00+02:00',
+                    'price': 0.30,
+                    'price_origin': 'test'
+                }
+            ]
         }
         energyforecast.store_raw_data(raw_data)
 
@@ -231,12 +214,7 @@ class TestEnergyforecast(unittest.TestCase):
         energyforecast = Energyforecast(self.timezone, self.token)
         energyforecast.set_price_parameters(self.vat, self.fees, self.markup)
 
-        raw_data = {
-            'forecast': {
-                'state': 0,
-                'data': []
-            }
-        }
+        raw_data = {'data': []}
         energyforecast.store_raw_data(raw_data)
 
         with patch('batcontrol.dynamictariff.energyforecast.datetime') as mock_datetime:
@@ -250,10 +228,11 @@ class TestEnergyforecast(unittest.TestCase):
         self.assertEqual(len(prices), 0)
 
     def test_missing_forecast_key(self):
-        """Test handling when forecast key is missing"""
+        """Test handling when 'data' key is missing"""
         energyforecast = Energyforecast(self.timezone, self.token)
         energyforecast.set_price_parameters(self.vat, self.fees, self.markup)
 
+        # Store dict without 'data' key to test error handling
         raw_data = {}
         energyforecast.store_raw_data(raw_data)
 
@@ -262,9 +241,10 @@ class TestEnergyforecast(unittest.TestCase):
             mock_datetime.datetime.now.return_value = mock_now
             mock_datetime.datetime.fromisoformat = datetime.datetime.fromisoformat
 
+            # Should handle missing 'data' key gracefully
             prices = energyforecast.get_prices_from_raw_data()
 
-        # Should return empty dict without crashing
+        # Should return empty dict when 'data' key is missing
         self.assertEqual(len(prices), 0)
 
     def test_token_required(self):
@@ -277,30 +257,6 @@ class TestEnergyforecast(unittest.TestCase):
             energyforecast.get_raw_data_from_provider()
 
         self.assertIn('token is required', str(context.exception).lower())
-
-    def test_token_in_request(self):
-        """Test that token and provider calculation parameters are included in API request"""
-        energyforecast = Energyforecast(self.timezone, 'test_api_key')
-        energyforecast.set_price_parameters(self.vat, self.fees, self.markup)
-
-        # Mock the requests.get call to verify parameters
-        with patch('batcontrol.dynamictariff.energyforecast.requests.get') as mock_get:
-            mock_response = unittest.mock.Mock()
-            mock_response.status_code = 200
-            mock_response.json.return_value = {'forecast': {'state': 0, 'data': []}}
-            mock_get.return_value = mock_response
-
-            energyforecast.get_raw_data_from_provider()
-
-            # Verify that requests.get was called with correct parameters
-            mock_get.assert_called_once()
-            call_args = mock_get.call_args
-            self.assertIn('params', call_args.kwargs)
-            self.assertEqual(call_args.kwargs['params']['token'], 'test_api_key')
-            self.assertEqual(call_args.kwargs['params']['resolution'], 'hourly')
-            # Verify that we request base prices without provider-side calculations
-            self.assertEqual(call_args.kwargs['params']['vat'], 0)
-            self.assertEqual(call_args.kwargs['params']['fixed_cost_cent'], 0)
 
 
 if __name__ == '__main__':

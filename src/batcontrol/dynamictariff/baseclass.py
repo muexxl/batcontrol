@@ -4,7 +4,7 @@ import time
 import random
 import logging
 from .dynamictariff_interface import TariffInterface
-from ..fetcher.relaxed_caching import RelaxedCaching, CacheMissError
+from ..fetcher.relaxed_caching import RelaxedCaching
 from ..scheduler import schedule_once
 
 
