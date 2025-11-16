@@ -49,6 +49,10 @@ class Energyforecast(DynamicTariffBaseclass):
         self.price_fees = 0
         self.price_markup = 0
 
+    def upgrade_48h_to_96h(self):
+        """ During initialization, we can upgrade the forecast if user wants 96h horizon """
+        self.url = 'https://www.energyforecast.de/api/v1/predictions/next_96_hours'
+
     def set_price_parameters(self, vat: float, price_fees: float, price_markup: float):
         """ Set the extra price parameters for the tariff calculation """
         self.vat = vat

@@ -85,7 +85,7 @@ class DynamicTariff:
                     )
             selected_tariff= Evcc(timezone,config.get('url'),min_time_between_api_calls)
 
-        elif provider.lower()=='energyforecast':
+        elif provider.lower()=='energyforecast' or provider.lower()=='energyforecast_96':
             required_fields=['vat', 'markup', 'fees', 'apikey']
             for field in required_fields:
                 if not field in config.keys():
@@ -102,6 +102,8 @@ class DynamicTariff:
                                            delay_evaluation_by_seconds
                                            )
             selected_tariff.set_price_parameters(vat,fees,markup)
+            if provider.lower()=='energyforecast_96':
+                selected_tariff.upgrade_48h_to_96h()
 
         else:
             raise RuntimeError(f'[DynamicTariff] Unkown provider {provider}')
