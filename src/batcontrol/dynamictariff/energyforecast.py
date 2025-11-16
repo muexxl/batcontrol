@@ -34,7 +34,7 @@ logger = logging.getLogger(__name__)
 class Energyforecast(DynamicTariffBaseclass):
     """ Implement energyforecast.de API to get dynamic electricity prices
         Inherits from DynamicTariffBaseclass
-        
+
         Uses 48-hour forecast window for better day-ahead planning.
         # min_time_between_API_calls: Minimum time between API calls in seconds
     """
@@ -85,7 +85,7 @@ class Energyforecast(DynamicTariffBaseclass):
 
     def get_prices_from_raw_data(self):
         """ Extract prices from raw data to internal data structure based on hours 
-        
+
         Expected API response format:
         {
           "forecast": {
@@ -101,9 +101,7 @@ class Energyforecast(DynamicTariffBaseclass):
           }
         }
         """
-        raw_data = self.get_raw_data()
-        forecast = raw_data.get('forecast', {})
-        data = forecast.get('data', [])
+        data = self.get_raw_data()
         now = datetime.datetime.now(self.timezone)
         prices = {}
 
