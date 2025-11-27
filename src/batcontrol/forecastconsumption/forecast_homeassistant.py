@@ -682,7 +682,6 @@ class ForecastConsumptionHomeAssistant(ForecastConsumptionBaseclass):
             asyncio.set_event_loop(loop)
 
         websocket = None
-        message_id = 1
 
         try:
             websocket, message_id = loop.run_until_complete(

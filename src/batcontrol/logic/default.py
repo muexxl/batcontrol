@@ -8,6 +8,8 @@ from .logic_interface import CalculationParameters, CalculationInput
 from .logic_interface import CalculationOutput, InverterControlSettings
 from .common import CommonLogic
 
+MIN_REMAINING_TIME_HOURS = 1 / 60  # 1 minute
+
 logger = logging.getLogger(__name__)
 
 class DefaultLogic(LogicInterface):
@@ -159,7 +161,7 @@ class DefaultLogic(LogicInterface):
                 remaining_time = remaining_minutes / 60  # Convert to hours
 
                 # Ensure minimum remaining time to avoid division by very small numbers
-                remaining_time = max(remaining_time, 1 / 60)  # At least 1 minute
+                remaining_time = max(remaining_time, MIN_REMAINING_TIME_HOURS)  # At least 1 minute
 
                 charge_rate = required_recharge_energy / remaining_time
 
