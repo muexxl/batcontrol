@@ -94,7 +94,7 @@ class Batcontrol:
         self.time_resolution = config.get('time_resolution_minutes', 60)
         if self.time_resolution not in [15, 60]:
             raise ValueError(
-                f"time_resolution_minutes must be 15 or 60, got: {self.time_resolution}"
+                f"time_resolution_minutes must be either 15 (quarter-hourly) or 60 (hourly), got: {self.time_resolution}. Please update your configuration file."
             )
         self.intervals_per_hour = 60 // self.time_resolution
         logger.info(
