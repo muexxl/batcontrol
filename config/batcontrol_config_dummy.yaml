@@ -3,6 +3,7 @@
 #  See more Details in: https://github.com/muexxl/batcontrol/wiki/Batcontrol-Configuration
 #--------------------------
 timezone: Europe/Berlin #your time zone. not optional.
+time_resolution_minutes: 60 # Time resolution for forecasts: 15 (quarter-hourly) or 60 (hourly). Default: 60
 loglevel: debug
 logfile_enabled: true
 log_everything: false # if false debug messages from fronius.auth and urllib3.connectionpool will be suppressed

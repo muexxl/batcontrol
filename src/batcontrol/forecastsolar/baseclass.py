@@ -1,5 +1,6 @@
 """ Parent Class for implementing different solar forecast providers"""
 from abc import ABCMeta
+import datetime
 import threading
 import time
 import random
@@ -7,8 +8,10 @@ import logging
 from .forecastsolar_interface import ForecastSolarInterface
 from ..fetcher.relaxed_caching import RelaxedCaching, CacheMissError
 from ..scheduler import schedule_once
+from ..interval_utils import upsample_forecast, downsample_to_hourly
 
 logger = logging.getLogger(__name__)
+
 
 class ProviderError(Exception):
     """Exception raised when there's an error with the forecast provider."""
@@ -19,11 +22,20 @@ class RateLimitException(ProviderError):
     """Exception raised when the provider's rate limit is exceeded."""
     pass
 
+
 class ForecastSolarBaseclass(ForecastSolarInterface):
     """ Parent Class for implementing different solar forecast providers
         # min_time_between_API_calls: Minimum time between API calls in seconds
+
+        Supports Full-Hour Alignment strategy:
+        - Providers return hour-aligned data (index 0 = start of current hour)
+        - Baseclass handles resolution conversion (hourly ↔ 15-min)
+        - Baseclass shifts indices to current-interval alignment
+        - Core receives data where [0] = current interval
     """
-    def __init__(self, pvinstallations, timezone, min_time_between_API_calls, delay_evaluation_by_seconds) -> None:
+
+    def __init__(self, pvinstallations, timezone, min_time_between_API_calls,
+                 delay_evaluation_by_seconds, target_resolution=60, native_resolution=60) -> None:
         self.pvinstallations = pvinstallations
         self.next_update_ts = 0
         self.min_time_between_updates = min_time_between_API_calls
@@ -32,6 +44,17 @@ class ForecastSolarBaseclass(ForecastSolarInterface):
         self.cache_list = {}
         self.rate_limit_blackout_window_ts = 0
         self._refresh_data_lock = threading.Lock()
+
+        # Resolution configuration
+        self.target_resolution = target_resolution  # What core.py expects (15 or 60)
+        self.native_resolution = native_resolution  # What provider returns (15 or 60)
+
+        logger.info(
+            '%s: native_resolution=%d min, target_resolution=%d min',
+            self.__class__.__name__,
+            self.native_resolution,
+            self.target_resolution
+        )
 
         try:
             for unit in pvinstallations:
@@ -102,17 +125,107 @@ class ForecastSolarBaseclass(ForecastSolarInterface):
                     logger.warning('Using cached raw solar forecast data')
 
     def get_forecast(self) -> dict[int, float]:
-        """ Get forecast from provider """
+        """
+        Get forecast with automatic resolution handling and current-interval alignment.
+
+        Returns:
+            Dict where [0] = current interval, [1] = next interval, etc.
+            Ready for core.py to factorize [0] based on elapsed time.
+        """
         if not self._refresh_data_lock.locked():
             self.refresh_data()
-        forecast = self.get_forecast_from_raw_data()
 
-        max_hour=max(forecast.keys())
-        if max_hour < 18:
-            logger.error('Less than 18 hours of forecast data. Stopping.')
+        # Get hour-aligned forecast from provider at native resolution
+        native_forecast = self.get_forecast_from_raw_data()
+
+        if not native_forecast:
+            logger.warning('%s: No data returned from get_forecast_from_raw_data',
+                           self.__class__.__name__)
+            return {}
+
+        # Convert resolution if needed
+        converted_forecast = self._convert_resolution(native_forecast)
+
+        # Shift indices to start from CURRENT interval
+        current_aligned_forecast = self._shift_to_current_interval(converted_forecast)
+
+        # Validate minimum forecast length
+        if self.target_resolution == 60:
+            min_intervals = 18  # 18 hours
+        else:  # 15 minutes
+            min_intervals = 72  # 18 hours * 4 = 72 intervals
+
+        max_interval = max(current_aligned_forecast.keys()) if current_aligned_forecast else 0
+        if max_interval < min_intervals:
+            logger.error('Less than 18 hours of forecast data. Got %d intervals, need %d.',
+                         max_interval, min_intervals)
             raise RuntimeError('Less than 18 hours of forecast data.')
 
+        return current_aligned_forecast
+
+    def _convert_resolution(self, forecast: dict[int, float]) -> dict[int, float]:
+        """
+        Convert forecast between resolutions if needed.
+
+        Args:
+            forecast: Hour-aligned forecast data at native resolution
+
+        Returns:
+            Forecast data at target resolution (still hour-aligned)
+        """
+        if self.native_resolution == self.target_resolution:
+            return forecast
+
+        if self.native_resolution == 60 and self.target_resolution == 15:
+            logger.debug('%s: Upsampling 60min → 15min using linear interpolation',
+                         self.__class__.__name__)
+            return upsample_forecast(forecast, target_resolution=15, method='linear')
+
+        if self.native_resolution == 15 and self.target_resolution == 60:
+            logger.debug('%s: Downsampling 15min → 60min by summing quarters',
+                         self.__class__.__name__)
+            return downsample_to_hourly(forecast)
+
+        logger.error('%s: Cannot convert %d min → %d min',
+                     self.__class__.__name__,
+                     self.native_resolution,
+                     self.target_resolution)
         return forecast
+
+    def _shift_to_current_interval(self, forecast: dict[int, float]) -> dict[int, float]:
+        """
+        Shift hour-aligned indices to current-interval alignment.
+
+        At time 10:20, if target resolution is 15 min:
+        - Provider returns: [0]=10:00-10:15, [1]=10:15-10:30, [2]=10:30-10:45, ...
+        - We're in interval 1 (10:15-10:30)
+        - Output: [0]=10:15-10:30, [1]=10:30-10:45, ... (interval 0 dropped)
+
+        Args:
+            forecast: Hour-aligned forecast at target resolution
+
+        Returns:
+            Current-interval aligned forecast
+        """
+        now = datetime.datetime.now(datetime.timezone.utc).astimezone(self.timezone)
+        current_minute = now.minute
+
+        # Find which interval we're in within the current hour
+        current_interval_in_hour = current_minute // self.target_resolution
+
+        logger.debug('%s: Current time %s, shifting by %d intervals',
+                     self.__class__.__name__,
+                     now.strftime('%H:%M:%S'),
+                     current_interval_in_hour)
+
+        # Shift indices: drop past intervals, renumber from 0
+        shifted_forecast = {}
+        for idx, value in forecast.items():
+            if idx >= current_interval_in_hour:
+                new_idx = idx - current_interval_in_hour
+                shifted_forecast[new_idx] = value
+
+        return shifted_forecast
 
     def get_raw_data_from_provider(self, pvinstallation_name) -> dict:
         """ Prototype for get_raw_data_from_provider and store in cache """
