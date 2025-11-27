@@ -136,7 +136,8 @@ class Batcontrol:
 
         self.fc_consumption = consumption_factory.create_consumption(
             self.timezone,
-            config['consumption_forecast']
+            config['consumption_forecast'],
+            full_config=config  # Pass full config for time_resolution_minutes
         )
 
         self.batconfig = config['battery_control']
