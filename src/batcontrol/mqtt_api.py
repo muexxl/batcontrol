@@ -49,8 +49,9 @@ logger.info('Loading module')
 class MqttApi:
     """ MQTT API to publish data from batcontrol to MQTT for further processing+visualization"""
     SET_SUFFIX = '/set'
-    def __init__(self, config:dict):
-        self.config=config
+    def __init__(self, config: dict, interval_minutes: int = 60):
+        self.config = config
+        self.interval_minutes = interval_minutes
         self.base_topic = config['topic']
         if config.get('auto_discover_enable'):
             self.auto_discover_enable = config['auto_discover_enable']
@@ -184,25 +185,28 @@ class MqttApi:
                 json.dumps(self._create_forecast(production, timestamp))
             )
 
-    def _create_forecast(self, forecast:np.ndarray, timestamp:float) -> dict:
-        """ Create a forecast JSON object
-            from a numpy array and a timestamp
+    def _create_forecast(self, forecast: np.ndarray, timestamp: float) -> dict:
+        """ Create a forecast JSON object from a numpy array and a timestamp.
+
+        Handles both 15-minute and 60-minute intervals based on self.interval_minutes.
+        Timestamps are aligned to the start of the current interval.
         """
-        # Take timestamp and reduce it to the first second of the hour
-        now = timestamp - (timestamp % 3600)
+        interval_seconds = self.interval_minutes * 60
+
+        # Align timestamp to the start of the current interval
+        now = timestamp - (timestamp % interval_seconds)
 
         data_list = []
-        for h, value in enumerate(forecast):
-            # next hour after now
+        for i, value in enumerate(forecast):
             data_list.append(
-            {
-                'time_start': now + h * 3600,
-                'value': value,
-                'time_end': now - h + (h + 1) * 3600
-            }
+                {
+                    'time_start': now + i * interval_seconds,
+                    'value': value,
+                    'time_end': now + (i + 1) * interval_seconds
+                }
             )
 
-        data = { 'data' : data_list }
+        data = {'data': data_list}
         return data
 
 
