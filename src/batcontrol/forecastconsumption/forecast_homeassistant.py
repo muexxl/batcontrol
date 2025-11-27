@@ -724,9 +724,10 @@ class ForecastConsumptionHomeAssistant(ForecastConsumptionInterface):
             Dict mapping hour offset to predicted consumption in Wh
         """
         # Check if cache has all required keys for the forecast hours
-        now = datetime.datetime.now(tz=self.timezone)
+        # Calculate now inside the lock to avoid race conditions around hour boundaries
         missing_keys = False
         with self._cache_lock:
+            now = datetime.datetime.now(tz=self.timezone)
             for h in range(hours):
                 future_time = now + datetime.timedelta(hours=h)
                 cache_key = self._get_cache_key(future_time.weekday(), future_time.hour)
@@ -740,7 +741,6 @@ class ForecastConsumptionHomeAssistant(ForecastConsumptionInterface):
 
         # Generate forecast for requested hours
         prediction = {}
-        now = datetime.datetime.now(tz=self.timezone)
 
         for h in range(hours):
             future_time = now + datetime.timedelta(hours=h)
