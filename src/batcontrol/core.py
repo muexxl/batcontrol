@@ -90,8 +90,18 @@ class Batcontrol:
         self.config = configdict
         config = configdict
 
-        # Extract time resolution (15 or 60 minutes)
+        # Extract and validate time resolution (15 or 60 minutes)
         self.time_resolution = config.get('time_resolution_minutes', 60)
+        if self.time_resolution not in [15, 60]:
+            raise ValueError(
+                f"time_resolution_minutes must be 15 or 60, got: {self.time_resolution}"
+            )
+        self.intervals_per_hour = 60 // self.time_resolution
+        logger.info(
+            'Using %d-minute time resolution (%d intervals per hour)',
+            self.time_resolution,
+            self.intervals_per_hour
+        )
 
         try:
             tzstring = config['timezone']
@@ -176,7 +186,10 @@ class Batcontrol:
         if config.get('mqtt', None) is not None:
             if config.get('mqtt').get('enabled', False):
                 logger.info('MQTT Connection enabled')
-                self.mqtt_api = MqttApi(config.get('mqtt'))
+                self.mqtt_api = MqttApi(
+                    config.get('mqtt'),
+                    interval_minutes=self.time_resolution
+                )
                 self.mqtt_api.wait_ready()
                 # Register for callbacks
                 self.mqtt_api.register_set_callback(
@@ -396,7 +409,7 @@ class Batcontrol:
         current_second = now.second
 
         # Get interval resolution from config (default to 60 for backward compatibility)
-        interval_minutes = self.config.get('time_resolution_minutes', 60)
+        interval_minutes = self.time_resolution
 
         # Calculate elapsed time in the CURRENT interval as a fraction
         # For 15-min: at 10:20:30, current_minute=20, we're in interval 10:15-10:30

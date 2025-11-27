@@ -13,7 +13,8 @@ logger = logging.getLogger(__name__)
 class DefaultLogic(LogicInterface):
     """ Default logic class for Batcontrol. """
 
-    def __init__(self, timezone: datetime.timezone = datetime.timezone.utc):
+    def __init__(self, timezone: datetime.timezone = datetime.timezone.utc,
+                 interval_minutes: int = 60):
         self.calculation_parameters = None
         self.calculation_output = None
         self.inverter_control_settings = None
@@ -21,6 +22,7 @@ class DefaultLogic(LogicInterface):
         self.soften_price_difference_on_charging = False
         self.soften_price_difference_on_charging_factor = 5.0  # Default factor
         self.timezone = timezone
+        self.interval_minutes = interval_minutes
         self.common = CommonLogic.get_instance()
 
     def set_round_price_digits(self, digits: int):
@@ -142,9 +144,24 @@ class DefaultLogic(LogicInterface):
 
             # charge if battery capacity available and more stored energy is required
             if is_charging_possible and required_recharge_energy > 0:
-                remaining_time = (
-                    60-calc_timestamp.minute)/60
-                charge_rate = required_recharge_energy/remaining_time
+                # Calculate remaining time in current interval
+                current_minute = calc_timestamp.minute
+                current_second = calc_timestamp.second
+
+                if self.interval_minutes == 15:
+                    # Find start of current 15-min interval and calculate remaining time
+                    current_interval_start = (current_minute // 15) * 15
+                    remaining_minutes = (current_interval_start + 15
+                                         - current_minute - current_second / 60)
+                else:  # 60 minutes
+                    remaining_minutes = 60 - current_minute - current_second / 60
+
+                remaining_time = remaining_minutes / 60  # Convert to hours
+
+                # Ensure minimum remaining time to avoid division by very small numbers
+                remaining_time = max(remaining_time, 1 / 60)  # At least 1 minute
+
+                charge_rate = required_recharge_energy / remaining_time
 
                 charge_rate = self.common.calculate_charge_rate(charge_rate)
 
