@@ -40,11 +40,16 @@ from .baseclass import ForecastSolarBaseclass
 
 logger = logging.getLogger(__name__)
 
+
 class EvccSolar(ForecastSolarBaseclass):
     """ Implement evcc API to get solar forecast data
         Inherits from ForecastSolarBaseclass
+
+        Returns 15-minute data at native resolution.
+        Baseclass handles conversion to hourly if needed.
     """
-    def __init__(self, pvinstallations, timezone, min_time_between_api_calls, api_delay):
+
+    def __init__(self, pvinstallations, timezone, min_time_between_api_calls, api_delay, target_resolution=60):
         """
         Initialize the EvccSolar instance.
 
@@ -54,16 +59,19 @@ class EvccSolar(ForecastSolarBaseclass):
             timezone: Timezone information for the forecast data
             min_time_between_API_calls (int): Minimum time between API calls in seconds
             api_delay (int): Delay in seconds for API evaluation
+            target_resolution (int): Target resolution in minutes (15 or 60)
         """
-        super().__init__(pvinstallations, timezone, min_time_between_api_calls, api_delay)
-
+        super().__init__(pvinstallations, timezone, min_time_between_api_calls, api_delay,
+                         target_resolution=target_resolution,
+                         native_resolution=15)  # EVCC provides 15-minute data
 
         # Extract URL from pvinstallations config
         if not pvinstallations or not isinstance(pvinstallations, list):
             raise ValueError("[EvccSolar] pvinstallations must be a non-empty list")
 
         if len(pvinstallations) != 1:
-            raise ValueError("[EvccSolar] evcc-solar provider expects exactly one installation configuration")
+            raise ValueError(
+                "[EvccSolar] evcc-solar provider expects exactly one installation configuration")
 
         installation = pvinstallations[0]
         if 'url' not in installation:
@@ -72,18 +80,15 @@ class EvccSolar(ForecastSolarBaseclass):
         self.url = installation['url']
         logger.info('Initialized EvccSolar with URL: %s', self.url)
 
-
     def get_forecast_from_raw_data(self) -> dict[int, float]:
         """
-        Process the raw data from the evcc API and return a dictionary of forecast values indexed
-        by relative hour.
-        """
-        # Initialize dictionaries for accumulating values and counting intervals per hour
-        hourly_values = {}
+        Process the raw data from the evcc API and return a dictionary of forecast values.
 
+        Returns 15-minute interval data indexed by relative interval from start of current hour.
+        Baseclass will handle conversion to hourly if target_resolution is 60.
+        """
         # We expect only one installation for evcc-solar
         raw_data = self.get_raw_data(self.pvinstallations[0]['name'])
-
 
         # Return empty prediction if no data available
         if not raw_data:
@@ -98,48 +103,49 @@ class EvccSolar(ForecastSolarBaseclass):
 
         now = datetime.datetime.now().astimezone(self.timezone)
 
-
-        # Die Logik aus dynamictariff/evcc.py: rel_hour auf Stundenbeginn, dann gruppieren
+        # Calculate start of current hour for relative indexing
         current_hour_start = now.replace(minute=0, second=0, microsecond=0)
-        hourly_values = {}
+
+        # Build 15-minute interval forecast (hour-aligned)
+        # Index 0 = first 15-min interval of current hour (e.g., 10:00-10:15)
+        # Index 1 = second 15-min interval (e.g., 10:15-10:30)
+        # Baseclass will shift indices to current interval later
+        prediction = {}
+
         for item in data:
             try:
                 timestamp = datetime.datetime.fromisoformat(item['start']).astimezone(self.timezone)
-                interval_hour_start = timestamp.replace(minute=0, second=0, microsecond=0)
-                diff = interval_hour_start - current_hour_start
-                rel_hour = int(diff.total_seconds() / 3600)
-                if rel_hour >= 0:
+
+                # Calculate relative 15-minute interval from start of current hour
+                diff = timestamp - current_hour_start
+                rel_interval_15min = int(diff.total_seconds() / 900)  # 900 seconds = 15 minutes
+
+                if rel_interval_15min >= 0:
                     value = item.get('value', 0)
                     if value is None:
                         value = 0
-                    if rel_hour not in hourly_values:
-                        hourly_values[rel_hour] = []
-                    hourly_values[rel_hour].append(value)
+
+                    # Convert power (W) to energy (Wh) for 15 minutes
+                    # value is in W, we need Wh for 15 min = W * 0.25h
+                    energy_wh = float(value) * 0.25
+                    prediction[rel_interval_15min] = round(energy_wh, 1)
+
             except (KeyError, ValueError, TypeError) as e:
                 logger.warning('Error processing forecast item %s: %s', item, e)
                 continue
 
-
-        # Durchschnitt pro Stunde berechnen
-        prediction = {}
-        for hour, value_list in hourly_values.items():
-            if value_list:
-                avg_power = sum(value_list) / len(value_list)
-                prediction[hour] = float(round(avg_power, 1))
-            else:
-                prediction[hour] = 0.0
-
-        # Fehlende Stunden mit 0 auffüllen
+        # Fill missing intervals with 0
         if prediction:
-            max_hour = max(prediction.keys())
-            for h in range(max_hour + 1):
-                if h not in prediction:
-                    prediction[h] = 0.0
+            max_interval = max(prediction.keys())
+            for i in range(max_interval + 1):
+                if i not in prediction:
+                    prediction[i] = 0.0
         else:
             prediction[0] = 0.0
 
-        # Sortiert zurückgeben
+        # Return sorted by interval index
         output = dict(sorted(prediction.items()))
+        logger.debug('Returning %d 15-minute intervals', len(output))
         return output
 
     def get_raw_data_from_provider(self, pvinstallation) -> dict:
@@ -187,7 +193,8 @@ def test():
     timezone = pytz.timezone('Europe/Berlin')
 
     try:
-        evcc_solar = EvccSolar(pvinstallations, timezone, min_time_between_api_calls=10, api_delay=0)
+        evcc_solar = EvccSolar(pvinstallations, timezone,
+                               min_time_between_api_calls=10, api_delay=0)
         forecast = evcc_solar.get_forecast()
         print(json.dumps(forecast, indent=4))
     except Exception as e:

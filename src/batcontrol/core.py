@@ -56,7 +56,7 @@ class Batcontrol:
     """ Main class for Batcontrol, handles the logic and control of the battery system """
     general_logic = None  # type: CommonLogic
 
-    def __init__(self, configdict:dict):
+    def __init__(self, configdict: dict):
         # For API
         self.api_overwrite = False
         # -1 = charge from grid , 0 = avoid discharge , 10 = discharge allowed
@@ -130,7 +130,8 @@ class Batcontrol:
             TIME_BETWEEN_UTILITY_API_CALLS,
             DELAY_EVALUATION_BY_SECONDS,
             requested_provider=config.get(
-                'solar_forecast_provider', 'fcsolarapi')
+                'solar_forecast_provider', 'fcsolarapi'),
+            full_config=config  # Pass full config for time_resolution_minutes
         )
 
         self.fc_consumption = consumption_factory.create_consumption(
@@ -161,7 +162,7 @@ class Batcontrol:
             charge_rate_multiplier=self.batconfig.get(
                 'charge_rate_multiplier', 1.1),
             always_allow_discharge_limit=self.batconfig.get(
-            'always_allow_discharge_limit', 0.9),
+                'always_allow_discharge_limit', 0.9),
             max_capacity=self.inverter.get_max_capacity(),
             min_charge_energy=self.batconfig.get('min_recharge_amount', 100.0)
         )
@@ -230,9 +231,12 @@ class Batcontrol:
         logger.info('Scheduler thread initialized')
         self.scheduler.start()
         # Schedule periodic checks as fail-safe variant
-        self.scheduler.schedule_every(1, 'hours', self.fc_solar.refresh_data, 'forecast-solar-every')
-        self.scheduler.schedule_every(1, 'hours', self.dynamic_tariff.refresh_data, 'utility-tariff-every')
-        self.scheduler.schedule_every(2, 'hours', self.fc_consumption.refresh_data, 'forecast-consumption-every')
+        self.scheduler.schedule_every(
+            1, 'hours', self.fc_solar.refresh_data, 'forecast-solar-every')
+        self.scheduler.schedule_every(
+            1, 'hours', self.dynamic_tariff.refresh_data, 'utility-tariff-every')
+        self.scheduler.schedule_every(
+            2, 'hours', self.fc_consumption.refresh_data, 'forecast-consumption-every')
         # Run initial data fetch
         try:
             self.fc_solar.refresh_data()
@@ -294,7 +298,7 @@ class Batcontrol:
         #   always_allow_discharge needs to be above max_charging from grid.
         #   if not, it will oscillate between discharging and charging.
         always_allow_discharge_limit = self.general_logic.get_always_allow_discharge_limit()
-        if  always_allow_discharge_limit < self.max_charging_from_grid_limit:
+        if always_allow_discharge_limit < self.max_charging_from_grid_limit:
             logger.warning("Always_allow_discharge_limit (%.2f) is"
                            " below max_charging_from_grid_limit (%.2f)",
                            always_allow_discharge_limit,
@@ -322,10 +326,10 @@ class Batcontrol:
                 fc_period+1)
             if len(consumption_forecast) < fc_period+1:
                 # Accept a shorter forecast horizon if not enough data is available
-                if len(consumption_forecast) < max(fc_period-FORECAST_TOLERANCE,MIN_FORECAST_HOURS):
+                if len(consumption_forecast) < max(fc_period-FORECAST_TOLERANCE, MIN_FORECAST_HOURS):
                     raise RuntimeError(f"Not enough consumption forecast data available, "
                                        f"requested {fc_period}, got {len(consumption_forecast)}"
-                            )
+                                       )
                 logger.warning("Insufficient consumption forecast data available, reducing "
                                "forecast to %d hours", len(consumption_forecast))
                 fc_period = len(consumption_forecast)-1
@@ -378,11 +382,34 @@ class Batcontrol:
             self.api_overwrite = False
             return
 
-        # correction for time that has already passed since the start of the current hour
-        production[0] *= 1 - \
-            datetime.datetime.now().astimezone(self.timezone).minute/60
-        consumption[0] *= 1 - \
-            datetime.datetime.now().astimezone(self.timezone).minute/60
+        # Correction for time that has already passed in the current interval
+        # Note: With Full-Hour Alignment, providers return data where [0] is already
+        # the current interval (e.g., at 10:20, [0] represents 10:15-10:30 for 15-min)
+        # We factorize based on elapsed time WITHIN the current interval
+        now = datetime.datetime.now().astimezone(self.timezone)
+        current_minute = now.minute
+        current_second = now.second
+
+        # Get interval resolution from config (default to 60 for backward compatibility)
+        interval_minutes = self.config.get('time_resolution_minutes', 60)
+
+        # Calculate elapsed time in the CURRENT interval as a fraction
+        # For 15-min: at 10:20:30, current_minute=20, we're in interval 10:15-10:30
+        #   elapsed = (20 % 15 + 30/60) / 15 = (5 + 0.5) / 15 = 0.367
+        # For 60-min: at 10:20:30, current_minute=20, we're in interval 10:00-11:00
+        #   elapsed = (20 + 30/60) / 60 = 20.5 / 60 = 0.342
+        elapsed_in_current = (current_minute % interval_minutes +
+                              current_second / 60) / interval_minutes
+
+        # Factorize [0] to account for elapsed time
+        production[0] *= (1 - elapsed_in_current)
+        consumption[0] *= (1 - elapsed_in_current)
+
+        logger.debug(
+            'Current interval factorization: elapsed=%.3f, remaining=%.3f',
+            elapsed_in_current,
+            1 - elapsed_in_current
+        )
 
         this_logic_run = LogicFactory.create_logic(self.config, self.timezone)
 
@@ -421,7 +448,7 @@ class Batcontrol:
                 calc_output.min_dynamic_price_difference)
 
         if self.discharge_blocked and not \
-                self.general_logic.is_discharge_always_allowed_soc( self.get_SOC() ):
+                self.general_logic.is_discharge_always_allowed_soc(self.get_SOC()):
             # We are blocked by a request outside control loop (evcc)
             # but only if the always_allow_discharge_limit is not reached.
             logger.debug('Discharge blocked due to external lock')
@@ -612,10 +639,9 @@ class Batcontrol:
         self.discharge_blocked = discharge_blocked
 
         if not self.general_logic.is_discharge_always_allowed_soc(
-                        self.get_SOC()
-                        ):
-                self.avoid_discharging()
-
+            self.get_SOC()
+        ):
+            self.avoid_discharging()
 
     def refresh_static_values(self) -> None:
         """ Refresh static and some dynamic values for API.
