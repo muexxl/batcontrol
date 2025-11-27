@@ -1,5 +1,6 @@
 from .core import Batcontrol
 from .setup import setup_logging, load_config
+import argparse
 import time
 import datetime
 import sys
@@ -11,14 +12,37 @@ EVALUATIONS_EVERY_MINUTES = 3  # Every x minutes on the clock
 LOGFILE_ENABLED_DEFAULT = True
 LOGFILE = "logs/batcontrol.log"
 
+
+def parse_arguments():
+    """Parse command line arguments."""
+    parser = argparse.ArgumentParser(
+        prog='batcontrol',
+        description='Battery control system for dynamic tariff optimization'
+    )
+    parser.add_argument(
+        '--one-shot',
+        action='store_true',
+        help='Run once and exit (load config, fetch data, run main loop once, then exit)'
+    )
+    parser.add_argument(
+        '--config', '-c',
+        default=CONFIGFILE,
+        help=f'Path to configuration file (default: {CONFIGFILE})'
+    )
+    return parser.parse_args()
+
+
 def main() -> int:
+    # Parse command line arguments
+    args = parse_arguments()
+
     # Configure a basic logger to be able to log even before the configuration is loaded
     setup_logging(level=logging.INFO)
     logger = logging.getLogger(__name__)
-    logger.info('Looking for config file at %s', CONFIGFILE)
+    logger.info('Looking for config file at %s', args.config)
 
     # Load the configuration
-    config = load_config(CONFIGFILE)
+    config = load_config(args.config)
 
     # Load the config for the logger with the loaded configuration
     loglevel = config.get('loglevel', 'info')
@@ -59,6 +83,12 @@ def main() -> int:
         while True:
             logger.info("Starting batcontrol")
             bc.run()
+
+            # Exit after first run if --one-shot is specified
+            if args.one_shot:
+                logger.info("One-shot mode: exiting after single run")
+                break
+
             loop_now = datetime.datetime.now().astimezone(bc.timezone)
             # reset base to full minutes on the clock
             next_eval = loop_now - datetime.timedelta(
