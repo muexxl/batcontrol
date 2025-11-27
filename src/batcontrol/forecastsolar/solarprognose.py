@@ -45,13 +45,27 @@ STATUS_ERROR_FAILED_TO_LOAD_WEATHER_LOCATION_ITEM = -29
 
 
 class SolarPrognose(ForecastSolarBaseclass):
-    """ Provider to get data from solarprognose API """
+    """ Provider to get data from solarprognose API 
+
+    Returns hourly data at native resolution (60 minutes).
+    Baseclass handles conversion to 15-min if needed.
+    """
 
     def __init__(self, pvinstallations, timezone, min_time_between_api_calls,
-                 delay_evaluation_by_seconds) -> None:
-        """ Initialize the SolarPrognose class """  
+                 delay_evaluation_by_seconds, target_resolution=60) -> None:
+        """ Initialize the SolarPrognose class 
+
+        Args:
+            pvinstallations: List of PV installation configurations
+            timezone: Timezone for forecast data
+            min_time_between_api_calls: Minimum seconds between API calls
+            delay_evaluation_by_seconds: Delay for API evaluation
+            target_resolution: Target resolution in minutes (15 or 60)
+        """
         super().__init__(pvinstallations, timezone,
-                         min_time_between_api_calls, delay_evaluation_by_seconds)
+                         min_time_between_api_calls, delay_evaluation_by_seconds,
+                         target_resolution=target_resolution,
+                         native_resolution=60)  # SolarPrognose provides hourly data
 
     def get_forecast_from_raw_data(self) -> dict:
         """ Get hourly forecast from provider """

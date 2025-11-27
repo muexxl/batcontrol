@@ -13,12 +13,13 @@ class Logic:
     def create_logic(config: dict, timezone) -> LogicInterface:
         """ Select and configure a logic class based on the given configuration """
         request_type = config.get('type', 'default').lower()
+        interval_minutes = config.get('time_resolution_minutes', 60)
         logic = None
         if request_type == 'default':
             if Logic.print_class_message:
                 logger.info('Using default logic')
                 Logic.print_class_message = False
-            logic = DefaultLogic(timezone)
+            logic = DefaultLogic(timezone, interval_minutes=interval_minutes)
             if config.get('battery_control_expert', None) is not None:
                 battery_control_expert = config.get( 'battery_control_expert', {})
                 attribute_list = [

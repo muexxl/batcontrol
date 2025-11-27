@@ -13,9 +13,9 @@ Methods:
     get_raw_data_from_provider(self):
         Fetches raw data from the evcc API and returns it as a JSON object.
 
-    get_prices_from_raw_data(self):
+    _get_prices_native(self):
         Processes the raw data from the evcc API and returns a dictionary of prices
-        indexed by the relative hour.
+        indexed by the relative interval.
 
     test():
         A test function to run the Evcc class with a provided URL and print the fetched prices.
@@ -29,16 +29,29 @@ from .baseclass import DynamicTariffBaseclass
 
 logger = logging.getLogger(__name__)
 
+
 class Evcc(DynamicTariffBaseclass):
     """ Implement evcc API to get dynamic electricity prices
         Inherits from DynamicTariffBaseclass
-    """
-    def __init__(self, timezone , url , min_time_between_API_calls=60):
-        super().__init__(timezone,min_time_between_API_calls, 0)
-        self.delay_evaluation_by_seconds=0
-        self.url=url
 
-    def get_raw_data_from_provider(self) -> dict:  # pylint: disable=unused-private-member
+        Native resolution: 15 minutes
+        EVCC provides 15-minute price data natively.
+        Baseclass handles averaging to hourly if target_resolution=60.
+    """
+
+    def __init__(self, timezone, url, min_time_between_API_calls=60,
+                 target_resolution: int = 60):
+        # EVCC provides native 15-minute data
+        super().__init__(
+            timezone,
+            min_time_between_API_calls,
+            delay_evaluation_by_seconds=0,
+            target_resolution=target_resolution,
+            native_resolution=15
+        )
+        self.url = url
+
+    def get_raw_data_from_provider(self) -> dict:
         logger.debug('Requesting price forecast from evcc API: %s', self.url)
         try:
             response = requests.get(self.url, timeout=30)
@@ -64,51 +77,48 @@ class Evcc(DynamicTariffBaseclass):
         #     }
         # }
 
-        raw_data=response.json()
+        raw_data = response.json()
         return raw_data
 
+    def _get_prices_native(self) -> dict[int, float]:
+        """Get hour-aligned prices at native (15-minute) resolution.
 
-    def get_prices_from_raw_data(self) -> dict[int, float]:   # pylint: disable=unused-private-member
-        """ Process the raw data from the evcc API and return a dictionary of prices indexed
-            by relative hour.
-            The relative hour is calculated from the current time in the specified timezone.
-            If multiple prices are provided for the same hour (e.g., every 15 minutes),
-            the hourly price is calculated as the average of all those entries.
+        Returns:
+            Dict mapping 15-min interval index to price value
+            Index 0 = start of current hour (first 15-min interval)
+            Indices 0-3 represent the 4 quarters of the current hour
         """
-        data=self.get_raw_data().get('rates', None)
+        data = self.get_raw_data().get('rates', None)
         if data is None:
-            #prior to evcc 0.207.0 the rates were in the 'result' field
-            data=self.get_raw_data().get('result', {}).get('rates', None)
+            # prior to evcc 0.207.0 the rates were in the 'result' field
+            data = self.get_raw_data().get('result', {}).get('rates', None)
 
-        now=datetime.datetime.now().astimezone(self.timezone)
-        # Get the start of the current hour
+        now = datetime.datetime.now().astimezone(self.timezone)
+        # Align to start of current hour
         current_hour_start = now.replace(minute=0, second=0, microsecond=0)
-        # Use a dictionary to collect all prices for each hour
-        hourly_prices={}
+
+        prices = {}
 
         for item in data:
             # "start":"2024-06-20T08:00:00+02:00" to timestamp
-            timestamp=datetime.datetime.fromisoformat(item['start']).astimezone(self.timezone)
-            # Get the start of the hour for this timestamp
-            interval_hour_start = timestamp.replace(minute=0, second=0, microsecond=0)
-            # Calculate relative hour based on hour boundaries
-            diff = interval_hour_start - current_hour_start
-            rel_hour = int(diff.total_seconds() / 3600)
-            if rel_hour >=0:
+            timestamp = datetime.datetime.fromisoformat(
+                item['start']).astimezone(self.timezone)
+
+            # Calculate relative 15-min interval from start of current hour
+            diff = timestamp - current_hour_start
+            rel_interval = int(diff.total_seconds() / 900)  # 900 seconds = 15 minutes
+
+            if rel_interval >= 0:
                 # since evcc 0.203.0 value is the name of the price field.
                 if item.get('value', None) is not None:
-                    price=item['value']
+                    price = item['value']
                 else:
-                    price=item['price']
+                    price = item['price']
 
-                # Collect all prices for this hour
-                if rel_hour not in hourly_prices:
-                    hourly_prices[rel_hour]=[]
-                hourly_prices[rel_hour].append(price)
+                prices[rel_interval] = price
 
-        # Calculate average for each hour
-        prices={}
-        for hour, price_list in hourly_prices.items():
-            prices[hour]=sum(price_list)/len(price_list)
-
+        logger.debug(
+            'EVCC: Retrieved %d prices at 15-min resolution (hour-aligned)',
+            len(prices)
+        )
         return prices

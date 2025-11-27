@@ -20,34 +20,60 @@ Methods:
     get_raw_data_from_provider(self):
         Fetches raw data from the energyforecast.de API.
 
-    get_prices_from_raw_data(self):
+    _get_prices_native(self):
         Processes the raw data to extract and calculate electricity prices.
 """
 import datetime
 import logging
-import math
 import requests
 from .baseclass import DynamicTariffBaseclass
 
 logger = logging.getLogger(__name__)
+
 
 class Energyforecast(DynamicTariffBaseclass):
     """ Implement energyforecast.de API to get dynamic electricity prices
         Inherits from DynamicTariffBaseclass
 
         Uses 48-hour forecast window for better day-ahead planning.
-        # min_time_between_API_calls: Minimum time between API calls in seconds
+
+        Energyforecast API supports both resolutions:
+        - hourly: Hourly prices (60-minute intervals)
+        - quarter_hourly: 15-minute prices
+
+        The native resolution is set based on target_resolution to fetch
+        data at the optimal granularity from the API.
     """
 
     def __init__(self, timezone, token, min_time_between_API_calls=0,
-                 delay_evaluation_by_seconds=0):
+                 delay_evaluation_by_seconds=0, target_resolution: int = 60):
         """ Initialize Energyforecast class with parameters """
-        super().__init__(timezone, min_time_between_API_calls, delay_evaluation_by_seconds)
+        # Energyforecast API supports both resolutions
+        if target_resolution == 15:
+            native_resolution = 15
+            self.api_resolution = "quarter_hourly"
+        else:
+            native_resolution = 60
+            self.api_resolution = "hourly"
+
+        super().__init__(
+            timezone,
+            min_time_between_API_calls,
+            delay_evaluation_by_seconds,
+            target_resolution=target_resolution,
+            native_resolution=native_resolution
+        )
         self.url = 'https://www.energyforecast.de/api/v1/predictions/next_48_hours'
         self.token = token
         self.vat = 0
         self.price_fees = 0
         self.price_markup = 0
+
+        logger.info(
+            'Energyforecast: Configured to fetch %s data (resolution=%d min)',
+            self.api_resolution,
+            self.native_resolution
+        )
 
     def upgrade_48h_to_96h(self):
         """ During initialization, we can upgrade the forecast if user wants 96h horizon """
@@ -61,14 +87,15 @@ class Energyforecast(DynamicTariffBaseclass):
 
     def get_raw_data_from_provider(self):
         """ Get raw data from energyforecast.de API and return parsed json """
-        logger.debug('Requesting price forecast from energyforecast.de API')
+        logger.debug('Requesting price forecast from energyforecast.de API (resolution=%s)',
+                     self.api_resolution)
         if not self.token:
             raise RuntimeError('[Energyforecast] API token is required')
         try:
             # Request base prices without provider-side calculations
             # We apply vat, fees, and markup locally
             params = {
-                'resolution': 'hourly',
+                'resolution': self.api_resolution,
                 'token': self.token,
                 'vat': 0,
                 'fixed_cost_cent': 0
@@ -83,8 +110,8 @@ class Energyforecast(DynamicTariffBaseclass):
         response_json = response.json()
         return {'data': response_json}
 
-    def get_prices_from_raw_data(self):
-        """ Extract prices from raw data to internal data structure based on hours 
+    def _get_prices_native(self) -> dict[int, float]:
+        """Get hour-aligned prices at native resolution.
 
         Expected API response format:
            data: [
@@ -96,11 +123,20 @@ class Energyforecast(DynamicTariffBaseclass):
               }
             ]
 
+        Returns:
+            Dict mapping interval index to price value
+            Index 0 = start of current hour
+            For 15-min resolution: indices 0-3 represent the current hour
         """
         raw_data = self.get_raw_data()
         data = raw_data.get('data', [])
         now = datetime.datetime.now(self.timezone)
+        # Align to start of current hour
+        current_hour_start = now.replace(minute=0, second=0, microsecond=0)
         prices = {}
+
+        # Determine interval duration in seconds
+        interval_seconds = self.native_resolution * 60
 
         for item in data:
             # Parse ISO format timestamp
@@ -111,15 +147,20 @@ class Energyforecast(DynamicTariffBaseclass):
                 item['start'].replace('Z', '+00:00')
             ).astimezone(self.timezone)
 
-            diff = timestamp - now
-            rel_hour = math.ceil(diff.total_seconds() / 3600)
+            diff = timestamp - current_hour_start
+            rel_interval = int(diff.total_seconds() / interval_seconds)
 
-            if rel_hour >= 0:
+            if rel_interval >= 0:
                 # Apply fees/markup/vat to the base price
                 # The price field should already be in the correct unit (EUR/kWh)
                 base_price = item['price']
                 end_price = ((base_price * (1 + self.price_markup) + self.price_fees)
-                            * (1 + self.vat))
-                prices[rel_hour] = end_price
+                             * (1 + self.vat))
+                prices[rel_interval] = end_price
 
+        logger.debug(
+            'Energyforecast: Retrieved %d prices at %d-min resolution (hour-aligned)',
+            len(prices),
+            self.native_resolution
+        )
         return prices
