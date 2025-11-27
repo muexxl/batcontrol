@@ -428,6 +428,53 @@ class TestForecastConsumptionHomeAssistant:
         assert mock_refresh.called
         assert len(forecast) == 1
 
+    @patch.object(ForecastConsumptionHomeAssistant, 'refresh_data_with_limit')
+    def test_get_forecast_stale_cache_triggers_refresh(
+        self, mock_refresh, base_config, timezone, mock_unit_check
+    ):
+        """Test that cache with old entries still triggers refresh for missing future hours.
+
+        This test verifies the fix for the issue where cache_size < hours was used
+        incorrectly - old cache entries should not satisfy the requirement for
+        specific future hour forecasts.
+        """
+        forecaster = ForecastConsumptionHomeAssistant(**base_config)
+
+        # Get current time
+        now = datetime.datetime.now(tz=timezone)
+
+        # Add old/irrelevant cache entries for different hours than we need
+        # This simulates having many cache entries but not the ones we need
+        with forecaster._cache_lock:
+            # Add entries for hours that are NOT the ones we'll need for forecast
+            for day in range(7):
+                for h in [0, 1, 2, 3]:  # Early morning hours
+                    key = f"{day}_{h}"
+                    forecaster.consumption_cache[key] = 100.0
+
+        # Verify we have many cache entries
+        with forecaster._cache_lock:
+            cache_size = len(forecaster.consumption_cache)
+        assert cache_size >= 28  # 7 days * 4 hours
+
+        # Set up mock to populate required cache entries when called
+        def populate_cache(hours):
+            with forecaster._cache_lock:
+                for h in range(hours):
+                    future_time = now + datetime.timedelta(hours=h)
+                    key = forecaster._get_cache_key(future_time.weekday(), future_time.hour)
+                    forecaster.consumption_cache[key] = 100.0 + (h * 10.0)
+
+        mock_refresh.side_effect = populate_cache
+
+        # Request forecast - should trigger refresh despite having 28+ cache entries
+        # because the specific future hours we need are not in the cache
+        forecast = forecaster.get_forecast(5)
+
+        # Should have triggered refresh because required keys were missing
+        assert mock_refresh.called
+        assert len(forecast) == 5
+
     def test_get_forecast_fallback_on_missing_key(self, base_config, timezone, mock_unit_check):
         """Test forecast stops when specific hour not in cache"""
         forecaster = ForecastConsumptionHomeAssistant(**base_config)

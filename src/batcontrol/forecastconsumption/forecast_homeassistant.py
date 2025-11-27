@@ -723,12 +723,19 @@ class ForecastConsumptionHomeAssistant(ForecastConsumptionInterface):
         Returns:
             Dict mapping hour offset to predicted consumption in Wh
         """
-        # Check if cache is empty, if so refresh data
+        # Check if cache has all required keys for the forecast hours
+        now = datetime.datetime.now(tz=self.timezone)
+        missing_keys = False
         with self._cache_lock:
-            cache_size = len(self.consumption_cache)
+            for h in range(hours):
+                future_time = now + datetime.timedelta(hours=h)
+                cache_key = self._get_cache_key(future_time.weekday(), future_time.hour)
+                if cache_key not in self.consumption_cache:
+                    missing_keys = True
+                    break
 
-        if cache_size == 0 or cache_size < hours:
-            logger.info("Cache empty or insufficient, refreshing consumption forecast data")
+        if missing_keys:
+            logger.info("Cache missing required keys, refreshing consumption forecast data")
             self.refresh_data_with_limit(hours)
 
         # Generate forecast for requested hours
