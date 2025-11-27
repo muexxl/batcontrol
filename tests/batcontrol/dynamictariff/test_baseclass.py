@@ -4,7 +4,7 @@ Test module for DynamicTariffBaseclass and providers
 import pytest
 import pytz
 from datetime import datetime, timezone as dt_timezone
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 from batcontrol.dynamictariff.baseclass import DynamicTariffBaseclass
 
 
