@@ -52,7 +52,7 @@ class TestEnergyforecast(unittest.TestCase):
             mock_datetime.datetime.now.return_value = mock_now
             mock_datetime.datetime.fromisoformat = datetime.datetime.fromisoformat
 
-            prices = energyforecast.get_prices_from_raw_data()
+            prices = energyforecast._get_prices_native()
 
         # Verify prices are calculated with fees, markup and vat
         # Formula: (price * (1 + markup) + fees) * (1 + vat)
@@ -91,7 +91,7 @@ class TestEnergyforecast(unittest.TestCase):
             mock_datetime.datetime.now.return_value = mock_now
             mock_datetime.datetime.fromisoformat = datetime.datetime.fromisoformat
 
-            prices = energyforecast.get_prices_from_raw_data()
+            prices = energyforecast._get_prices_native()
 
         # Should have prices for all 48 hours
         self.assertEqual(len(prices), 48)
@@ -124,7 +124,7 @@ class TestEnergyforecast(unittest.TestCase):
             mock_datetime.datetime.now.return_value = mock_now
             mock_datetime.datetime.fromisoformat = datetime.datetime.fromisoformat
 
-            prices = energyforecast.get_prices_from_raw_data()
+            prices = energyforecast._get_prices_native()
 
         # Should have the price at rel_hour 0
         self.assertIn(0, prices)
@@ -170,7 +170,7 @@ class TestEnergyforecast(unittest.TestCase):
             mock_datetime.datetime.now.return_value = mock_now
             mock_datetime.datetime.fromisoformat = datetime.datetime.fromisoformat
 
-            prices = energyforecast.get_prices_from_raw_data()
+            prices = energyforecast._get_prices_native()
 
         # Should only have future/current prices (rel_hour >= 0)
         self.assertEqual(len(prices), 2)
@@ -202,7 +202,7 @@ class TestEnergyforecast(unittest.TestCase):
             mock_datetime.datetime.now.return_value = mock_now
             mock_datetime.datetime.fromisoformat = datetime.datetime.fromisoformat
 
-            prices = energyforecast.get_prices_from_raw_data()
+            prices = energyforecast._get_prices_native()
 
         # Formula: (price * (1 + markup) + fees) * (1 + vat)
         # (0.30 * 1.05 + 0.01) * 1.19
@@ -222,7 +222,7 @@ class TestEnergyforecast(unittest.TestCase):
             mock_datetime.datetime.now.return_value = mock_now
             mock_datetime.datetime.fromisoformat = datetime.datetime.fromisoformat
 
-            prices = energyforecast.get_prices_from_raw_data()
+            prices = energyforecast._get_prices_native()
 
         # Should return empty dict
         self.assertEqual(len(prices), 0)
@@ -242,7 +242,7 @@ class TestEnergyforecast(unittest.TestCase):
             mock_datetime.datetime.fromisoformat = datetime.datetime.fromisoformat
 
             # Should handle missing 'data' key gracefully
-            prices = energyforecast.get_prices_from_raw_data()
+            prices = energyforecast._get_prices_native()
 
         # Should return empty dict when 'data' key is missing
         self.assertEqual(len(prices), 0)

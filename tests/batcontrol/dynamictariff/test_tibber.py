@@ -15,8 +15,8 @@ class TestTibber(unittest.TestCase):
         self.timezone = pytz.timezone('Europe/Berlin')
         self.token = 'test_token_12345'
 
-    def test_get_prices_from_raw_data(self):
-        """Test that get_prices_from_raw_data correctly fetches from cache"""
+    def test__get_prices_native(self):
+        """Test that _get_prices_native correctly fetches from cache"""
         tibber = Tibber(self.timezone, self.token)
 
         # Mock raw data with Tibber API format
@@ -69,7 +69,7 @@ class TestTibber(unittest.TestCase):
             mock_datetime.datetime.now.return_value = mock_now
             mock_datetime.datetime.fromisoformat = datetime.datetime.fromisoformat
 
-            prices = tibber.get_prices_from_raw_data()
+            prices = tibber._get_prices_native()
 
         # Verify prices are extracted correctly
         self.assertEqual(prices[0], 0.25)  # Current hour (10:00)
@@ -78,14 +78,14 @@ class TestTibber(unittest.TestCase):
         self.assertIn(24, prices)  # Tomorrow at 10:00
         self.assertEqual(prices[24], 0.27)
 
-    def test_get_prices_from_raw_data_empty_cache(self):
-        """Test that get_prices_from_raw_data handles empty cache gracefully"""
+    def test__get_prices_native_empty_cache(self):
+        """Test that _get_prices_native handles empty cache gracefully"""
         tibber = Tibber(self.timezone, self.token)
 
         # Don't store any data - cache is empty
         # This should raise an error when trying to access raw data
         with self.assertRaises(Exception):
-            tibber.get_prices_from_raw_data()
+            tibber._get_prices_native()
 
     def test_multiple_homes_uses_first_home(self):
         """Test that Tibber uses the first home (index 0) from multiple homes"""
@@ -142,7 +142,7 @@ class TestTibber(unittest.TestCase):
             mock_datetime.datetime.now.return_value = mock_now
             mock_datetime.datetime.fromisoformat = datetime.datetime.fromisoformat
 
-            prices = tibber.get_prices_from_raw_data()
+            prices = tibber._get_prices_native()
 
         # Should use the first home's price (0.25) not the second home's (0.99)
         self.assertEqual(prices[0], 0.25)
@@ -193,7 +193,7 @@ class TestTibber(unittest.TestCase):
             mock_datetime.datetime.now.return_value = mock_now
             mock_datetime.datetime.fromisoformat = datetime.datetime.fromisoformat
 
-            prices = tibber.get_prices_from_raw_data()
+            prices = tibber._get_prices_native()
 
         # Should only have current and future prices, not past ones
         self.assertIn(0, prices)  # Current hour

@@ -14,7 +14,7 @@ class ForecastSolar:
                               min_time_between_api_calls,
                               api_delay=0,
                               requested_provider='fcsolarapi',
-                              full_config: dict = None) -> ForecastSolarInterface:
+                              target_resolution: int = 60) -> ForecastSolarInterface:
         """ Select and configure a solar forecast provider based on the given configuration 
 
         Args:
@@ -23,13 +23,8 @@ class ForecastSolar:
             min_time_between_api_calls: Minimum seconds between API calls
             api_delay: Delay for API evaluation
             requested_provider: Provider name
-            full_config: Full configuration dict (for accessing time_resolution_minutes)
+            target_resolution: Target resolution in minutes (15 or 60)
         """
-        # Extract target resolution from full config
-        target_resolution = 60  # Default
-        if full_config:
-            target_resolution = full_config.get('time_resolution_minutes', 60)
-
         provider = None
         if requested_provider.lower() == 'fcsolarapi':
             provider = FCSolar(config, timezone, min_time_between_api_calls,
