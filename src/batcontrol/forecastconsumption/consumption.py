@@ -19,20 +19,15 @@ class Consumption:
     def create_consumption(
             tz,
             config: dict,
-            full_config: dict = None) -> ForecastConsumptionInterface:
+            target_resolution: int = 60) -> ForecastConsumptionInterface:
         """ Select and configure a consumption forecast provider based on
             the given configuration segment consumption_forecast in the config file.
 
         Args:
             tz: Timezone for forecast data
             config: Consumption forecast configuration (consumption_forecast)
-            full_config: Full configuration dict (for accessing time_resolution_minutes)
+            target_resolution: Target resolution in minutes (15 or 60)
         """
-        # Extract target resolution from full config
-        target_resolution = 60  # Default
-        if full_config:
-            target_resolution = full_config.get('time_resolution_minutes', 60)
-
         consumption = None
 
         consumption_type = config.get('type', 'csv').lower()

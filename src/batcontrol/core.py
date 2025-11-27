@@ -90,6 +90,9 @@ class Batcontrol:
         self.config = configdict
         config = configdict
 
+        # Extract time resolution (15 or 60 minutes)
+        self.time_resolution = config.get('time_resolution_minutes', 60)
+
         try:
             tzstring = config['timezone']
             self.timezone = pytz.timezone(tzstring)
@@ -117,7 +120,8 @@ class Batcontrol:
             config['utility'],
             self.timezone,
             TIME_BETWEEN_UTILITY_API_CALLS,
-            DELAY_EVALUATION_BY_SECONDS
+            DELAY_EVALUATION_BY_SECONDS,
+            target_resolution=self.time_resolution
         )
 
         self.inverter = inverter_factory.create_inverter(
@@ -131,13 +135,13 @@ class Batcontrol:
             DELAY_EVALUATION_BY_SECONDS,
             requested_provider=config.get(
                 'solar_forecast_provider', 'fcsolarapi'),
-            full_config=config  # Pass full config for time_resolution_minutes
+            target_resolution=self.time_resolution
         )
 
         self.fc_consumption = consumption_factory.create_consumption(
             self.timezone,
             config['consumption_forecast'],
-            full_config=config  # Pass full config for time_resolution_minutes
+            target_resolution=self.time_resolution
         )
 
         self.batconfig = config['battery_control']
