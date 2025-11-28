@@ -734,3 +734,76 @@ class TestForecastConsumptionHomeAssistant:
 
         # Average of 1500 and 2000 Wh = 1750 Wh
         assert result == 1750.0
+
+    @patch('src.batcontrol.forecastconsumption.forecast_homeassistant.connect')
+    def test_refresh_data_with_non_contiguous_missing_hours(
+        self, mock_connect, base_config, timezone, mock_unit_check
+    ):
+        """Test that refresh correctly populates cache for non-contiguous missing hours.
+
+        This test verifies the fix for the bug where cache was incorrectly populated
+        when missing_periods started at a non-zero hour offset (e.g., hours 38-47).
+        Previously, the code would store data for hours 0-9 instead of 38-47.
+        """
+        forecaster = ForecastConsumptionHomeAssistant(**base_config)
+
+        # Get current time
+        now = datetime.datetime.now(tz=timezone)
+        now_full_hour = now.replace(minute=0, second=0, microsecond=0)
+
+        # Pre-populate cache with data for first 38 hours (hours 0-37)
+        with forecaster._cache_lock:
+            for h in range(38):
+                future_time = now + datetime.timedelta(hours=h)
+                key = forecaster._get_cache_key(future_time.weekday(), future_time.hour)
+                forecaster.consumption_cache[key] = 100.0 + h
+
+        # Mock WebSocket to return sample data for missing hours
+        mock_websocket = AsyncMock()
+
+        # Build response list: auth_required, auth_ok, then data for each missing hour
+        responses = [
+            json.dumps({"type": "auth_required"}),
+            json.dumps({"type": "auth_ok"}),
+        ]
+
+        # Add responses for each of the missing hours (38-47) and each history_day (-7, -14)
+        for h in range(38, 48):
+            for _ in base_config['history_days']:
+                responses.append(json.dumps({
+                    "id": len(responses) - 1,
+                    "type": "result",
+                    "success": True,
+                    "result": {
+                        'sensor.energy_consumption': [
+                            {
+                                'start': (now_full_hour + datetime.timedelta(hours=h)).isoformat(),
+                                'change': 200.0 + h  # Distinct value for each hour
+                            }
+                        ]
+                    }
+                }))
+
+        mock_websocket.recv = AsyncMock(side_effect=responses)
+        mock_websocket.send = AsyncMock()
+        mock_websocket.close = AsyncMock()
+
+        async def mock_connect_coro(*args, **kwargs):
+            return mock_websocket
+
+        mock_connect.side_effect = mock_connect_coro
+
+        # Call refresh_data_with_limit to fill missing hours
+        forecaster.refresh_data_with_limit(48)
+
+        # Verify that hours 38-47 are now in the cache with correct keys
+        with forecaster._cache_lock:
+            for h in range(38, 48):
+                future_time = now + datetime.timedelta(hours=h)
+                key = forecaster._get_cache_key(future_time.weekday(), future_time.hour)
+                assert key in forecaster.consumption_cache, \
+                    f"Hour {h} (key={key}) should be in cache but is missing"
+                # The value should be around 200 + h (adjusted by multiplier if any)
+                value = forecaster.consumption_cache[key]
+                assert value > 200, \
+                    f"Hour {h} (key={key}) should have value > 200, got {value}"

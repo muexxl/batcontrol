@@ -697,7 +697,10 @@ class ForecastConsumptionHomeAssistant(ForecastConsumptionInterface):
             return
 
         # Calculate weighted statistics and update cache
-        updated_count = self._update_cache_with_statistics(now, history_periods)
+        # Use the timestamp of the first missing period as the start time,
+        # since history_periods contains data starting from missing_periods[0]
+        start_time = now + datetime.timedelta(hours=missing_periods[0])
+        updated_count = self._update_cache_with_statistics(start_time, history_periods)
 
         logger.info(
             "Successfully updated consumption forecast cache with %d hour slots",
