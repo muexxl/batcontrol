@@ -516,19 +516,18 @@ class ForecastConsumptionHomeAssistant(ForecastConsumptionInterface):
 
     def _update_cache_with_statistics(
         self,
-        timestamp: datetime.datetime,
-        history_periods: List[float]
+        now: datetime.datetime,
+        history_periods: Dict[int, float]
     ) -> int:
         """Calculate weighted statistics and update cache
 
         Args:
-            history_periods: List of hourly data dicts from different time periods
+            now: Current timestamp (full hour) used as reference for hour offsets
+            history_periods: Dict mapping hour offset to consumption value in Wh
 
         Returns:
             Number of cache entries updated
         """
-
-
         # Calculate weighted average for each hour and store in cache
         with self._cache_lock:
             logger.debug(
@@ -536,8 +535,8 @@ class ForecastConsumptionHomeAssistant(ForecastConsumptionInterface):
                 len(history_periods)
             )
             updated_count = 0
-            for hour_offset, consumption in enumerate(history_periods):
-                future_time = timestamp + datetime.timedelta(hours=hour_offset)
+            for hour_offset, consumption in history_periods.items():
+                future_time = now + datetime.timedelta(hours=hour_offset)
                 weekday = future_time.weekday()
                 hour = future_time.hour
                 cache_key = self._get_cache_key(weekday, hour)
@@ -603,7 +602,7 @@ class ForecastConsumptionHomeAssistant(ForecastConsumptionInterface):
         now = now.replace(minute=0, second=0, microsecond=0)
 
         reference_slots = self._get_reference_slots()
-        history_periods = []
+        history_periods = {}  # Dict mapping hour offset to consumption value
 
         # Connect to WebSocket once for all requests
         try:
@@ -674,7 +673,8 @@ class ForecastConsumptionHomeAssistant(ForecastConsumptionInterface):
                             )
 
                     if weight_sum > 0:
-                        history_periods.append(summary_results / weight_sum)
+                        # Store with actual hour offset as key
+                        history_periods[fetch_hour] = summary_results / weight_sum
 
                 else:
                     # No data fetched for this hour
@@ -696,7 +696,7 @@ class ForecastConsumptionHomeAssistant(ForecastConsumptionInterface):
             logger.error("No statistics data could be fetched, forecast unavailable")
             return
 
-        # Calculate weighted statistics and update cache
+        # Update cache using dict with hour offsets as keys
         updated_count = self._update_cache_with_statistics(now, history_periods)
 
         logger.info(

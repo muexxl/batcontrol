@@ -314,9 +314,9 @@ class TestForecastConsumptionHomeAssistant:
         """Test cache update with weighted statistics"""
         forecaster = ForecastConsumptionHomeAssistant(**base_config)
 
-        # Create sample data - now expects a list of floats (one per hour)
-        # These represent average consumption values for consecutive hours
-        history_periods = [100.0, 120.0, 150.0]  # 3 hours of data
+        # Create sample data - dict mapping hour offset to consumption value
+        # These represent average consumption values for specific hours
+        history_periods = {0: 100.0, 1: 120.0, 2: 150.0}  # 3 hours of data
 
         # Use a fixed timestamp for testing (Monday 10:00)
         test_timestamp = datetime.datetime(2023, 10, 30, 10, 0, tzinfo=pytz.UTC)
@@ -328,17 +328,47 @@ class TestForecastConsumptionHomeAssistant:
 
         # Check cache contents
         with forecaster._cache_lock:
-            # Monday 10:00 (first hour)
+            # Monday 10:00 (first hour, offset 0)
             assert '0_10' in forecaster.consumption_cache
             assert abs(forecaster.consumption_cache['0_10'] - 100.0) < 0.1
 
-            # Monday 11:00 (second hour)
+            # Monday 11:00 (second hour, offset 1)
             assert '0_11' in forecaster.consumption_cache
             assert abs(forecaster.consumption_cache['0_11'] - 120.0) < 0.1
 
-            # Monday 12:00 (third hour)
+            # Monday 12:00 (third hour, offset 2)
             assert '0_12' in forecaster.consumption_cache
             assert abs(forecaster.consumption_cache['0_12'] - 150.0) < 0.1
+
+    def test_update_cache_with_statistics_non_contiguous(self, base_config, mock_unit_check):
+        """Test cache update with non-contiguous hour offsets (dict keys)"""
+        forecaster = ForecastConsumptionHomeAssistant(**base_config)
+
+        # Create sample data with non-contiguous hour offsets (gaps in the data)
+        # This simulates the case where hours 38-40 need to be filled
+        history_periods = {38: 200.0, 39: 220.0, 40: 250.0}
+
+        # Use a fixed timestamp for testing (Monday 10:00)
+        test_timestamp = datetime.datetime(2023, 10, 30, 10, 0, tzinfo=pytz.UTC)
+
+        # Update cache
+        updated_count = forecaster._update_cache_with_statistics(test_timestamp, history_periods)
+
+        assert updated_count == 3  # Three hour slots updated
+
+        # Check cache contents - hours 38, 39, 40 from Monday 10:00
+        # Hour 38 = Monday 10:00 + 38 hours = Wednesday 0:00 (weekday 2, hour 0)
+        # Hour 39 = Monday 10:00 + 39 hours = Wednesday 1:00 (weekday 2, hour 1)
+        # Hour 40 = Monday 10:00 + 40 hours = Wednesday 2:00 (weekday 2, hour 2)
+        with forecaster._cache_lock:
+            assert '2_0' in forecaster.consumption_cache
+            assert abs(forecaster.consumption_cache['2_0'] - 200.0) < 0.1
+
+            assert '2_1' in forecaster.consumption_cache
+            assert abs(forecaster.consumption_cache['2_1'] - 220.0) < 0.1
+
+            assert '2_2' in forecaster.consumption_cache
+            assert abs(forecaster.consumption_cache['2_2'] - 250.0) < 0.1
 
     @patch('src.batcontrol.forecastconsumption.forecast_homeassistant.connect')
     def test_refresh_data(self, mock_connect, base_config, mock_unit_check):
@@ -734,3 +764,80 @@ class TestForecastConsumptionHomeAssistant:
 
         # Average of 1500 and 2000 Wh = 1750 Wh
         assert result == 1750.0
+
+    @patch('src.batcontrol.forecastconsumption.forecast_homeassistant.connect')
+    def test_refresh_data_with_non_contiguous_missing_hours(
+        self, mock_connect, base_config, timezone, mock_unit_check
+    ):
+        """Test that refresh correctly populates cache for non-contiguous missing hours.
+
+        This test verifies the fix for the bug where cache was incorrectly populated
+        when missing_periods started at a non-zero hour offset (e.g., hours 38-47).
+        Previously, the code would store data for hours 0-9 instead of 38-47.
+        """
+        forecaster = ForecastConsumptionHomeAssistant(**base_config)
+
+        # Get current time
+        now = datetime.datetime.now(tz=timezone)
+        now_full_hour = now.replace(minute=0, second=0, microsecond=0)
+
+        # Pre-populate cache with data for first 38 hours (hours 0-37)
+        with forecaster._cache_lock:
+            for h in range(38):
+                future_time = now + datetime.timedelta(hours=h)
+                key = forecaster._get_cache_key(future_time.weekday(), future_time.hour)
+                forecaster.consumption_cache[key] = 100.0 + h
+
+        # Mock WebSocket to return sample data for missing hours
+        mock_websocket = AsyncMock()
+
+        # Build response list: auth_required, auth_ok, then data for each missing hour
+        responses = [
+            json.dumps({"type": "auth_required"}),
+            json.dumps({"type": "auth_ok"}),
+        ]
+
+        # Add responses for each of the missing hours (38-47) and each history_day (-7, -14)
+        message_id = 1
+        for h in range(38, 48):
+            for history_day in base_config['history_days']:
+                # Calculate the actual time being queried (for this hour + history_day offset)
+                query_time = now_full_hour + datetime.timedelta(hours=h, days=history_day)
+                responses.append(json.dumps({
+                    "id": message_id,
+                    "type": "result",
+                    "success": True,
+                    "result": {
+                        'sensor.energy_consumption': [
+                            {
+                                'start': query_time.isoformat(),
+                                'change': 200.0 + h  # Distinct value for each hour
+                            }
+                        ]
+                    }
+                }))
+                message_id += 1
+
+        mock_websocket.recv = AsyncMock(side_effect=responses)
+        mock_websocket.send = AsyncMock()
+        mock_websocket.close = AsyncMock()
+
+        async def mock_connect_coro(*args, **kwargs):
+            return mock_websocket
+
+        mock_connect.side_effect = mock_connect_coro
+
+        # Call refresh_data_with_limit to fill missing hours
+        forecaster.refresh_data_with_limit(48)
+
+        # Verify that hours 38-47 are now in the cache with correct keys
+        with forecaster._cache_lock:
+            for h in range(38, 48):
+                future_time = now + datetime.timedelta(hours=h)
+                key = forecaster._get_cache_key(future_time.weekday(), future_time.hour)
+                assert key in forecaster.consumption_cache, \
+                    f"Hour {h} (key={key}) should be in cache but is missing"
+                # The value should be around 200 + h (adjusted by multiplier if any)
+                value = forecaster.consumption_cache[key]
+                assert value > 200, \
+                    f"Hour {h} (key={key}) should have value > 200, got {value}"
