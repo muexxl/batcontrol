@@ -768,21 +768,25 @@ class TestForecastConsumptionHomeAssistant:
         ]
 
         # Add responses for each of the missing hours (38-47) and each history_day (-7, -14)
+        message_id = 1
         for h in range(38, 48):
-            for _ in base_config['history_days']:
+            for history_day in base_config['history_days']:
+                # Calculate the actual time being queried (for this hour + history_day offset)
+                query_time = now_full_hour + datetime.timedelta(hours=h, days=history_day)
                 responses.append(json.dumps({
-                    "id": len(responses) - 1,
+                    "id": message_id,
                     "type": "result",
                     "success": True,
                     "result": {
                         'sensor.energy_consumption': [
                             {
-                                'start': (now_full_hour + datetime.timedelta(hours=h)).isoformat(),
+                                'start': query_time.isoformat(),
                                 'change': 200.0 + h  # Distinct value for each hour
                             }
                         ]
                     }
                 }))
+                message_id += 1
 
         mock_websocket.recv = AsyncMock(side_effect=responses)
         mock_websocket.send = AsyncMock()
