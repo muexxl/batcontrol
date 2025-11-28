@@ -314,9 +314,9 @@ class TestForecastConsumptionHomeAssistant:
         """Test cache update with weighted statistics"""
         forecaster = ForecastConsumptionHomeAssistant(**base_config)
 
-        # Create sample data - now expects a list of floats (one per hour)
-        # These represent average consumption values for consecutive hours
-        history_periods = [100.0, 120.0, 150.0]  # 3 hours of data
+        # Create sample data - dict mapping hour offset to consumption value
+        # These represent average consumption values for specific hours
+        history_periods = {0: 100.0, 1: 120.0, 2: 150.0}  # 3 hours of data
 
         # Use a fixed timestamp for testing (Monday 10:00)
         test_timestamp = datetime.datetime(2023, 10, 30, 10, 0, tzinfo=pytz.UTC)
@@ -328,17 +328,47 @@ class TestForecastConsumptionHomeAssistant:
 
         # Check cache contents
         with forecaster._cache_lock:
-            # Monday 10:00 (first hour)
+            # Monday 10:00 (first hour, offset 0)
             assert '0_10' in forecaster.consumption_cache
             assert abs(forecaster.consumption_cache['0_10'] - 100.0) < 0.1
 
-            # Monday 11:00 (second hour)
+            # Monday 11:00 (second hour, offset 1)
             assert '0_11' in forecaster.consumption_cache
             assert abs(forecaster.consumption_cache['0_11'] - 120.0) < 0.1
 
-            # Monday 12:00 (third hour)
+            # Monday 12:00 (third hour, offset 2)
             assert '0_12' in forecaster.consumption_cache
             assert abs(forecaster.consumption_cache['0_12'] - 150.0) < 0.1
+
+    def test_update_cache_with_statistics_non_contiguous(self, base_config, mock_unit_check):
+        """Test cache update with non-contiguous hour offsets (dict keys)"""
+        forecaster = ForecastConsumptionHomeAssistant(**base_config)
+
+        # Create sample data with non-contiguous hour offsets (gaps in the data)
+        # This simulates the case where hours 38-40 need to be filled
+        history_periods = {38: 200.0, 39: 220.0, 40: 250.0}
+
+        # Use a fixed timestamp for testing (Monday 10:00)
+        test_timestamp = datetime.datetime(2023, 10, 30, 10, 0, tzinfo=pytz.UTC)
+
+        # Update cache
+        updated_count = forecaster._update_cache_with_statistics(test_timestamp, history_periods)
+
+        assert updated_count == 3  # Three hour slots updated
+
+        # Check cache contents - hours 38, 39, 40 from Monday 10:00
+        # Hour 38 = Monday 10:00 + 38 hours = Wednesday 0:00 (weekday 2, hour 0)
+        # Hour 39 = Monday 10:00 + 39 hours = Wednesday 1:00 (weekday 2, hour 1)
+        # Hour 40 = Monday 10:00 + 40 hours = Wednesday 2:00 (weekday 2, hour 2)
+        with forecaster._cache_lock:
+            assert '2_0' in forecaster.consumption_cache
+            assert abs(forecaster.consumption_cache['2_0'] - 200.0) < 0.1
+
+            assert '2_1' in forecaster.consumption_cache
+            assert abs(forecaster.consumption_cache['2_1'] - 220.0) < 0.1
+
+            assert '2_2' in forecaster.consumption_cache
+            assert abs(forecaster.consumption_cache['2_2'] - 250.0) < 0.1
 
     @patch('src.batcontrol.forecastconsumption.forecast_homeassistant.connect')
     def test_refresh_data(self, mock_connect, base_config, mock_unit_check):
