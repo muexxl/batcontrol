@@ -110,14 +110,6 @@ class TestFroniusConfigurableIDs(unittest.TestCase):
         # Assert custom value
         self.assertEqual(inverter.controller_id, '3')
 
-        # Create inverter with custom fronius_controller_id
-        config = self.base_config.copy()
-        config['fronius_controller_id'] = '3'
-        inverter = FroniusWR(config)
-
-        # Assert custom value
-        self.assertEqual(inverter.controller_id, '3')
-
     @patch('batcontrol.inverter.fronius.FroniusWR.get_firmware_version')
     @patch('batcontrol.inverter.fronius.FroniusWR.get_battery_config')
     @patch('batcontrol.inverter.fronius.FroniusWR.get_powerunit_config')
