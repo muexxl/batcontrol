@@ -50,6 +50,8 @@ inverter:
   # password: YOUR-PASSWORD #
   max_grid_charge_rate: 5000 # Watt, Upper limit for Grid to Battery charge rate.
   max_pv_charge_rate: 0 # Watt, This allows to limit the PV to Battery charge rate. Set to 0 for unlimited charging.
+  # fronius_inverter_id: '1' # Optional: ID of the inverter in Fronius API (default: '1')
+  # fronius_controller_id: '0' # Optional: ID of the controller in Fronius API (default: '0')
 
 #--------------------------
 #  Dynamic Tariff Provider

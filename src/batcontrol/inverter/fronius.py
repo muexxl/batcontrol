@@ -33,6 +33,7 @@ logger.info('Loading module ')
 
 logger_auth = logging.getLogger("batcontrol.inverter.fronius.auth")
 
+
 def hash_utf8(x, algorithm="MD5"):
     """Hash a string or bytes object.
 
@@ -67,9 +68,11 @@ BATTERY_CONFIG_FILENAME = 'config/battery_config.json'
 
 class MockResponse:
     """ Mock response object to return when no update is needed """
+
     def __init__(self):
         self.text = '{"writeSuccess": ["timeofuse"]}'
         self.status_code = 200
+
 
 @dataclass
 class FroniusApiConfig:
@@ -186,6 +189,9 @@ class FroniusWR(InverterBaseclass):
         self.nonce = 0
         self.user = config['user']
         self.password = config['password']
+        # Fronius API IDs - configurable with defaults
+        self.inverter_id = str(config.get('fronius_inverter_id', '1'))
+        self.controller_id = str(config.get('fronius_controller_id', '0'))
         self.fronius_version = self.get_firmware_version()
         self.api_config = get_api_config(self.fronius_version)
         self.previous_battery_config = self.get_battery_config()
@@ -208,7 +214,8 @@ class FroniusWR(InverterBaseclass):
         self._soc_cache = TTLCache(maxsize=1, ttl=30)
 
         # Initialize time of use cache with 15-minute TTL (maxsize=1 since we only cache one config)
-        self._time_of_use_cache = TTLCache(maxsize=1, ttl=910)  # 15 minutes , 10 Seconds = 910 seconds
+        # 15 minutes , 10 Seconds = 910 seconds
+        self._time_of_use_cache = TTLCache(maxsize=1, ttl=910)
 
         if not self.previous_battery_config:
             raise RuntimeError(
@@ -240,7 +247,7 @@ class FroniusWR(InverterBaseclass):
                 self.previous_battery_config['HYB_BACKUP_RESERVED']
             )
         self.max_soc = self.previous_battery_config['BAT_M0_SOC_MAX']
-        self.backup_time_of_use() # save timesofuse
+        self.backup_time_of_use()  # save timesofuse
         self.set_allow_grid_charging(True)
 
     def get_firmware_version(self) -> version:
@@ -285,7 +292,7 @@ class FroniusWR(InverterBaseclass):
             )
             return 99.0
         result = json.loads(response.text)
-        soc = result['Body']['Data']['Inverters']['1']['SOC']
+        soc = result['Body']['Data']['Inverters'][self.inverter_id]['SOC']
 
         # Cache the result
         self._soc_cache[cache_key] = soc
@@ -451,7 +458,6 @@ class FroniusWR(InverterBaseclass):
                 raise RuntimeError(f'failed to set {expected_write_success}')
         return response
 
-
     def backup_time_of_use(self):
         """ Get time of use configuration from inverter and keep a backup."""
         result = self.get_time_of_use()
@@ -466,7 +472,6 @@ class FroniusWR(InverterBaseclass):
             )
 
         return result
-
 
     def get_time_of_use(self):
         """ Get time of use configuration from inverter with 15-minute caching."""
@@ -661,7 +666,7 @@ class FroniusWR(InverterBaseclass):
             )
             return 1000
         result = json.loads(response.text)
-        capacity = result['Body']['Data']['0']['Controller']['DesignedCapacity']
+        capacity = result['Body']['Data'][self.controller_id]['Controller']['DesignedCapacity']
         self.capacity = capacity
         return capacity
 
@@ -714,7 +719,7 @@ class FroniusWR(InverterBaseclass):
             headers['Authorization'] = self.get_auth_header(
                 method=method, path=fullpath)
             logger_auth.debug("Requesting %s , header: %s",
-                                fullpath, headers)
+                              fullpath, headers)
 
         for i in range(3):
             # 3 retries if connection can't be established
@@ -774,7 +779,7 @@ class FroniusWR(InverterBaseclass):
                 logger_auth.info(
                     "Retrying login in 10 seconds")
                 time.sleep(10)
-        if self.login_attempts  >= 3:
+        if self.login_attempts >= 3:
             logger_auth.info(
                 'Login failed 3 times .. aborting'
             )
@@ -811,10 +816,10 @@ class FroniusWR(InverterBaseclass):
             self.nonce = auth_dict['nonce']
 
         logger_auth.debug("nc: %s, cnonce: %s, nonce: %s",
-            self.ncvalue_num ,
-            self.cnonce,
-            self.nonce
-         )
+                          self.ncvalue_num,
+                          self.cnonce,
+                          self.nonce
+                          )
 
     def __split_response_auth_header(self, response):
         """ Split the response header into a dictionary."""
@@ -877,7 +882,6 @@ class FroniusWR(InverterBaseclass):
         auth_header += f'response="{respdig}"'
         return auth_header
 
-
     def __get_password_hash_method(self) -> str:
         """ Figure out the password hash method during first login."""
         # If we already found a working method, use it
@@ -891,9 +895,10 @@ class FroniusWR(InverterBaseclass):
             if self._last_password_hash_method_index >= len(self.usable_password_hash_methods):
                 self._last_password_hash_method_index = 0
             password_algorithm = self.usable_password_hash_methods[
-                                                    self._last_password_hash_method_index
-                                                    ]
-            logger_auth.debug("Trying password hash method %s", password_algorithm)
+                self._last_password_hash_method_index
+            ]
+            logger_auth.debug(
+                "Trying password hash method %s", password_algorithm)
         else:
             # Fallback to MD5 only for older firmwares
             password_algorithm = "MD5"
@@ -909,10 +914,10 @@ class FroniusWR(InverterBaseclass):
             # We already have a working method, do not change it
             return
         self.password_hash = self.usable_password_hash_methods[
-                                    self._last_password_hash_method_index
-                                    ]
+            self._last_password_hash_method_index
+        ]
         logger_auth.debug("Password hash method set to %s",
-                            self.password_hash)
+                          self.password_hash)
 
     def __set_em(self, mode=None, power=None):
         """ Change Energy Management """
@@ -1127,4 +1132,3 @@ class FroniusWR(InverterBaseclass):
             em_power
         )
         self.set_em_power(em_power)
-
