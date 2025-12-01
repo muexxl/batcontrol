@@ -194,6 +194,10 @@ class FroniusWR(InverterBaseclass):
         self.controller_id = str(config.get('fronius_controller_id', '0'))
         self.fronius_version = self.get_firmware_version()
         self.api_config = get_api_config(self.fronius_version)
+
+        # Verify that the configured IDs are valid
+        self._verify_fronius_ids()
+
         self.previous_battery_config = self.get_battery_config()
         self.previous_backup_power_config = None
         # default values
@@ -669,6 +673,110 @@ class FroniusWR(InverterBaseclass):
         capacity = result['Body']['Data'][self.controller_id]['Controller']['DesignedCapacity']
         self.capacity = capacity
         return capacity
+
+    def _verify_fronius_ids(self):
+        """
+        Verify that the configured inverter_id and controller_id are valid.
+
+        This method makes test calls to the Fronius API to ensure the configured
+        IDs exist in the actual API responses. If verification fails, it logs
+        the complete JSON response to help with debugging.
+        """
+        # Verify inverter_id by checking powerflow data
+        try:
+            logger.info('Verifying Fronius inverter_id: %s', self.inverter_id)
+            path = self.api_config.powerflow_path
+            response = self.send_request(path)
+            if response:
+                result = json.loads(response.text)
+                inverters = result.get('Body', {}).get(
+                    'Data', {}).get('Inverters', {})
+
+                if self.inverter_id not in inverters:
+                    logger.error(
+                        'Configured inverter_id "%s" not found in Fronius API response.',
+                        self.inverter_id
+                    )
+                    logger.error(
+                        'Available inverter IDs: %s',
+                        list(inverters.keys())
+                    )
+                    logger.error(
+                        'Complete Inverters JSON response:\n%s',
+                        json.dumps(inverters, indent=2)
+                    )
+                    raise RuntimeError(
+                        f'Invalid fronius_inverter_id "{self.inverter_id}". '
+                        f'Available IDs: {list(inverters.keys())}'
+                    )
+                logger.info(
+                    'Inverter ID "%s" verified successfully', self.inverter_id)
+        except (KeyError, json.JSONDecodeError) as e:
+            logger.error(
+                'Failed to verify inverter_id due to unexpected response format: %s',
+                e
+            )
+            if response:
+                logger.error('Complete API response:\n%s', response.text)
+            raise RuntimeError(
+                f'Failed to verify fronius_inverter_id "{self.inverter_id}": {e}'
+            )
+
+        # Verify controller_id by checking storage data
+        try:
+            logger.info('Verifying Fronius controller_id: %s',
+                        self.controller_id)
+            path = self.api_config.storage_path
+            response = self.send_request(path)
+            if response:
+                result = json.loads(response.text)
+                data = result.get('Body', {}).get('Data', {})
+
+                if self.controller_id not in data:
+                    logger.error(
+                        'Configured controller_id "%s" not found in Fronius API response.',
+                        self.controller_id
+                    )
+                    logger.error(
+                        'Available controller IDs: %s',
+                        list(data.keys())
+                    )
+                    logger.error(
+                        'Complete Storage Data JSON response:\n%s',
+                        json.dumps(data, indent=2)
+                    )
+                    raise RuntimeError(
+                        f'Invalid fronius_controller_id "{self.controller_id}". '
+                        f'Available IDs: {list(data.keys())}'
+                    )
+
+                # Also verify that the Controller key exists within the data
+                controller_data = data.get(self.controller_id, {})
+                if 'Controller' not in controller_data:
+                    logger.error(
+                        'Controller data not found for controller_id "%s"',
+                        self.controller_id
+                    )
+                    logger.error(
+                        'Complete data for controller_id "%s":\n%s',
+                        self.controller_id,
+                        json.dumps(controller_data, indent=2)
+                    )
+                    raise RuntimeError(
+                        f'No Controller data found for fronius_controller_id "{self.controller_id}"'
+                    )
+                logger.info(
+                    'Controller ID "%s" verified successfully', self.controller_id)
+        except (KeyError, json.JSONDecodeError) as e:
+            logger.error(
+                'Failed to verify controller_id due to unexpected response format: %s',
+                e
+            )
+            if response:
+                logger.error('Complete API response:\n%s', response.text)
+            raise RuntimeError(
+                f'Failed to verify fronius_controller_id "{self.controller_id}": {e}'
+            )
 
     def send_request(self, path, method='GET', payload="", params=None, headers=None, auth=False):
         """Send a HTTP REST request to the inverter.
