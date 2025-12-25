@@ -18,36 +18,36 @@ using the existing connection. This ensures:
 TOPIC STRUCTURE AND RETENTION REQUIREMENTS
 ===========================================
 
-All topics follow the pattern: <batcontrol_base_topic>/inverter/$num/<subtopic>
+All topics follow the pattern: <batcontrol_base_topic>/inverters/$num/<subtopic>
 Here, <batcontrol_base_topic> is the MQTT base topic (from configuration), and <b>$num</b> is a placeholder for the inverter number (e.g., 0, 1, 2), not the literal string "$num".
-For example, if base_topic is "batcontrol" and inverter number is 0, the topic would be: batcontrol/inverter/0/status/capacity
+For example, if base_topic is "batcontrol" and inverter number is 0, the topic would be: batcontrol/inverters/0/status/capacity
 
 Status Topics (Inverter -> batcontrol):
 ---------------------------------------
 These topics MUST be published as RETAINED by the external inverter/bridge
 system:
-- <batcontrol_base_topic>/inverter/$num/status/capacity             - Battery capacity in Wh (float)
+- <batcontrol_base_topic>/inverters/$num/status/capacity             - Battery capacity in Wh (float)
 
 Optional status topics (also RETAINED):
-- <batcontrol_base_topic>/inverter/$num/status/min_soc              - Minimum SoC limit in %
+- <batcontrol_base_topic>/inverters/$num/status/min_soc              - Minimum SoC limit in %
                                              (float, 0-100)
-- <batcontrol_base_topic>/inverter/$num/status/max_soc              - Maximum SoC limit in %
+- <batcontrol_base_topic>/inverters/$num/status/max_soc              - Maximum SoC limit in %
                                              (float, 0-100)
-- <batcontrol_base_topic>/inverter/$num/status/max_charge_rate      - Maximum charge rate in W
+- <batcontrol_base_topic>/inverters/$num/status/max_charge_rate      - Maximum charge rate in W
                                              (float)
 Update these topics at least every 2 minutes to ensure batcontrol has fresh data:
 
-- <batcontrol_base_topic>/inverter/$num/status/soc                  - State of Charge in %
+- <batcontrol_base_topic>/inverters/$num/status/soc                  - State of Charge in %
                                              (float, 0-100)
 
 Command Topics (batcontrol -> Inverter):
 ----------------------------------------
 These topics are published by batcontrol and MUST NOT be retained:
-- <batcontrol_base_topic>/inverter/$num/command/mode                - Set mode:
+- <batcontrol_base_topic>/inverters/$num/command/mode                - Set mode:
                                              'force_charge',
                                              'allow_discharge',
                                              'avoid_discharge'
-- <batcontrol_base_topic>/inverter/$num/command/charge_rate         - Set charge rate in W
+- <batcontrol_base_topic>/inverters/$num/command/charge_rate         - Set charge rate in W
                                              (float)
 
 WHY RETENTION MATTERS:
