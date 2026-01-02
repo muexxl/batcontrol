@@ -122,6 +122,9 @@ consumption_forecast:
   #   base_url: ws://homeassistant:8123  # Your HomeAssistant URL
   #   apitoken: YOUR_LONG_LIVED_ACCESS_TOKEN  # Get from HomeAssistant Profile
   #   entity_id: sensor.energy_consumption  # Entity ID with consumption data (in Wh or kWh)
+  #   sensor_unit: auto  # Options: 'auto' (default, auto-detect), 'Wh', or 'kWh'
+  #                      # Set to 'Wh' or 'kWh' to skip auto-detection (faster startup)
+  #                      # Use 'auto' for first-time setup or if you're unsure
   #   history_days: [-7, -14, -21]  # Days to look back for historical data
   #   history_weights: [1, 1, 1]  # Weight for each history period (1-10), higher = more influence
   #   cache_ttl_hours: 48.0  # How long to cache computed statistics (hours)

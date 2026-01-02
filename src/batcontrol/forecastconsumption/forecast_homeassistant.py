@@ -58,7 +58,8 @@ class ForecastConsumptionHomeAssistant(ForecastConsumptionInterface):
         history_days: Optional[List[int]] = None,
         history_weights: Optional[List[int]] = None,
         cache_ttl_hours: float = 48.0,
-        multiplier: float = 1.0
+        multiplier: float = 1.0,
+        sensor_unit: Optional[str] = "auto"
     ) -> None:
         """Initialize HomeAssistant consumption forecaster
 
@@ -72,6 +73,10 @@ class ForecastConsumptionHomeAssistant(ForecastConsumptionInterface):
             cache_ttl_hours: Time-to-live for cached statistics in hours (default: 48)
             multiplier: Multiplier applied to all forecast values (default: 1.0)
                        Use >1.0 to increase forecast, <1.0 to decrease
+            sensor_unit: Optional sensor unit ('auto', 'Wh', or 'kWh').
+                        If set to 'Wh' or 'kWh', skips auto-detection and uses the specified unit.
+                        If set to 'auto' , queries Home Assistant to detect the unit.
+                        Default: auto (auto-detect)
         """
         self.base_url = base_url.rstrip('/')
         self.api_token = api_token
@@ -94,6 +99,21 @@ class ForecastConsumptionHomeAssistant(ForecastConsumptionInterface):
             if not 1 <= weight <= 10:
                 raise ValueError(f"History weights must be between 1 and 10, got {weight}")
 
+        # Validate sensor_unit parameter
+        if sensor_unit is not None:
+            sensor_unit_lower = sensor_unit.lower()
+            if sensor_unit_lower not in ['auto', 'wh', 'kwh']:
+                raise ValueError(
+                    f"Invalid sensor_unit '{sensor_unit}'. "
+                    f"Allowed values: 'auto', 'Wh', 'kWh'"
+                )
+            self.sensor_unit = sensor_unit_lower
+        else:
+            raise ValueError(
+                f"Invalid sensor_unit '{sensor_unit}'. "
+                f"Allowed values: 'auto', 'Wh', 'kWh'"
+            )
+
         # Initialize cache with TTL
         # Cache key format: "weekday_hour" (e.g., "0_14" for Monday 14:00)
         # Cache stores consumption value in Wh for each hour slot
@@ -103,15 +123,30 @@ class ForecastConsumptionHomeAssistant(ForecastConsumptionInterface):
         self.consumption_cache: TTLCache = TTLCache(maxsize=168, ttl=cache_ttl_seconds)
         self._cache_lock = threading.Lock()
 
-        # Query sensor to determine unit and set conversion factor
-        self.unit_conversion_factor = self._check_sensor_unit()
+        # Query sensor to determine unit and set conversion factor (if not explicitly configured)
+        if self.sensor_unit and self.sensor_unit != 'auto':
+            # User explicitly configured the unit, skip discovery
+            if self.sensor_unit == 'wh':
+                self.unit_conversion_factor = 1.0
+                logger.info(
+                    "Using configured sensor unit: Wh (conversion factor: 1.0)"
+                )
+            elif self.sensor_unit == 'kwh':
+                self.unit_conversion_factor = 1000.0
+                logger.info(
+                    "Using configured sensor unit: kWh (conversion factor: 1000.0)"
+                )
+        else:
+            # Auto-detect unit from Home Assistant
+            logger.info("Auto-detecting sensor unit from Home Assistant...")
+            self.unit_conversion_factor = self._check_sensor_unit()
 
         logger.info(
             "Initialized HomeAssistant consumption forecaster: "
             "entity_id=%s, history_days=%s, weights=%s, cache_ttl=%0.1fh, "
-            "multiplier=%0.2f, unit_conversion_factor=%0.1f",
+            "multiplier=%0.2f, sensor_unit=%s, unit_conversion_factor=%0.1f",
             entity_id, self.history_days, self.history_weights,
-            cache_ttl_hours, multiplier, self.unit_conversion_factor
+            cache_ttl_hours, multiplier, self.sensor_unit or 'auto', self.unit_conversion_factor
         )
 
     def _check_sensor_unit(self) -> float:
@@ -199,7 +234,7 @@ class ForecastConsumptionHomeAssistant(ForecastConsumptionInterface):
             if unit == "Wh":
                 logger.debug("Unit is Wh, no conversion needed")
                 return 1.0
-            elif unit == "kWh":
+            if unit == "kWh":
                 logger.info("Unit is kWh, will multiply values by 1000 to convert to Wh")
                 return 1000.0
 
@@ -238,7 +273,10 @@ class ForecastConsumptionHomeAssistant(ForecastConsumptionInterface):
 
         logger_ha_communication.debug("Connecting to HomeAssistant WebSocket: %s", ws_url)
 
-        websocket = await connect(ws_url)
+        # Set max_size to 4MB to handle large Home Assistant instances
+        # Default is 1MB which causes crashes for installations with many entities
+        # See: https://github.com/muexxl/batcontrol/issues/241
+        websocket = await connect(ws_url, max_size=4 * 1024 * 1024)
 
         # Step 1: Receive auth_required message
         auth_required = await websocket.recv()

@@ -74,11 +74,12 @@ def _create_homeassistant_forecast(tz, config) -> ForecastConsumptionInterface:
 
     cache_ttl_hours = ha_config.get('cache_ttl_hours', 48.0)
     multiplier = ha_config.get('multiplier', 1.0)
+    sensor_unit = ha_config.get('sensor_unit', "auto")
 
     logger.info(
         "Creating HomeAssistant consumption forecast: "
-        "entity_id=%s, history_days=%s, weights=%s, multiplier=%0.2f",
-        entity_id, history_days, history_weights, multiplier
+        "entity_id=%s, history_days=%s, weights=%s, multiplier=%0.2f, sensor_unit=%s",
+        entity_id, history_days, history_weights, multiplier, sensor_unit
     )
 
     consumption = ForecastConsumptionHomeAssistant(
@@ -89,7 +90,8 @@ def _create_homeassistant_forecast(tz, config) -> ForecastConsumptionInterface:
         history_days=history_days,
         history_weights=history_weights,
         cache_ttl_hours=cache_ttl_hours,
-        multiplier=multiplier
+        multiplier=multiplier,
+        sensor_unit=sensor_unit
     )
     return consumption
 
