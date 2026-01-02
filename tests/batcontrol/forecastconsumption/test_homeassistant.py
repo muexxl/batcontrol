@@ -841,3 +841,165 @@ class TestForecastConsumptionHomeAssistant:
                 value = forecaster.consumption_cache[key]
                 assert value > 200, \
                     f"Hour {h} (key={key}) should have value > 200, got {value}"
+
+
+class TestSensorUnitConfiguration:
+    """Test cases for sensor_unit configuration parameter (Issue #241)"""
+
+    def test_sensor_unit_wh_skips_autodiscovery(self, timezone):
+        """Test that sensor_unit='Wh' skips auto-discovery and sets factor to 1.0"""
+        # Should NOT call _check_sensor_unit when sensor_unit is explicitly set
+        with patch.object(ForecastConsumptionHomeAssistant, '_check_sensor_unit') as mock_check:
+            forecaster = ForecastConsumptionHomeAssistant(
+                base_url='http://localhost:8123',
+                api_token='test_token',
+                entity_id='sensor.test',
+                timezone=timezone,
+                sensor_unit='Wh'
+            )
+
+            # _check_sensor_unit should NOT be called
+            mock_check.assert_not_called()
+
+            # Conversion factor should be 1.0
+            assert forecaster.unit_conversion_factor == 1.0
+            assert forecaster.sensor_unit == 'wh'
+
+    def test_sensor_unit_kwh_skips_autodiscovery(self, timezone):
+        """Test that sensor_unit='kWh' skips auto-discovery and sets factor to 1000.0"""
+        with patch.object(ForecastConsumptionHomeAssistant, '_check_sensor_unit') as mock_check:
+            forecaster = ForecastConsumptionHomeAssistant(
+                base_url='http://localhost:8123',
+                api_token='test_token',
+                entity_id='sensor.test',
+                timezone=timezone,
+                sensor_unit='kWh'
+            )
+
+            mock_check.assert_not_called()
+            assert forecaster.unit_conversion_factor == 1000.0
+            assert forecaster.sensor_unit == 'kwh'
+
+    def test_sensor_unit_auto_performs_autodiscovery(self, timezone):
+        """Test that sensor_unit='auto' triggers auto-discovery"""
+        with patch.object(ForecastConsumptionHomeAssistant, '_check_sensor_unit', 
+                         return_value=1.0) as mock_check:
+            forecaster = ForecastConsumptionHomeAssistant(
+                base_url='http://localhost:8123',
+                api_token='test_token',
+                entity_id='sensor.test',
+                timezone=timezone,
+                sensor_unit='auto'
+            )
+
+            # _check_sensor_unit SHOULD be called for 'auto'
+            mock_check.assert_called_once()
+            assert forecaster.unit_conversion_factor == 1.0
+            assert forecaster.sensor_unit == 'auto'
+
+    def test_sensor_unit_case_insensitive(self, timezone):
+        """Test that sensor_unit is case-insensitive"""
+        with patch.object(ForecastConsumptionHomeAssistant, '_check_sensor_unit') as mock_check:
+            # Test uppercase
+            forecaster1 = ForecastConsumptionHomeAssistant(
+                base_url='http://localhost:8123',
+                api_token='test_token',
+                entity_id='sensor.test',
+                timezone=timezone,
+                sensor_unit='WH'
+            )
+            assert forecaster1.sensor_unit == 'wh'
+            assert forecaster1.unit_conversion_factor == 1.0
+
+            # Test mixed case
+            forecaster2 = ForecastConsumptionHomeAssistant(
+                base_url='http://localhost:8123',
+                api_token='test_token',
+                entity_id='sensor.test',
+                timezone=timezone,
+                sensor_unit='KwH'
+            )
+            assert forecaster2.sensor_unit == 'kwh'
+            assert forecaster2.unit_conversion_factor == 1000.0
+
+            mock_check.assert_not_called()
+
+    def test_sensor_unit_invalid_value_raises_error(self, timezone):
+        """Test that invalid sensor_unit values raise ValueError"""
+        with pytest.raises(ValueError, match="Invalid sensor_unit"):
+            ForecastConsumptionHomeAssistant(
+                base_url='http://localhost:8123',
+                api_token='test_token',
+                entity_id='sensor.test',
+                timezone=timezone,
+                sensor_unit='invalid'
+            )
+
+    def test_sensor_unit_empty_string_raises_error(self, timezone):
+        """Test that empty string sensor_unit raises ValueError"""
+        with pytest.raises(ValueError, match="Invalid sensor_unit"):
+            ForecastConsumptionHomeAssistant(
+                base_url='http://localhost:8123',
+                api_token='test_token',
+                entity_id='sensor.test',
+                timezone=timezone,
+                sensor_unit=''
+            )
+
+    @patch('src.batcontrol.forecastconsumption.forecast_homeassistant.connect')
+    def test_websocket_connect_uses_4mb_limit(self, mock_connect, timezone):
+        """Test that WebSocket connection uses 4MB max_size limit (Issue #241)"""
+        with patch.object(ForecastConsumptionHomeAssistant, '_check_sensor_unit', 
+                         return_value=1.0):
+            forecaster = ForecastConsumptionHomeAssistant(
+                base_url='http://localhost:8123',
+                api_token='test_token',
+                entity_id='sensor.test',
+                timezone=timezone
+            )
+
+        # Mock WebSocket for connection test
+        mock_websocket = AsyncMock()
+        mock_websocket.recv = AsyncMock(side_effect=[
+            json.dumps({"type": "auth_required"}),
+            json.dumps({"type": "auth_ok"})
+        ])
+        mock_websocket.send = AsyncMock()
+        mock_websocket.close = AsyncMock()
+
+        async def mock_connect_coro(*args, **kwargs):
+            return mock_websocket
+
+        mock_connect.side_effect = mock_connect_coro
+
+        # Trigger a WebSocket connection
+        import asyncio
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        try:
+            loop.run_until_complete(forecaster._websocket_connect())
+        finally:
+            loop.close()
+
+        # Verify connect was called with max_size=4MB
+        mock_connect.assert_called_once()
+        call_kwargs = mock_connect.call_args.kwargs
+        assert 'max_size' in call_kwargs
+        assert call_kwargs['max_size'] == 4 * 1024 * 1024  # 4MB
+
+    def test_sensor_unit_no_default_performs_autodiscovery(self, timezone):
+        """Test that omitting sensor_unit parameter performs auto-discovery"""
+        with patch.object(ForecastConsumptionHomeAssistant, '_check_sensor_unit',
+                         return_value=1.0) as mock_check:
+            # Don't pass sensor_unit at all
+            forecaster = ForecastConsumptionHomeAssistant(
+                base_url='http://localhost:8123',
+                api_token='test_token',
+                entity_id='sensor.test',
+                timezone=timezone
+            )
+
+            # Should call auto-discovery
+            mock_check.assert_called_once()
+            assert forecaster.sensor_unit == 'auto'
+            assert forecaster.unit_conversion_factor == 1.0
