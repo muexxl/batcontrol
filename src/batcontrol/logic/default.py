@@ -8,6 +8,12 @@ from .logic_interface import CalculationParameters, CalculationInput
 from .logic_interface import CalculationOutput, InverterControlSettings
 from .common import CommonLogic
 
+# Minimum remaining time in hours to prevent division by very small numbers
+# when calculating charge rates. This constant serves as a safety threshold:
+# - Prevents extremely high charge rates at the end of intervals
+# - Ensures charge rate calculations remain within reasonable bounds
+# - 1 minute (1/60 hour) is chosen as it allows adequate time for the inverter
+#   to respond while preventing numerical instability in the calculation
 MIN_REMAINING_TIME_HOURS = 1.0 / 60.0  # 1 minute expressed in hours
 
 logger = logging.getLogger(__name__)
@@ -146,23 +152,34 @@ class DefaultLogic(LogicInterface):
 
             # charge if battery capacity available and more stored energy is required
             if is_charging_possible and required_recharge_energy > 0:
-                # Calculate remaining time in current interval
+                # Calculate remaining time in current interval to determine charge rate
+                # The charge rate must be sufficient to reach target energy before the
+                # current price interval ends, while staying within safe operating limits
                 current_minute = calc_timestamp.minute
                 current_second = calc_timestamp.second
 
                 if self.interval_minutes == 15:
-                    # Find start of current 15-min interval and calculate remaining time
+                    # For 15-minute intervals: find start of current interval (0, 15, 30, or 45)
+                    # and calculate time remaining until the next interval boundary
                     current_interval_start = (current_minute // 15) * 15
                     remaining_minutes = (current_interval_start + 15
                                          - current_minute - current_second / 60)
                 else:  # 60 minutes
+                    # For 60-minute intervals: calculate time remaining until next hour
                     remaining_minutes = 60 - current_minute - current_second / 60
 
-                remaining_time = remaining_minutes / 60  # Convert to hours
+                # Convert remaining time to hours for charge rate calculation
+                remaining_time = remaining_minutes / 60
 
-                # Ensure minimum remaining time to avoid division by very small numbers
-                remaining_time = max(remaining_time, MIN_REMAINING_TIME_HOURS)  # At least 1 minute
+                # Apply minimum time threshold to prevent extreme charge rates
+                # Near the end of an interval (e.g., at XX:59:59), the remaining time
+                # approaches zero, which would cause charge_rate = energy / time to spike
+                # to unrealistic values. MIN_REMAINING_TIME_HOURS ensures we never divide
+                # by less than 1 minute, keeping charge rates within practical bounds.
+                # Note: interval_minutes is validated in core.py (must be 15 or 60)
+                remaining_time = max(remaining_time, MIN_REMAINING_TIME_HOURS)
 
+                # Calculate required charge rate: energy needed / time available
                 charge_rate = required_recharge_energy / remaining_time
 
                 charge_rate = self.common.calculate_charge_rate(charge_rate)
