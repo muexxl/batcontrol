@@ -176,7 +176,7 @@ class DefaultLogic(LogicInterface):
                 # approaches zero, which would cause charge_rate = energy / time to spike
                 # to unrealistic values. MIN_REMAINING_TIME_HOURS ensures we never divide
                 # by less than 1 minute, keeping charge rates within practical bounds.
-                # Note: interval_minutes is validated at initialization, so it cannot be 0
+                # Note: interval_minutes is validated in core.py (must be 15 or 60)
                 remaining_time = max(remaining_time, MIN_REMAINING_TIME_HOURS)
 
                 # Calculate required charge rate: energy needed / time available
