@@ -2,6 +2,7 @@
 
 from abc import ABC, abstractmethod
 
+
 class ForecastConsumptionInterface(ABC):
     """ Interface for ConsumptionAPI classes """
 

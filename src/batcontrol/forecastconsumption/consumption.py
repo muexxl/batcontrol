@@ -10,22 +10,34 @@ logger.info('Loading module')
 DEFAULT_CSV_FILE = 'default_load_profile.csv'
 
 # pylint: disable=too-few-public-methods
+
+
 class Consumption:
     """ Factory for consumption forecast providers """
 
     @staticmethod
-    def create_consumption(tz, config: dict) -> ForecastConsumptionInterface:
+    def create_consumption(
+            tz,
+            config: dict,
+            target_resolution: int = 60) -> ForecastConsumptionInterface:
         """ Select and configure a consumption forecast provider based on
-            the given configuration segment consumption_forecast in the config file."""
+            the given configuration segment consumption_forecast in the config file.
+
+        Args:
+            tz: Timezone for forecast data
+            config: Consumption forecast configuration (consumption_forecast)
+            target_resolution: Target resolution in minutes (15 or 60)
+        """
         consumption = None
 
         consumption_type = config.get('type', 'csv').lower()
 
         # csv is the default.
         if consumption_type == 'csv':
-            consumption = _create_csv_forecast(tz, config)
+            consumption = _create_csv_forecast(tz, config, target_resolution)
         elif consumption_type == 'homeassistant-api':
-            consumption = _create_homeassistant_forecast(tz, config)
+            consumption = _create_homeassistant_forecast(
+                tz, config, target_resolution)
         else:
             raise ValueError(
                 f"Unknown consumption forecast type: '{consumption_type}'. "
@@ -34,7 +46,11 @@ class Consumption:
 
         return consumption
 
-def _create_homeassistant_forecast(tz, config) -> ForecastConsumptionInterface:
+
+def _create_homeassistant_forecast(
+        tz,
+        config,
+        target_resolution: int = 60) -> ForecastConsumptionInterface:
     """ Create and configure HomeAssistant consumption forecast provider """
     ha_config = {}
     # HomeAssistant schema validation can't handle 3rd level nesting
@@ -42,7 +58,6 @@ def _create_homeassistant_forecast(tz, config) -> ForecastConsumptionInterface:
         ha_config = config['homeassistant_api']
     else:
         ha_config = config
-
 
     # Validate required parameters
     required_params = ['base_url', 'apitoken', 'entity_id']
@@ -78,9 +93,13 @@ def _create_homeassistant_forecast(tz, config) -> ForecastConsumptionInterface:
 
     logger.info(
         "Creating HomeAssistant consumption forecast: "
-        "entity_id=%s, history_days=%s, weights=%s, multiplier=%0.2f, sensor_unit=%s",
-        entity_id, history_days, history_weights, multiplier, sensor_unit
-    )
+        "entity_id=%s, history_days=%s, weights=%s, multiplier=%0.2f, sensor_unit=%s, target_resolution=%d min",
+        entity_id,
+        history_days,
+        history_weights,
+        multiplier,
+        sensor_unit,
+        target_resolution)
 
     consumption = ForecastConsumptionHomeAssistant(
         base_url=base_url,
@@ -91,11 +110,16 @@ def _create_homeassistant_forecast(tz, config) -> ForecastConsumptionInterface:
         history_weights=history_weights,
         cache_ttl_hours=cache_ttl_hours,
         multiplier=multiplier,
-        sensor_unit=sensor_unit
+        sensor_unit=sensor_unit,
+        target_resolution=target_resolution
     )
     return consumption
 
-def _create_csv_forecast(tz, config) -> ForecastConsumptionInterface:
+
+def _create_csv_forecast(
+        tz,
+        config,
+        target_resolution: int = 60) -> ForecastConsumptionInterface:
     """ Create and configure CSV consumption forecast provider """
     csv_config = {}
     # Homeassistant schema validation can't handle 3rd level nesting
@@ -113,8 +137,9 @@ def _create_csv_forecast(tz, config) -> ForecastConsumptionInterface:
         csv_config['load_profile'] = DEFAULT_CSV_FILE
 
     consumption = ForecastConsumptionCsv(
-                        'config/' + csv_config['load_profile'],
-                        tz,
-                        csv_config.get('annual_consumption', 0)
-                    )
+        'config/' + csv_config['load_profile'],
+        tz,
+        csv_config.get('annual_consumption', 0),
+        target_resolution=target_resolution
+    )
     return consumption

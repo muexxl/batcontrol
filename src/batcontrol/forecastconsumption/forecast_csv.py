@@ -1,17 +1,18 @@
-#%%
+# %%
 import datetime
 import math
 import logging
 import pandas as pd
 import numpy as np
 import os
-from .forecastconsumption_interface import ForecastConsumptionInterface
+from .baseclass import ForecastConsumptionBaseclass
 
 
 logger = logging.getLogger(__name__)
 logger.info('Loading module')
 
-class ForecastConsumptionCsv(ForecastConsumptionInterface):
+
+class ForecastConsumptionCsv(ForecastConsumptionBaseclass):
     """Forecasts Consumption based on load profiles
 
         Loadprofile:
@@ -25,101 +26,117 @@ class ForecastConsumptionCsv(ForecastConsumptionInterface):
         forecasting will be done by considering month, weekday and hour
     """
 
-    def __init__(self, loadprofile, timezone, annual_consumption=0 , datafile=None, ) -> None:
+    def __init__(
+            self,
+            loadprofile,
+            timezone,
+            annual_consumption=0,
+            datafile=None,
+            target_resolution: int = 60) -> None:
+        # Initialize baseclass with 60-minute native resolution
+        super().__init__(
+            timezone,
+            target_resolution=target_resolution,
+            native_resolution=60)
         if not os.path.isfile(loadprofile):
             raise RuntimeError(
                 "[ForecastCSV] Specified Load Profile file " +
                 f"'{loadprofile}' not found"
             )
 
-        self.path_to_load_profile=loadprofile
+        self.path_to_load_profile = loadprofile
         if datafile:
-            self.create_loadprofile(datafile,self.path_to_load_profile)
+            self.create_loadprofile(datafile, self.path_to_load_profile)
         self.load_loadprofile()
-        if annual_consumption >0:
-            self.scaling_factor = self.calculate_scaling_factor(annual_consumption)
+        if annual_consumption > 0:
+            self.scaling_factor = self.calculate_scaling_factor(
+                annual_consumption)
             logger.info(
-                    "The hourly values from the load profile are scaled with a "
-                    "factor of %.2f to match the annual consumption of %d kWh",
-                    self.scaling_factor,
-                    annual_consumption
-                    )
+                "The hourly values from the load profile are scaled with a "
+                "factor of %.2f to match the annual consumption of %d kWh",
+                self.scaling_factor,
+                annual_consumption
+            )
         else:
-            self.scaling_factor=1
-            annual_consumption_load_profile= self.dataframe['energy'].sum()*8760/2016/1000
+            self.scaling_factor = 1
+            annual_consumption_load_profile = self.dataframe['energy'].sum(
+            ) * 8760 / 2016 / 1000
             logger.info(
                 "The annual consumption of the applied load profile is %.2f kWh ",
-                 annual_consumption_load_profile
-                )
+                annual_consumption_load_profile)
             logger.info(
                 "You can specify your estimated annual consumption in the config file "
-                "under consumption_forecast:  annual_consumption "
-                )
-        self.timezone=timezone
+                "under consumption_forecast:  annual_consumption ")
 
-    def calculate_scaling_factor(self, annual_consumption):
-        annual_consumption_load_profile= self.dataframe['energy'].sum()*8760/2016/1000
-        logger.info(
-            "The annual consumption of the applied load profile is %s kWh ",
-            annual_consumption_load_profile
-            )
-        scaling_factor = annual_consumption/annual_consumption_load_profile
-        return scaling_factor
+    def _get_forecast_native(self, hours: int) -> dict[int, float]:
+        """Get hour-aligned forecast at native (60-minute) resolution.
 
-    def load_data_file(self, datafile):
-        df = pd.read_csv(datafile)
-        df['timestamp'] = df['timestamp'].map(
-            lambda timestamp: pd.to_datetime(timestamp).astimezone(self.timezone))
-        df['month'] = df['timestamp'].map(lambda timestamp: timestamp.month)
-        df['weekday'] = df['timestamp'].map(
-            lambda timestamp: timestamp.dayofweek)
-        df['hour'] = df['timestamp'].map(lambda timestamp: timestamp.hour)
-        # convert Ws to Wh and adjust sign
-        df['energy'] = df['energy']/3600*-1
-        return df
+        Args:
+            hours: Number of hours to forecast
 
-    def get_forecast(self, hours):
+        Returns:
+            Dict mapping hour index to energy value (Wh per hour)
+            Index 0 = start of current hour
+        """
         t0 = datetime.datetime.now().astimezone(self.timezone)
+        # Align to start of current hour
+        t0 = t0.replace(minute=0, second=0, microsecond=0)
         df = self.dataframe
         prediction = {}
 
         for h in range(hours):
             delta_t = datetime.timedelta(hours=h)
-            t1 = t0+delta_t
+            t1 = t0 + delta_t
             energy = df.loc[df['hour'] == t1.hour].loc[df['month'] ==
-                                    t1.month].loc[df['weekday'] == t1.weekday()]['energy'].median()
+                                                       t1.month].loc[df['weekday'] == t1.weekday()]['energy'].median()
             if math.isnan(energy):
                 energy = df['energy'].median()
-            prediction[h]=energy*self.scaling_factor
+            prediction[h] = energy * self.scaling_factor
 
         logger.debug(
-                  'Predicting consumption: %s',
-                   np.array(list(prediction.values())).round(1)
-                )
+            'Predicting consumption (hour-aligned): %s',
+            np.array(list(prediction.values())).round(1)
+        )
         return prediction
 
-    def refresh_data(self) -> None:
-        """Refresh forecast data - No-op for CSV-based forecasts
+    def calculate_scaling_factor(self, annual_consumption):
+        annual_consumption_load_profile = self.dataframe['energy'].sum(
+        ) * 8760 / 2016 / 1000
+        logger.info(
+            "The annual consumption of the applied load profile is %s kWh ",
+            annual_consumption_load_profile
+        )
+        scaling_factor = annual_consumption / annual_consumption_load_profile
+        return scaling_factor
 
-        CSV forecasts use static load profiles and don't require data refresh.
-        This method is provided to comply with the ForecastConsumptionInterface.
-        """
-        pass
+    def load_data_file(self, datafile):
+        df = pd.read_csv(datafile)
+        df['timestamp'] = df['timestamp'].map(
+            lambda timestamp: pd.to_datetime(timestamp).astimezone(
+                self.timezone))
+        df['month'] = df['timestamp'].map(lambda timestamp: timestamp.month)
+        df['weekday'] = df['timestamp'].map(
+            lambda timestamp: timestamp.dayofweek)
+        df['hour'] = df['timestamp'].map(lambda timestamp: timestamp.hour)
+        # convert Ws to Wh and adjust sign
+        df['energy'] = df['energy'] / 3600 * -1
+        return df
 
     def create_loadprofile(self, datafile, path_to_profile='load_profile.csv'):
-        df=self.load_data_file(datafile)
-        a=[]
-        energy=0
-        for month in range(1,13):
+        df = self.load_data_file(datafile)
+        a = []
+        energy = 0
+        for month in range(1, 13):
             for day in range(7):
                 for hour in range(24):
-                    energy = df.loc[df['hour'] == hour].loc[df['month'] == month].loc[df['weekday'] == day]['energy'].mean()  # pylint: disable=c0301
-                    a.append([month,day,hour,energy])
-        df_load_profile=pd.DataFrame(a)
+                    energy = df.loc[df['hour'] == hour].loc[df['month'] ==
+                                                            month].loc[df['weekday'] == day]['energy'].mean()  # pylint: disable=c0301
+                    a.append([month, day, hour, energy])
+        df_load_profile = pd.DataFrame(a)
         df_load_profile.to_csv(
-                  path_to_profile,header=['month','weekday','hour','energy'],
-                  index=None
-                )
+            path_to_profile, header=['month', 'weekday', 'hour', 'energy'],
+            index=None
+        )
 
     def load_loadprofile(self):
-        self.dataframe=pd.read_csv(self.path_to_load_profile)
+        self.dataframe = pd.read_csv(self.path_to_load_profile)

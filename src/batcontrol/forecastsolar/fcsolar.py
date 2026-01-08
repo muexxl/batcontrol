@@ -15,13 +15,29 @@ from .baseclass import ForecastSolarBaseclass, ProviderError, RateLimitException
 logger = logging.getLogger(__name__)
 logger.info('Loading module')
 
+
 class FCSolar(ForecastSolarBaseclass):
-    """ Provider to get data from https://forecast.solar/ """
+    """ Provider to get data from https://forecast.solar/ 
+
+    Returns hourly data at native resolution (60 minutes).
+    Baseclass handles conversion to 15-min if needed.
+    """
+
     def __init__(self, pvinstallations, timezone,
-                 min_time_between_api_calls, api_delay=0):
-        """ Initialize the FCSolar class """
+                 min_time_between_api_calls, api_delay=0, target_resolution=60):
+        """ Initialize the FCSolar class 
+
+        Args:
+            pvinstallations: List of PV installation configurations
+            timezone: Timezone for forecast data
+            min_time_between_api_calls: Minimum seconds between API calls
+            api_delay: Delay for API evaluation
+            target_resolution: Target resolution in minutes (15 or 60)
+        """
         super().__init__(pvinstallations, timezone,
-                         min_time_between_api_calls, api_delay)
+                         min_time_between_api_calls, api_delay,
+                         target_resolution=target_resolution,
+                         native_resolution=60)  # FCSolar provides hourly data
 
     def get_forecast_from_raw_data(self) -> dict:
         """ Get hourly forecast from previously fetched raw data """
@@ -51,14 +67,14 @@ class FCSolar(ForecastSolarBaseclass):
                     else:
                         prediction[rel_hour] = value
 
-        #complete hours without production with 0 values
-        max_hour=max(prediction.keys())
+        # complete hours without production with 0 values
+        max_hour = max(prediction.keys())
         for h in range(max_hour+1):
             if h not in prediction.keys():
-                prediction[h]=0
+                prediction[h] = 0
 
-        #complete hours without production with 0 values        #sort output
-        output=dict(sorted(prediction.items()))
+        # complete hours without production with 0 values        #sort output
+        output = dict(sorted(prediction.items()))
 
         return output
 
@@ -81,19 +97,19 @@ class FCSolar(ForecastSolarBaseclass):
         az = unit['azimuth']  # 90 =W -90 = E
         kwp = unit['kWp']
 
-        apikey_urlmod=''
+        apikey_urlmod = ''
         if 'apikey' in unit.keys() and unit['apikey'] is not None:
-            apikey_urlmod = unit['apikey'] +"/"# ForecastSolar api
-        #legacy naming in config file
+            apikey_urlmod = unit['apikey'] + "/"  # ForecastSolar api
+        # legacy naming in config file
         elif 'api' in unit.keys() and unit['api'] is not None:
-            apikey_urlmod = unit['api'] +"/" # ForecastSolar api
+            apikey_urlmod = unit['api'] + "/"  # ForecastSolar api
 
         horizon_querymod = ''
         if 'horizon' in unit.keys() and unit['horizon'] is not None:
             horizon_querymod = "?horizon=" + unit['horizon']  # ForecastSolar api
 
         url = (f"https://api.forecast.solar/{apikey_urlmod}estimate/"
-                f"watthours/period/{lat}/{lon}/{dec}/{az}/{kwp}{horizon_querymod}")
+               f"watthours/period/{lat}/{lon}/{dec}/{az}/{kwp}{horizon_querymod}")
         logger.info(
             'Requesting Information for PV Installation %s', name)
 
@@ -128,24 +144,24 @@ class FCSolar(ForecastSolarBaseclass):
         else:
             logger.warning(
                 'Forecast solar API returned %s - %s',
-                    response.status_code, response.text)
+                response.status_code, response.text)
             raise ProviderError(
                 f'Forecast solar API returned {response.status_code} - {response.text}')
 
 
 if __name__ == '__main__':
     test_pvinstallations = [{'name': 'Nordhalle',
-                        'lat': '49.632461',
-                        'lon': '8.617459',
-                        'declination': '15',
-                        'azimuth': '-1',
-                        'kWp': '75.695'},
-                       {'name': 'Suedhalle',
-                           'lat': '49.6319',
-                           'lon': '8.6175',
-                           'declination': '20',
-                           'azimuth': '7',
-                           'kWp': '25.030'}]
-    fcs=FCSolar( test_pvinstallations, 'Europe/Berlin' , 10)
+                             'lat': '49.632461',
+                             'lon': '8.617459',
+                             'declination': '15',
+                             'azimuth': '-1',
+                             'kWp': '75.695'},
+                            {'name': 'Suedhalle',
+                             'lat': '49.6319',
+                             'lon': '8.6175',
+                             'declination': '20',
+                             'azimuth': '7',
+                             'kWp': '25.030'}]
+    fcs = FCSolar(test_pvinstallations, 'Europe/Berlin', 10)
     fcs.refresh_data()
-    print (fcs.get_forecast())
+    print(fcs.get_forecast())
