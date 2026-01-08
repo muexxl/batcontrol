@@ -14,7 +14,7 @@ from .common import CommonLogic
 # - Ensures charge rate calculations remain within reasonable bounds
 # - 1 minute (1/60 hour) is chosen as it allows adequate time for the inverter
 #   to respond while preventing numerical instability in the calculation
-MIN_REMAINING_TIME_HOURS = 1 / 60  # 1 minute in hours
+MIN_REMAINING_TIME_HOURS = 1.0 / 60.0  # 1 minute expressed in hours
 
 logger = logging.getLogger(__name__)
 
