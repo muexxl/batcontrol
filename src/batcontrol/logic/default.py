@@ -8,7 +8,7 @@ from .logic_interface import CalculationParameters, CalculationInput
 from .logic_interface import CalculationOutput, InverterControlSettings
 from .common import CommonLogic
 
-MIN_REMAINING_TIME_HOURS = 1 / 60  # 1 minute
+MIN_REMAINING_TIME_HOURS = 1.0 / 60.0  # 1 minute expressed in hours
 
 logger = logging.getLogger(__name__)
 
