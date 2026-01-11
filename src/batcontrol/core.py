@@ -91,7 +91,14 @@ class Batcontrol:
         config = configdict
 
         # Extract and validate time resolution (15 or 60 minutes)
-        self.time_resolution = config.get('time_resolution_minutes', 60)
+        # Get time resolution from config, convert string to int if needed
+        # (HomeAssistant form fields may provide string values)
+        time_resolution_raw = config.get('time_resolution_minutes', 60)
+        if isinstance(time_resolution_raw, str):
+            self.time_resolution = int(time_resolution_raw)
+        else:
+            self.time_resolution = time_resolution_raw
+
         if self.time_resolution not in [15, 60]:
             raise ValueError(
                 f"time_resolution_minutes must be either 15 (quarter-hourly) or 60 (hourly), got: {self.time_resolution}. Please update your configuration file."
