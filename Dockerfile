@@ -32,10 +32,11 @@ RUN pip install --no-cache-dir --extra-index-url https://piwheels.org/simple --p
 
 ENV BATCONTROL_VERSION=${VERSION}
 ENV BATCONTROL_GIT_SHA=${GIT_SHA}
-# Set default timezone to UTC, override with -e TZ=Europe/Berlin or similar 
-# when starting the container 
+ENV BATCONTROL_RUNTIME_ENV="docker"
+# Set default timezone to UTC, override with -e TZ=Europe/Berlin or similar
+# when starting the container
 # or set the timezone in docker-compose.yml in the environment section,
-ENV TZ=UTC  
+ENV TZ=UTC
 
 # Create the app directory and copy the app files
 RUN mkdir -p /app /app/logs /app/config
