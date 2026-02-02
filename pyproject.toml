@@ -16,7 +16,8 @@ dependencies = [
     "packaging>=23.0",
     "cachetools>=5.0",
     "websockets>=11.0",
-    "schedule>=1.2.0"
+    "schedule>=1.2.0",
+    "pytz>=2024.2"
 ]
 
 # Config for the build system
