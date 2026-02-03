@@ -251,7 +251,7 @@ class TestTibberProvider:
         provider = Tibber(timezone, 'test_token', 900, 0, target_resolution=15)
         assert provider.native_resolution == 15
         assert provider.target_resolution == 15
-        assert provider.api_resolution == "QUARTERLY"
+        assert provider.api_resolution == "QUARTER_HOURLY"
 
 
 class TestEvccProvider:
