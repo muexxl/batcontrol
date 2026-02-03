@@ -4,9 +4,9 @@ Tibber API supports both HOURLY and QUARTER_HOURLY resolution via the priceInfo 
 """
 
 import datetime
+import json
 import logging
 import requests
-import json
 from .baseclass import DynamicTariffBaseclass
 
 logger = logging.getLogger(__name__)
