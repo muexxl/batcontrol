@@ -1,11 +1,12 @@
 """ Implement Tibber API to get dynamic electricity prices
 
-Tibber API supports both HOURLY and QUARTERLY resolution via the priceInfo resolution parameter.
+Tibber API supports both HOURLY and QUARTER_HOURLY resolution via the priceInfo resolution parameter.
 """
 
 import datetime
 import logging
 import requests
+import json
 from .baseclass import DynamicTariffBaseclass
 
 logger = logging.getLogger(__name__)
@@ -17,7 +18,7 @@ class Tibber(DynamicTariffBaseclass):
 
         Tibber API supports both resolutions:
         - HOURLY: Hourly prices (60-minute intervals)
-        - QUARTERLY: 15-minute prices (in supported regions)
+        - QUARTER_HOURLY: 15-minute prices (in supported regions)
 
         The native resolution is set based on target_resolution to fetch
         data at the optimal granularity from the API.
@@ -34,7 +35,7 @@ class Tibber(DynamicTariffBaseclass):
         # to avoid unnecessary conversion
         if target_resolution == 15:
             native_resolution = 15
-            self.api_resolution = "QUARTERLY"
+            self.api_resolution = "QUARTER_HOURLY"
         else:
             native_resolution = 60
             self.api_resolution = "HOURLY"
@@ -67,9 +68,30 @@ class Tibber(DynamicTariffBaseclass):
             "Content-Type": "application/json"
         }
         # Use configured resolution in the GraphQL query
-        data = f"""{{ "query":
-        "{{viewer {{homes {{currentSubscription {{priceInfo(resolution: {self.api_resolution}) {{ current {{total startsAt }} today {{total startsAt }} tomorrow {{total startsAt }}}}}}}}}}}}" }}
-        """
+        graphql_query = f"""{{
+            viewer {{
+                homes {{
+                    currentSubscription {{
+                        priceInfo(resolution: {self.api_resolution}) {{
+                            current {{
+                                total
+                                startsAt
+                            }}
+                            today {{
+                                total
+                                startsAt
+                            }}
+                            tomorrow {{
+                                total
+                                startsAt
+                            }}
+                        }}
+                    }}
+                }}
+            }}
+        }}"""
+
+        data = json.dumps({"query": graphql_query})
         try:
             response = requests.post(
                 self.url, data, headers=headers, timeout=30)
