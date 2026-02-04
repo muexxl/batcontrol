@@ -300,8 +300,8 @@ class Batcontrol:
             if self.evcc_api is not None:
                 self.evcc_api.shutdown()
                 del self.evcc_api
-        except BaseException:
-            pass
+        except Exception as exc:
+            logger.exception("Error during Batcontrol shutdown: %s", exc)
 
     def reset_forecast_error(self):
         """ Reset the forecast error timer """
@@ -388,7 +388,7 @@ class Batcontrol:
         self.reset_forecast_error()
 
         # initialize arrays
-        net_consumption = np.zeros(fc_period + 1)
+
         production = np.zeros(fc_period + 1)
         consumption = np.zeros(fc_period + 1)
         prices = np.zeros(fc_period + 1)
