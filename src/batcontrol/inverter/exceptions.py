@@ -32,16 +32,3 @@ class InverterOutageError(Exception):
         minutes = self.outage_duration_seconds / 60
         return f"{self.message} (outage duration: {minutes:.1f} minutes)"
 
-
-class InverterCommunicationError(Exception):
-    """
-    Exception raised when communication with the inverter fails.
-
-    This is a general exception for inverter communication failures that
-    can be caught and handled by the resilient wrapper to provide
-    cached values during temporary outages.
-    """
-
-    def __init__(self, message: str):
-        super().__init__(message)
-        self.message = message
