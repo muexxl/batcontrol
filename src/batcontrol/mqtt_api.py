@@ -48,9 +48,11 @@ import numpy as np
 logger = logging.getLogger(__name__)
 logger.info('Loading module')
 
+
 class MqttApi:
     """ MQTT API to publish data from batcontrol to MQTT for further processing+visualization"""
     SET_SUFFIX = '/set'
+
     def __init__(self, config: dict, interval_minutes: int = 60):
         self.config = config
         self.interval_minutes = interval_minutes
@@ -78,7 +80,11 @@ class MqttApi:
         if 'username' in config and 'password' in config:
             self.client.username_pw_set(config['username'], config['password'])
 
-        self.client.will_set(self.base_topic + '/status', 'offline', retain=True)
+        self.client.will_set(
+            self.base_topic +
+            '/status',
+            'offline',
+            retain=True)
 
         # TLS , not tested yet
         if config['tls'] is True:
@@ -100,13 +106,18 @@ class MqttApi:
                 self.client.connect(config['broker'], config['port'], 60)
                 break
             except (ValueError, TypeError) as e:
-                logger.error('Connection failed: %s, retrying[%d]x in [%d] seconds',
-                                e, retry_attempts, retry_delay)
+                logger.error(
+                    'Connection failed: %s, retrying[%d]x in [%d] seconds',
+                    e,
+                    retry_attempts,
+                    retry_delay)
                 retry_attempts -= 1
                 if retry_attempts == 0:
                     logger.error('All retry attempts failed')
                     raise
-                logger.info('Retrying connection in %d seconds...', retry_delay)
+                logger.info(
+                    'Retrying connection in %d seconds...',
+                    retry_delay)
                 time.sleep(retry_delay)
 
     def on_connect(self, client, userdata, flags, rc):
@@ -150,32 +161,40 @@ class MqttApi:
         else:
             logger.warning('No callback registered for %s', message.topic)
 
-    def register_set_callback(self, topic:str,  callback:callable, convert: callable) -> None:
+    def register_set_callback(
+            self,
+            topic: str,
+            callback: callable,
+            convert: callable) -> None:
         """ Generic- register a callback for changing values inside batcontrol via
             MQTT set topics
         """
         topic_string = self.base_topic + "/" + topic + MqttApi.SET_SUFFIX
         logger.debug('Registering callback for %s', topic_string)
-                # set api endpoints, generic subscription
-        self.callbacks[topic_string] = { 'function' : callback , 'convert' : convert }
+        # set api endpoints, generic subscription
+        self.callbacks[topic_string] = {
+            'function': callback, 'convert': convert}
         self.client.subscribe(topic_string)
-        self.client.message_callback_add(topic_string , self._handle_message)
+        self.client.message_callback_add(topic_string, self._handle_message)
 
-    def publish_mode(self, mode:int) -> None:
+    def publish_mode(self, mode: int) -> None:
         """ Publish the mode (charge, lock, discharge) to MQTT
             /mode
         """
         if self.client.is_connected():
             self.client.publish(self.base_topic + '/mode', mode)
 
-    def publish_charge_rate(self, rate:float) -> None:
+    def publish_charge_rate(self, rate: float) -> None:
         """ Publish the forced charge rate in W to MQTT
             /charge_rate
         """
         if self.client.is_connected():
             self.client.publish(self.base_topic + '/charge_rate', rate)
 
-    def publish_production(self, production:np.ndarray, timestamp:float) -> None:
+    def publish_production(
+            self,
+            production: np.ndarray,
+            timestamp: float) -> None:
         """ Publish the production to MQTT
             /FCST/production
             The value is in W and based of solar forecast API.
@@ -211,8 +230,10 @@ class MqttApi:
         data = {'data': data_list}
         return data
 
-
-    def publish_consumption(self, consumption:np.ndarray, timestamp:float) -> None:
+    def publish_consumption(
+            self,
+            consumption: np.ndarray,
+            timestamp: float) -> None:
         """ Publish the consumption to MQTT
             /FCST/consumption
             The value is in W and based of load profile and multiplied with
@@ -222,10 +243,10 @@ class MqttApi:
         if self.client.is_connected():
             self.client.publish(
                 self.base_topic + '/FCST/consumption',
-                json.dumps(self._create_forecast(consumption,timestamp))
+                json.dumps(self._create_forecast(consumption, timestamp))
             )
 
-    def publish_prices(self, price:np.ndarray ,timestamp:float) -> None:
+    def publish_prices(self, price: np.ndarray, timestamp: float) -> None:
         """ Publish the prices to MQTT
             /FCST/prices
             The length is the same as used in internal arrays.
@@ -233,10 +254,13 @@ class MqttApi:
         if self.client.is_connected():
             self.client.publish(
                 self.base_topic + '/FCST/prices',
-                json.dumps(self._create_forecast(price,timestamp))
+                json.dumps(self._create_forecast(price, timestamp))
             )
 
-    def publish_net_consumption(self, net_consumption:np.ndarray, timestamp:float) -> None:
+    def publish_net_consumption(
+            self,
+            net_consumption: np.ndarray,
+            timestamp: float) -> None:
         """ Publish the net consumption in W to MQTT
             /FCST/net_consumption
             The length is the same as used in internal arrays.
@@ -245,17 +269,17 @@ class MqttApi:
         if self.client.is_connected():
             self.client.publish(
                 self.base_topic + '/FCST/net_consumption',
-                json.dumps(self._create_forecast(net_consumption,timestamp))
+                json.dumps(self._create_forecast(net_consumption, timestamp))
             )
 
-    def publish_SOC(self, soc:float) -> None:       # pylint: disable=invalid-name
+    def publish_SOC(self, soc: float) -> None:       # pylint: disable=invalid-name
         """ Publish the state of charge in % to MQTT
             /SOC
         """
         if self.client.is_connected():
             self.client.publish(self.base_topic + '/SOC', f'{int(soc):03}')
 
-    def publish_stored_energy_capacity(self, stored_energy:float) -> None:
+    def publish_stored_energy_capacity(self, stored_energy: float) -> None:
         """ Publish the stored energy capacity in Wh to MQTT
             /stored_energy_capacity
         """
@@ -264,7 +288,8 @@ class MqttApi:
                 self.base_topic + '/stored_energy_capacity',
                 f'{stored_energy:.1f}')
 
-    def publish_stored_usable_energy_capacity(self, stored_energy:float) -> None:
+    def publish_stored_usable_energy_capacity(
+            self, stored_energy: float) -> None:
         """ Publish the stored usable energy capacity in Wh to MQTT
             /stored_usable_energy_capacity
         """
@@ -274,7 +299,7 @@ class MqttApi:
                 f'{stored_energy:.1f}'
             )
 
-    def publish_reserved_energy_capacity(self, reserved_energy:float) -> None:
+    def publish_reserved_energy_capacity(self, reserved_energy: float) -> None:
         """ Publish the reserved energy capacity in Wh to MQTT
             /reserved_energy_capacity
         """
@@ -284,7 +309,8 @@ class MqttApi:
                 f'{reserved_energy:.1f}'
             )
 
-    def publish_always_allow_discharge_limit_capacity(self, discharge_limit:float) -> None:
+    def publish_always_allow_discharge_limit_capacity(
+            self, discharge_limit: float) -> None:
         """ Publish the always discharge limit in Wh to MQTT
             /always_allow_discharge_limit_capacity
         """
@@ -294,7 +320,8 @@ class MqttApi:
                 f'{discharge_limit:.1f}'
             )
 
-    def publish_always_allow_discharge_limit(self, allow_discharge_limit:float) -> None:
+    def publish_always_allow_discharge_limit(
+            self, allow_discharge_limit: float) -> None:
         """ Publish the always discharge limit to MQTT
             /always_allow_discharge_limit as digit
             /always_allow_discharge_limit_percent
@@ -309,7 +336,8 @@ class MqttApi:
                 f'{allow_discharge_limit * 100:.0f}'
             )
 
-    def publish_max_charging_from_grid_limit(self, charge_limit:float) -> None:
+    def publish_max_charging_from_grid_limit(
+            self, charge_limit: float) -> None:
         """ Publish the maximum charging limit to MQTT
             /max_charging_from_grid_limit_percent
             /max_charging_from_grid_limit   as digit.
@@ -324,7 +352,8 @@ class MqttApi:
                 f'{charge_limit:.2f}'
             )
 
-    def publish_min_price_difference(self, min_price_difference:float) -> None:
+    def publish_min_price_difference(
+            self, min_price_difference: float) -> None:
         """ Publish the minimum price difference to MQTT found in config
             /min_price_difference
         """
@@ -334,7 +363,8 @@ class MqttApi:
                 f'{min_price_difference:.3f}'
             )
 
-    def publish_min_price_difference_rel(self, min_price_difference_rel:float) -> None:
+    def publish_min_price_difference_rel(
+            self, min_price_difference_rel: float) -> None:
         """ Publish the relative minimum price difference to MQTT found in config
             /min_price_difference_rel
         """
@@ -344,7 +374,8 @@ class MqttApi:
                 f'{min_price_difference_rel:.3f}'
             )
 
-    def publish_min_dynamic_price_diff(self, dynamic_price_diff:float) -> None:
+    def publish_min_dynamic_price_diff(
+            self, dynamic_price_diff: float) -> None:
         """ Publish the dynamic price difference limit to MQTT
             /min_dynamic_price_difference
         """
@@ -354,7 +385,7 @@ class MqttApi:
                 f'{dynamic_price_diff:.3f}'
             )
 
-    def publish_max_energy_capacity(self, max_capacity:float) -> None:
+    def publish_max_energy_capacity(self, max_capacity: float) -> None:
         """ Publish the maximum energy capacity to MQTT
             /max_energy_capacity
         """
@@ -364,29 +395,34 @@ class MqttApi:
                 f'{max_capacity:.1f}'
             )
 
-    def publish_evaluation_intervall(self, intervall:int) -> None:
+    def publish_evaluation_intervall(self, intervall: int) -> None:
         """ Publish the evaluation intervall to MQTT
             /evaluation_intervall
         """
         if self.client.is_connected():
-            self.client.publish(self.base_topic + '/evaluation_intervall', f'{intervall:.0f}')
+            self.client.publish(self.base_topic +
+                                '/evaluation_intervall', f'{intervall:.0f}')
 
-    def publish_last_evaluation_time(self, timestamp:float) -> None:
+    def publish_last_evaluation_time(self, timestamp: float) -> None:
         """ Publish the last evaluation timestamp to MQTT
             This is the time when the last evaluation was started.
             /last_evaluation
         """
         if self.client.is_connected():
-            self.client.publish(self.base_topic + '/last_evaluation', f'{timestamp:.0f}')
+            self.client.publish(self.base_topic +
+                                '/last_evaluation', f'{timestamp:.0f}')
 
-    def publish_discharge_blocked(self, discharge_blocked:bool) -> None:
+    def publish_discharge_blocked(self, discharge_blocked: bool) -> None:
         """ Publish the discharge blocked status to MQTT
             /discharge_blocked
         """
         if self.client.is_connected():
-            self.client.publish(self.base_topic + '/discharge_blocked', str(discharge_blocked))
+            self.client.publish(
+                self.base_topic +
+                '/discharge_blocked',
+                str(discharge_blocked))
 
-    def publish_production_offset(self, production_offset:float) -> None:
+    def publish_production_offset(self, production_offset: float) -> None:
         """ Publish the production offset percentage to MQTT
             /production_offset
         """
@@ -396,8 +432,9 @@ class MqttApi:
                 f'{production_offset:.3f}'
             )
 
-    # For depended APIs like the Fronius Inverter classes, which is not directly batcontrol.
-    def generic_publish(self, topic:str, value:str) -> None:
+    # For depended APIs like the Fronius Inverter classes, which is not
+    # directly batcontrol.
+    def generic_publish(self, topic: str, value: str) -> None:
         """ Publish a generic value to a topic
             For depended APIs like the Fronius Inverter classes, which is not directly batcontrol.
         """
@@ -412,129 +449,251 @@ class MqttApi:
         self.send_mqtt_discovery_for_mode()
 
         # configuration
-        self.publish_mqtt_discovery_message("Charge Rate",
-            "batcontrol_charge_rate", "number", "power", "W",
-            self.base_topic + "/charge_rate",
-            self.base_topic + "/charge_rate/set",
+        self.publish_mqtt_discovery_message(
+            "Charge Rate",
+            "batcontrol_charge_rate",
+            "number",
+            "power",
+            "W",
+            self.base_topic +
+            "/charge_rate",
+            self.base_topic +
+            "/charge_rate/set",
             entity_category="config",
             min_value=0,
             max_value=10000,
             initial_value=10000)
 
-        self.publish_mqtt_discovery_message("Always Allow Discharge Limit",
-            "batcontrol_always_allow_discharge_limit", "number", None, None,
-            self.base_topic + "/always_allow_discharge_limit",
-            self.base_topic + "/always_allow_discharge_limit/set",
+        self.publish_mqtt_discovery_message(
+            "Always Allow Discharge Limit",
+            "batcontrol_always_allow_discharge_limit",
+            "number",
+            None,
+            None,
+            self.base_topic +
+            "/always_allow_discharge_limit",
+            self.base_topic +
+            "/always_allow_discharge_limit/set",
             entity_category="config",
-            min_value=0.0, max_value=1.0, step_value=0.1, initial_value=0.9)
+            min_value=0.0,
+            max_value=1.0,
+            step_value=0.1,
+            initial_value=0.9)
 
-        self.publish_mqtt_discovery_message("Max Charging From Grid Limit",
-            "batcontrol_max_charging_from_grid_limit", "number", None, None,
-            self.base_topic + "/max_charging_from_grid_limit",
-            self.base_topic + "/max_charging_from_grid_limit/set",
+        self.publish_mqtt_discovery_message(
+            "Max Charging From Grid Limit",
+            "batcontrol_max_charging_from_grid_limit",
+            "number",
+            None,
+            None,
+            self.base_topic +
+            "/max_charging_from_grid_limit",
+            self.base_topic +
+            "/max_charging_from_grid_limit/set",
             entity_category="config",
-            min_value=0.0, max_value=1.0, step_value=0.1, initial_value=0.9)
+            min_value=0.0,
+            max_value=1.0,
+            step_value=0.1,
+            initial_value=0.9)
 
-        self.publish_mqtt_discovery_message("Min Price Difference",
-            "batcontrol_min_price_difference", "number", "monetary", None,
-            self.base_topic + "/min_price_difference",
-            self.base_topic + "/min_price_difference/set",
+        self.publish_mqtt_discovery_message(
+            "Min Price Difference",
+            "batcontrol_min_price_difference",
+            "number",
+            "monetary",
+            None,
+            self.base_topic +
+            "/min_price_difference",
+            self.base_topic +
+            "/min_price_difference/set",
             entity_category="config",
-            min_value=0, max_value=0.5, step_value=0.01, initial_value=0.05)
+            min_value=0,
+            max_value=0.5,
+            step_value=0.01,
+            initial_value=0.05)
 
-        self.publish_mqtt_discovery_message("Production Offset",
-            "batcontrol_production_offset", "number", None, None,
-            self.base_topic + "/production_offset",
-            self.base_topic + "/production_offset/set",
+        self.publish_mqtt_discovery_message(
+            "Production Offset",
+            "batcontrol_production_offset",
+            "number",
+            None,
+            None,
+            self.base_topic +
+            "/production_offset",
+            self.base_topic +
+            "/production_offset/set",
             entity_category="config",
-            min_value=0.0, max_value=2.0, step_value=0.01, initial_value=1.0)
+            min_value=0.0,
+            max_value=2.0,
+            step_value=0.01,
+            initial_value=1.0)
 
         # sensors
-        self.publish_mqtt_discovery_message("Discharge Blocked",
+        self.publish_mqtt_discovery_message(
+            "Discharge Blocked",
             "batcontrol_discharge_blocked",
-            "sensor", None, None,
-            self.base_topic + "/discharge_blocked",
-            value_template="{% if value | lower == 'True' %}blocked{% else %}not blocked{% endif %}"
-            )
+            "sensor",
+            None,
+            None,
+            self.base_topic +
+            "/discharge_blocked",
+            value_template="{% if value | lower == 'True' %}blocked{% else %}not blocked{% endif %}")
 
-        self.publish_mqtt_discovery_message("Reserved Energy Capacity",
-            "batcontrol_reserved_energy_capacity", "sensor", "energy", "Wh",
-            self.base_topic + "/reserved_energy_capacity")
+        self.publish_mqtt_discovery_message(
+            "Reserved Energy Capacity",
+            "batcontrol_reserved_energy_capacity",
+            "sensor",
+            "energy",
+            "Wh",
+            self.base_topic +
+            "/reserved_energy_capacity")
 
-        self.publish_mqtt_discovery_message("Stored Usable Energy Capacity",
-            "batcontrol_stored_usable_energy_capacity", "sensor", "energy", "Wh",
-            self.base_topic + "/stored_usable_energy_capacity")
+        self.publish_mqtt_discovery_message(
+            "Stored Usable Energy Capacity",
+            "batcontrol_stored_usable_energy_capacity",
+            "sensor",
+            "energy",
+            "Wh",
+            self.base_topic +
+            "/stored_usable_energy_capacity")
 
-        self.publish_mqtt_discovery_message("Min Price Difference Relative",
-            "batcontrol_min_price_difference_rel", "sensor", "monetary", None,
-            self.base_topic + "/min_price_difference_rel")
+        self.publish_mqtt_discovery_message(
+            "Min Price Difference Relative",
+            "batcontrol_min_price_difference_rel",
+            "sensor",
+            "monetary",
+            None,
+            self.base_topic +
+            "/min_price_difference_rel")
 
-        self.publish_mqtt_discovery_message("Min Dynamic Price Difference",
-            "batcontrol_min_dynamic_price_difference", "sensor", "monetary", None,
-            self.base_topic + "/min_dynamic_price_difference")
+        self.publish_mqtt_discovery_message(
+            "Min Dynamic Price Difference",
+            "batcontrol_min_dynamic_price_difference",
+            "sensor",
+            "monetary",
+            None,
+            self.base_topic +
+            "/min_dynamic_price_difference")
 
         # diagnostic
-        self.publish_mqtt_discovery_message("Status",
-            "batcontrol_status", "sensor", None, None,
-            self.base_topic + "/status", command_topic=None, entity_category="diagnostic")
-
-        self.publish_mqtt_discovery_message("Last Evaluation",
-            "batcontrol_last_evaluation", "sensor", "timestamp", None,
-            self.base_topic + "/last_evaluation", command_topic=None, entity_category="diagnostic",
-            options=None,
-            value_template="{{ (value | int | timestamp_local) }}",command_template=None)
-
-        self.publish_mqtt_discovery_message("SOC Main",
-            "batcontrol_soc", "sensor", "battery", "%",
-            self.base_topic + "/SOC", entity_category="diagnostic")
-
-        self.publish_mqtt_discovery_message("Max Energy Capacity",
-            "batcontrol_max_energy_capacity", "sensor", "energy", "Wh",
-            self.base_topic + "/max_energy_capacity", entity_category="diagnostic")
-
-        self.publish_mqtt_discovery_message("Always Allow Discharge Limit Capacity",
-            "batcontrol_always_allow_discharge_limit_capacity", "sensor", "energy", "Wh",
-            self.base_topic + "/always_allow_discharge_limit_capacity",
+        self.publish_mqtt_discovery_message(
+            "Status",
+            "batcontrol_status",
+            "sensor",
+            None,
+            None,
+            self.base_topic +
+            "/status",
+            command_topic=None,
             entity_category="diagnostic")
 
-        self.publish_mqtt_discovery_message("Stored Energy Capacity",
-            "batcontrol_stored_energy_capacity", "sensor", "energy", "Wh",
-            self.base_topic + "/stored_energy_capacity", entity_category="diagnostic")
+        self.publish_mqtt_discovery_message(
+            "Last Evaluation",
+            "batcontrol_last_evaluation",
+            "sensor",
+            "timestamp",
+            None,
+            self.base_topic +
+            "/last_evaluation",
+            command_topic=None,
+            entity_category="diagnostic",
+            options=None,
+            value_template="{{ (value | int | timestamp_local) }}",
+            command_template=None)
+
+        self.publish_mqtt_discovery_message(
+            "SOC Main",
+            "batcontrol_soc",
+            "sensor",
+            "battery",
+            "%",
+            self.base_topic + "/SOC",
+            entity_category="diagnostic")
+
+        self.publish_mqtt_discovery_message(
+            "Max Energy Capacity",
+            "batcontrol_max_energy_capacity",
+            "sensor",
+            "energy",
+            "Wh",
+            self.base_topic +
+            "/max_energy_capacity",
+            entity_category="diagnostic")
+
+        self.publish_mqtt_discovery_message(
+            "Always Allow Discharge Limit Capacity",
+            "batcontrol_always_allow_discharge_limit_capacity",
+            "sensor",
+            "energy",
+            "Wh",
+            self.base_topic +
+            "/always_allow_discharge_limit_capacity",
+            entity_category="diagnostic")
+
+        self.publish_mqtt_discovery_message(
+            "Stored Energy Capacity",
+            "batcontrol_stored_energy_capacity",
+            "sensor",
+            "energy",
+            "Wh",
+            self.base_topic +
+            "/stored_energy_capacity",
+            entity_category="diagnostic")
 
     def send_mqtt_discovery_for_mode(self) -> None:
         """ Publish Home Assistant MQTT Auto Discovery message for mode"""
         val_templ = (
-                    "{% if value == '-1' %}Charge from Grid"
-                    "{% elif value == '0' %}Avoid Discharge"
-                    "{% elif value == '10' %}Discharge Allowed"
-                    "{% else %}Unknown"
-                    "{% endif %}"
+            "{% if value == '-1' %}Charge from Grid"
+            "{% elif value == '0' %}Avoid Discharge"
+            "{% elif value == '10' %}Discharge Allowed"
+            "{% else %}Unknown"
+            "{% endif %}"
         )
         cmd_templ = (
-                    "{% if value == 'Charge from Grid' %}-1"
-                    "{% elif value == 'Avoid Discharge' %}0"
-                    "{% elif value == 'Discharge Allowed' %}10"
-                    "{% else %}-1"
-                    "{% endif %}"
+            "{% if value == 'Charge from Grid' %}-1"
+            "{% elif value == 'Avoid Discharge' %}0"
+            "{% elif value == 'Discharge Allowed' %}10"
+            "{% else %}-1"
+            "{% endif %}"
         )
         self.publish_mqtt_discovery_message(
-            "Batcontrol mode", "batcontrol_mode", "select", None, None,
+            "Batcontrol mode",
+            "batcontrol_mode",
+            "select",
+            None,
+            None,
             self.base_topic + "/mode",
-            self.base_topic + "/mode/set", entity_category=None,
-            options=["Charge from Grid", "Avoid Discharge", "Discharge Allowed"],
-            value_template=val_templ, command_template=cmd_templ)
+            self.base_topic + "/mode/set",
+            entity_category=None,
+            options=[
+                "Charge from Grid",
+                "Avoid Discharge",
+                "Discharge Allowed"],
+            value_template=val_templ,
+            command_template=cmd_templ)
 
     # Home Assistant MQTT Auto Discovery
     # https://www.home-assistant.io/docs/mqtt/discovery/
     # item_type = sensor, switch, binary_sensor, select
     # device_class = battery, power, energy, temperature, humidity,
     #                   timestamp, signal_strength, problem, connectivity
-    def publish_mqtt_discovery_message(self, name:str, unique_id:str,
-        item_type:str, device_class:str, unit_of_measurement:str,
-        state_topic:str, command_topic:str=None, entity_category:str=None,
-        min_value=None, max_value=None, step_value=None, initial_value=None,
-        options:str=None, value_template:str=None, command_template:str=None
-        ) -> None:
+    def publish_mqtt_discovery_message(
+            self,
+            name: str,
+            unique_id: str,
+            item_type: str,
+            device_class: str,
+            unit_of_measurement: str,
+            state_topic: str,
+            command_topic: str = None,
+            entity_category: str = None,
+            min_value=None,
+            max_value=None,
+            step_value=None,
+            initial_value=None,
+            options: str = None,
+            value_template: str = None,
+            command_template: str = None) -> None:
         """ Publish Home Assistant MQTT Auto Discovery message"""
         if self.client.is_connected():
             payload = {}
@@ -567,7 +726,8 @@ class MqttApi:
             try:
                 sw_version = importlib.metadata.version('batcontrol')
             except Exception as e:
-                logger.exception("Failed to retrieve batcontrol package version: %s", e)
+                logger.exception(
+                    "Failed to retrieve batcontrol package version: %s", e)
                 sw_version = "unknown"
 
             device = {
@@ -580,7 +740,18 @@ class MqttApi:
             payload["device"] = device
             logger.debug(
                 'Sending HA AD config message for %s',
-                self.auto_discover_topic + '/' + item_type + '/' + unique_id + '/config')
+                self.auto_discover_topic +
+                '/' +
+                item_type +
+                '/' +
+                unique_id +
+                '/config')
             self.client.publish(
-                self.auto_discover_topic + '/' + item_type + '/batcontrol/' + unique_id + '/config',
-                json.dumps(payload), retain=True)
+                self.auto_discover_topic +
+                '/' +
+                item_type +
+                '/batcontrol/' +
+                unique_id +
+                '/config',
+                json.dumps(payload),
+                retain=True)
