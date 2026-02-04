@@ -100,6 +100,7 @@ class Batcontrol:
             self.time_resolution = time_resolution_raw
 
         if self.time_resolution not in [15, 60]:
+            # Note: Python3.11 had issue with f-strings and multiline. Using format() here.
             error_message = (
                 "time_resolution_minutes must be either 15 (quarter-hourly) or 60 (hourly), "
                 " got '%s'.".format(self.time_resolution)
@@ -374,9 +375,10 @@ class Batcontrol:
                 # available
                 if len(consumption_forecast) < max(
                         fc_period - FORECAST_TOLERANCE, MIN_FORECAST_HOURS):
+                    # Note: string formatting to avoid f-string multiline issues in <=Python3.11
                     raise RuntimeError(
-                        f"Not enough consumption forecast data available, " f"requested {fc_period}, got {
-                            len(consumption_forecast)}")
+                        "Not enough consumption forecast data available, requested %d, got %d" % (
+                            fc_period, len(consumption_forecast)))
                 logger.warning(
                     "Insufficient consumption forecast data available, reducing "
                     "forecast to %d hours", len(consumption_forecast))
