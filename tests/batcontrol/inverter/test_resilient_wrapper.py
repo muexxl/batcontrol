@@ -15,7 +15,6 @@ from unittest.mock import Mock
 from batcontrol.inverter.resilient_wrapper import (
     ResilientInverterWrapper,
     CachedValues,
-    DEFAULT_OUTAGE_TOLERANCE_SECONDS
 )
 from batcontrol.inverter.exceptions import InverterOutageError
 
