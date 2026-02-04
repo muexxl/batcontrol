@@ -824,3 +824,5 @@ class Batcontrol:
             'API: Setting production offset to %.3f (%.1f%%)',
             production_offset, production_offset * 100)
         self.production_offset_percent = production_offset
+        if self.mqtt_api is not None:
+            self.mqtt_api.publish_production_offset(production_offset)
