@@ -110,8 +110,6 @@ def main() -> int:
             "Terminating batcontrol. Error: %s", e
         )
         print(f"FATAL: Inverter outage exceeded tolerance - {e}")
-        bc.shutdown()
-        del bc
         return 1
     finally:
         bc.shutdown()
