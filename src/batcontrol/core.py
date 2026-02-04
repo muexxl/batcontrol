@@ -101,11 +101,11 @@ class Batcontrol:
 
         if self.time_resolution not in [15, 60]:
             # Note: Python3.11 had issue with f-strings and multiline. Using format() here.
-            error_message = (
-                "time_resolution_minutes must be either 15 (quarter-hourly) or 60 (hourly), "
-                " got '%s'.".format(self.time_resolution)
+            error_message = "time_resolution_minutes must be either " + \
+                "15 (quarter-hourly) or 60 (hourly), " + \
+                " got '%s'.".format(self.time_resolution) + \
                 " Please update your configuration file."
-            )
+
             raise ValueError(error_message)
 
         self.intervals_per_hour = 60 // self.time_resolution
