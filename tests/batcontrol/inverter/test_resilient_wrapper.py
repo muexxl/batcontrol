@@ -262,7 +262,6 @@ class TestResilientWrapperBackoff:
         # Initialize with set_mode and cache values
         wrapper.set_mode_allow_discharge()
         wrapper.get_SOC()
-        initial_call_count = mock_inverter.get_soc_calls
 
         # Now fail
         mock_inverter.should_fail = True
