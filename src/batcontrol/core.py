@@ -100,9 +100,14 @@ class Batcontrol:
             self.time_resolution = time_resolution_raw
 
         if self.time_resolution not in [15, 60]:
-            raise ValueError(
-                f"time_resolution_minutes must be either 15 (quarter-hourly) or 60 (hourly), got: {self.time_resolution}. Please update your configuration file."
-            )
+            # Note: Python3.11 had issue with f-strings and multiline. Using format() here.
+            error_message = "time_resolution_minutes must be either " + \
+                "15 (quarter-hourly) or 60 (hourly), " + \
+                " got '%s'.".format(self.time_resolution) + \
+                " Please update your configuration file."
+
+            raise ValueError(error_message)
+
         self.intervals_per_hour = 60 // self.time_resolution
         logger.info(
             'Using %d-minute time resolution (%d intervals per hour)',
@@ -129,7 +134,8 @@ class Batcontrol:
             )
             os.environ['TZ'] = config['timezone']
 
-        # time.tzset() is not available on Windows. When handling timezones exclusively using pytz this is fine
+        # time.tzset() is not available on Windows. When handling timezones
+        # exclusively using pytz this is fine
         if platform.system() != 'Windows':
             time.tzset()
 
@@ -172,6 +178,7 @@ class Batcontrol:
             'min_price_difference_rel', 0)
 
         self.round_price_digits = 4
+        self.production_offset_percent = 1.0  # Default: no offset
 
         if self.config.get('battery_control_expert', None) is not None:
             battery_control_expert = self.config.get(
@@ -179,6 +186,9 @@ class Batcontrol:
             self.round_price_digits = battery_control_expert.get(
                 'round_price_digits',
                 self.round_price_digits)
+            self.production_offset_percent = battery_control_expert.get(
+                'production_offset_percent',
+                self.production_offset_percent)
 
         self.general_logic = CommonLogic.get_instance(
             charge_rate_multiplier=self.batconfig.get(
@@ -229,6 +239,11 @@ class Batcontrol:
                     self.api_set_min_price_difference_rel,
                     float
                 )
+                self.mqtt_api.register_set_callback(
+                    'production_offset',
+                    self.api_set_production_offset,
+                    float
+                )
                 # Inverter Callbacks
                 self.inverter.activate_mqtt(self.mqtt_api)
 
@@ -259,9 +274,15 @@ class Batcontrol:
         self.scheduler.schedule_every(
             1, 'hours', self.fc_solar.refresh_data, 'forecast-solar-every')
         self.scheduler.schedule_every(
-            1, 'hours', self.dynamic_tariff.refresh_data, 'utility-tariff-every')
+            1,
+            'hours',
+            self.dynamic_tariff.refresh_data,
+            'utility-tariff-every')
         self.scheduler.schedule_every(
-            2, 'hours', self.fc_consumption.refresh_data, 'forecast-consumption-every')
+            2,
+            'hours',
+            self.fc_consumption.refresh_data,
+            'forecast-consumption-every')
         # Run initial data fetch
         try:
             self.fc_solar.refresh_data()
@@ -284,8 +305,8 @@ class Batcontrol:
             if self.evcc_api is not None:
                 self.evcc_api.shutdown()
                 del self.evcc_api
-        except:
-            pass
+        except Exception as exc:
+            logger.exception("Error during Batcontrol shutdown: %s", exc)
 
     def reset_forecast_error(self):
         """ Reset the forecast error timer """
@@ -300,7 +321,7 @@ class Batcontrol:
             self.time_at_forecast_error = error_ts
 
         # get time delta since error
-        time_passed = error_ts-self.time_at_forecast_error
+        time_passed = error_ts - self.time_at_forecast_error
 
         if time_passed < ERROR_IGNORE_TIME:
             # keep current mode
@@ -348,38 +369,49 @@ class Batcontrol:
             fc_period = min(max(price_dict.keys()),
                             max(production_forecast.keys()))
             consumption_forecast = self.fc_consumption.get_forecast(
-                fc_period+1)
-            if len(consumption_forecast) < fc_period+1:
-                # Accept a shorter forecast horizon if not enough data is available
-                if len(consumption_forecast) < max(fc_period-FORECAST_TOLERANCE, MIN_FORECAST_HOURS):
-                    raise RuntimeError(f"Not enough consumption forecast data available, "
-                                       f"requested {fc_period}, got {len(consumption_forecast)}"
-                                       )
-                logger.warning("Insufficient consumption forecast data available, reducing "
-                               "forecast to %d hours", len(consumption_forecast))
-                fc_period = len(consumption_forecast)-1
+                fc_period + 1)
+            if len(consumption_forecast) < fc_period + 1:
+                # Accept a shorter forecast horizon if not enough data is
+                # available
+                if len(consumption_forecast) < max(
+                        fc_period - FORECAST_TOLERANCE, MIN_FORECAST_HOURS):
+                    # Note: string formatting to avoid f-string multiline issues in <=Python3.11
+                    raise RuntimeError(
+                        "Not enough consumption forecast data available, requested %d, got %d" % (
+                            fc_period, len(consumption_forecast)))
+                logger.warning(
+                    "Insufficient consumption forecast data available, reducing "
+                    "forecast to %d hours", len(consumption_forecast))
+                fc_period = len(consumption_forecast) - 1
         except Exception as e:
             logger.warning(
-                'Following Exception occurred when trying to get forecasts: %s', e,
-                exc_info=True
-            )
+                'Following Exception occurred when trying to get forecasts: %s',
+                e,
+                exc_info=True)
             self.handle_forecast_error()
             return
 
         self.reset_forecast_error()
 
         # initialize arrays
-        net_consumption = np.zeros(fc_period+1)
-        production = np.zeros(fc_period+1)
-        consumption = np.zeros(fc_period+1)
-        prices = np.zeros(fc_period+1)
 
-        for h in range(fc_period+1):
-            production[h] = production_forecast[h]
+        production = np.zeros(fc_period + 1)
+        consumption = np.zeros(fc_period + 1)
+        prices = np.zeros(fc_period + 1)
+
+        for h in range(fc_period + 1):
+            production[h] = production_forecast[h] * \
+                self.production_offset_percent
             consumption[h] = consumption_forecast[h]
             prices[h] = round(price_dict[h], self.round_price_digits)
 
-        net_consumption = consumption-production
+        net_consumption = consumption - production
+
+        # Log if production offset is active
+        if self.production_offset_percent != 1.0:
+            logger.info('Production offset active: %.1f%% (multiplier: %.3f)',
+                        self.production_offset_percent * 100,
+                        self.production_offset_percent)
 
         # Format arrays consistently for logging (suppress scientific notation)
         with np.printoptions(suppress=True):
@@ -415,7 +447,8 @@ class Batcontrol:
         current_minute = now.minute
         current_second = now.second
 
-        # Get interval resolution from config (default to 60 for backward compatibility)
+        # Get interval resolution from config (default to 60 for backward
+        # compatibility)
         interval_minutes = self.time_resolution
 
         # Calculate elapsed time in the CURRENT interval as a fraction
@@ -522,7 +555,12 @@ class Batcontrol:
         self.__set_mode(MODE_FORCE_CHARGING)
         self.__set_charge_rate(charge_rate)
 
-    def __save_run_data(self, production, consumption, net_consumption, prices):
+    def __save_run_data(
+            self,
+            production,
+            consumption,
+            net_consumption,
+            prices):
         """ Save data for API """
         self.last_production = production
         self.last_consumption = consumption
@@ -618,7 +656,8 @@ class Batcontrol:
             self.mqtt_api.publish_always_allow_discharge_limit_capacity(
                 discharge_limit)
 
-    def set_always_allow_discharge_limit(self, always_allow_discharge_limit: float) -> None:
+    def set_always_allow_discharge_limit(
+            self, always_allow_discharge_limit: float) -> None:
         """ Set the always allow discharge limit for battery control """
         self.general_logic.set_always_allow_discharge_limit(
             always_allow_discharge_limit)
@@ -686,6 +725,8 @@ class Batcontrol:
                 self.min_price_difference)
             self.mqtt_api.publish_min_price_difference_rel(
                 self.min_price_difference_rel)
+            self.mqtt_api.publish_production_offset(
+                self.production_offset_percent)
             #
             self.mqtt_api.publish_evaluation_intervall(
                 TIME_BETWEEN_EVALUATIONS)
@@ -698,7 +739,10 @@ class Batcontrol:
     def api_set_mode(self, mode: int):
         """ Log and change config run mode of inverter(s) from external call """
         # Check if mode is valid
-        if mode not in [MODE_FORCE_CHARGING, MODE_AVOID_DISCHARGING, MODE_ALLOW_DISCHARGING]:
+        if mode not in [
+                MODE_FORCE_CHARGING,
+                MODE_AVOID_DISCHARGING,
+                MODE_ALLOW_DISCHARGING]:
             logger.warning('API: Invalid mode %s', mode)
             return
 
@@ -719,7 +763,7 @@ class Batcontrol:
             logger.warning(
                 'API: Invalid charge rate %d W', charge_rate)
             return
-        logger.info('API: Setting charge rate to %d W',  charge_rate)
+        logger.info('API: Setting charge rate to %d W', charge_rate)
         self.api_overwrite = True
         if charge_rate != self.last_charge_rate:
             self.force_charge(charge_rate)
@@ -760,12 +804,31 @@ class Batcontrol:
             'API: Setting min price difference to %.3f', min_price_difference)
         self.min_price_difference = min_price_difference
 
-    def api_set_min_price_difference_rel(self, min_price_difference_rel: float):
+    def api_set_min_price_difference_rel(
+            self, min_price_difference_rel: float):
         """ Log and change config min_price_difference_rel from external call """
         if min_price_difference_rel < 0:
             logger.warning(
-                'API: Invalid min price rel difference %.3f', min_price_difference_rel)
+                'API: Invalid min price rel difference %.3f',
+                min_price_difference_rel)
             return
         logger.info(
-            'API: Setting min price rel difference to %.3f', min_price_difference_rel)
+            'API: Setting min price rel difference to %.3f',
+            min_price_difference_rel)
         self.min_price_difference_rel = min_price_difference_rel
+
+    def api_set_production_offset(self, production_offset: float):
+        """ Set production offset percentage from external API request.
+            The change is temporary and will not be written to the config file.
+        """
+        if production_offset < 0 or production_offset > 2.0:
+            logger.warning(
+                'API: Invalid production offset %.3f (must be between 0.0 and 2.0)',
+                production_offset)
+            return
+        logger.info(
+            'API: Setting production offset to %.3f (%.1f%%)',
+            production_offset, production_offset * 100)
+        self.production_offset_percent = production_offset
+        if self.mqtt_api is not None:
+            self.mqtt_api.publish_production_offset(production_offset)
