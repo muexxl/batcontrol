@@ -31,4 +31,3 @@ class InverterOutageError(Exception):
     def __str__(self):
         minutes = self.outage_duration_seconds / 60
         return f"{self.message} (outage duration: {minutes:.1f} minutes)"
-
