@@ -5,7 +5,6 @@ Tests the production offset feature that allows adjusting solar production
 forecast by a percentage factor.
 """
 import pytest
-import numpy as np
 from unittest.mock import Mock, MagicMock, patch
 import sys
 import os
