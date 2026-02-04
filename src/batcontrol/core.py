@@ -172,6 +172,7 @@ class Batcontrol:
             'min_price_difference_rel', 0)
 
         self.round_price_digits = 4
+        self.production_offset_percent = 1.0  # Default: no offset
 
         if self.config.get('battery_control_expert', None) is not None:
             battery_control_expert = self.config.get(
@@ -179,6 +180,9 @@ class Batcontrol:
             self.round_price_digits = battery_control_expert.get(
                 'round_price_digits',
                 self.round_price_digits)
+            self.production_offset_percent = battery_control_expert.get(
+                'production_offset_percent',
+                self.production_offset_percent)
 
         self.general_logic = CommonLogic.get_instance(
             charge_rate_multiplier=self.batconfig.get(
@@ -227,6 +231,11 @@ class Batcontrol:
                 self.mqtt_api.register_set_callback(
                     'min_price_difference_rel',
                     self.api_set_min_price_difference_rel,
+                    float
+                )
+                self.mqtt_api.register_set_callback(
+                    'production_offset',
+                    self.api_set_production_offset,
                     float
                 )
                 # Inverter Callbacks
@@ -375,11 +384,17 @@ class Batcontrol:
         prices = np.zeros(fc_period+1)
 
         for h in range(fc_period+1):
-            production[h] = production_forecast[h]
+            production[h] = production_forecast[h] * self.production_offset_percent
             consumption[h] = consumption_forecast[h]
             prices[h] = round(price_dict[h], self.round_price_digits)
 
         net_consumption = consumption-production
+
+        # Log if production offset is active
+        if self.production_offset_percent != 1.0:
+            logger.info('Production offset active: %.1f%% (multiplier: %.3f)',
+                       self.production_offset_percent * 100,
+                       self.production_offset_percent)
 
         # Format arrays consistently for logging (suppress scientific notation)
         with np.printoptions(suppress=True):
@@ -686,6 +701,8 @@ class Batcontrol:
                 self.min_price_difference)
             self.mqtt_api.publish_min_price_difference_rel(
                 self.min_price_difference_rel)
+            self.mqtt_api.publish_production_offset(
+                self.production_offset_percent)
             #
             self.mqtt_api.publish_evaluation_intervall(
                 TIME_BETWEEN_EVALUATIONS)
@@ -769,3 +786,18 @@ class Batcontrol:
         logger.info(
             'API: Setting min price rel difference to %.3f', min_price_difference_rel)
         self.min_price_difference_rel = min_price_difference_rel
+
+    def api_set_production_offset(self, production_offset: float):
+        """ Set production offset percentage from external API request.
+            The change is temporary and will not be written to the config file.
+        """
+        if production_offset < 0 or production_offset > 2.0:
+            logger.warning(
+                'API: Invalid production offset %.3f (must be between 0.0 and 2.0)',
+                production_offset)
+            return
+        logger.info(
+            'API: Setting production offset to %.3f (%.1f%%)',
+            production_offset, production_offset * 100)
+        self.production_offset_percent = production_offset
+

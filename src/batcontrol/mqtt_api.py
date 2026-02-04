@@ -20,6 +20,7 @@ The following topics are published:
 - /SOC: state of charge in %
 - /min_price_difference : minimum price difference in EUR
 - /discharge_blocked        : bool  # Discharge is blocked by other sources
+- /production_offset: production offset percentage (1.0 = 100%, 0.8 = 80%, etc.)
 
 The following statistical arrays are published as JSON arrays:
 - /FCST/production: forecasted production in W
@@ -33,6 +34,7 @@ Implemented Input-API:
 - /always_allow_discharge_limit/set: set always discharge limit in 0.1-1
 - /max_charging_from_grid_limit/set: set charge limit in 0-1
 - /min_price_difference/set: set minimum price difference in EUR
+- /production_offset/set: set production offset percentage (0.0-2.0)
 
 The module uses the paho-mqtt library for MQTT communication and numpy for handling arrays.
 """
@@ -384,6 +386,16 @@ class MqttApi:
         if self.client.is_connected():
             self.client.publish(self.base_topic + '/discharge_blocked', str(discharge_blocked))
 
+    def publish_production_offset(self, production_offset:float) -> None:
+        """ Publish the production offset percentage to MQTT
+            /production_offset
+        """
+        if self.client.is_connected():
+            self.client.publish(
+                self.base_topic + '/production_offset',
+                f'{production_offset:.3f}'
+            )
+
     # For depended APIs like the Fronius Inverter classes, which is not directly batcontrol.
     def generic_publish(self, topic:str, value:str) -> None:
         """ Publish a generic value to a topic
@@ -429,6 +441,13 @@ class MqttApi:
             self.base_topic + "/min_price_difference/set",
             entity_category="config",
             min_value=0, max_value=0.5, step_value=0.01, initial_value=0.05)
+
+        self.publish_mqtt_discovery_message("Production Offset",
+            "batcontrol_production_offset", "number", None, None,
+            self.base_topic + "/production_offset",
+            self.base_topic + "/production_offset/set",
+            entity_category="config",
+            min_value=0.0, max_value=2.0, step_value=0.01, initial_value=1.0)
 
         # sensors
         self.publish_mqtt_discovery_message("Discharge Blocked",

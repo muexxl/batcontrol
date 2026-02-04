@@ -29,6 +29,8 @@ battery_control_expert:
                                              # future_price <= current_price-min_price_difference/soften_price_difference_on_charging_factor
   soften_price_difference_on_charging_factor: 5
   round_price_digits: 4 # round price to n digits after the comma
+  production_offset_percent: 1.0 # Adjust production forecast by a percentage (1.0 = 100%, 0.8 = 80%, etc.)
+                                 # Useful for winter mode when solar panels are covered with snow
 
 #--------------------------
 #  Inverter
