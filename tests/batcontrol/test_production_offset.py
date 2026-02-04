@@ -6,11 +6,6 @@ forecast by a percentage factor.
 """
 import pytest
 from unittest.mock import Mock, MagicMock, patch
-import sys
-import os
-
-# Add the src directory to Python path for testing
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', 'src'))
 
 from batcontrol.core import Batcontrol
 
