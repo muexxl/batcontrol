@@ -10,7 +10,7 @@ These tests verify that the resilient wrapper:
 
 import pytest
 import time
-from unittest.mock import Mock, MagicMock, patch
+from unittest.mock import Mock
 
 from batcontrol.inverter.resilient_wrapper import (
     ResilientInverterWrapper,
