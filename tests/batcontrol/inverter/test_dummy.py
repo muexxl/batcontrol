@@ -62,7 +62,8 @@ class TestDummyInverter:
         """Test that the factory can create a dummy inverter wrapped in resilient wrapper"""
         config = {
             'type': 'dummy',
-            'max_grid_charge_rate': 3000
+            'max_grid_charge_rate': 3000,
+            'enable_resilient_wrapper': True
         }
         
         inverter = Inverter.create_inverter(config)
@@ -76,7 +77,8 @@ class TestDummyInverter:
         """Test that the factory works with different case"""
         config = {
             'type': 'DUMMY',
-            'max_grid_charge_rate': 3000
+            'max_grid_charge_rate': 3000,
+            'enable_resilient_wrapper': True
         }
         
         inverter = Inverter.create_inverter(config)
