@@ -6,7 +6,7 @@ if [ -f "./venv/activate" ]; then
 fi
 
 # Install pytest dependencies if not already installed
-pip install pytest pytest-cov
+pip install pytest pytest-cov pytest-asyncio
 
 # Run tests with coverage
 python -m pytest tests/ --cov=src/batcontrol --log-cli-level=DEBUG --log-cli-format="%(asctime)s [%(levelname)8s] %(name)s: %(message)s" --log-cli-date-format="%Y-%m-%d %H:%M:%S"
