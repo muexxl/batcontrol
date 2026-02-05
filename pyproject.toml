@@ -6,7 +6,7 @@ authors = [{name = "Stephan Mükusch", email = "muexxl@gmx.net"}]
 license = "MIT"
 license-files = ["LICENSE"]
 readme = "README.md"
-requires-python = ">3.8, <3.14"
+requires-python = ">3.8, <3.15"
 dependencies = [
     "numpy>=1.24",
     "pandas>=2.0",
@@ -48,6 +48,7 @@ pythonpath = ["src"]
 test = [
     "pytest>=7.0.0",
     "pytest-cov>=4.0.0",
+    "pytest-asyncio>=0.21.0",
 ]
 
 # Bump Version
