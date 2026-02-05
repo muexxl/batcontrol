@@ -118,8 +118,7 @@ pvinstallations:
   # ALTERNATIVE: HomeAssistant Solar Forecast ML - Uses ML forecast from HomeAssistant
   # Uncomment this section to use HomeAssistant Solar Forecast ML integration
   # - name: HA Solar ML Forecast
-  #   type: homeassistant-solar-forecast-ml
-  #   base_url: http://homeassistant.local:8123  # Your HomeAssistant URL
+  #   base_url: ws://homeassistant.local:8123  # Your HomeAssistant URL
   #   api_token: eyJ...                           # Long-lived access token from HA Profile
   #   entity_id: sensor.solar_forecast_ml_prognose_nachste_stunde  # Forecast sensor entity
   #   sensor_unit: auto                           # Options: 'auto' (detect), 'Wh', or 'kWh'

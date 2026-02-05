@@ -11,10 +11,8 @@ Sensor: sensor.solar_forecast_ml_prognose_nachste_stunde
 import asyncio
 import json
 import logging
-import threading
 from typing import Dict, Optional
 
-from cachetools import TTLCache
 from websockets.asyncio.client import connect
 from .baseclass import ForecastSolarBaseclass
 
@@ -42,8 +40,6 @@ class ForecastSolarHomeAssistantML(ForecastSolarBaseclass):
         timezone: Timezone for data processing
         sensor_unit: Unit of the sensor ('wh', 'kwh', or 'auto')
         unit_conversion_factor: Factor to convert sensor values to Wh
-        forecast_cache: TTLCache storing hourly forecast values
-        cache_ttl_hours: TTL for cached forecast data
     """
 
     # pylint: disable=too-many-arguments,too-many-positional-arguments
@@ -56,7 +52,6 @@ class ForecastSolarHomeAssistantML(ForecastSolarBaseclass):
         entity_id: str,
         min_time_between_api_calls: int = 21600,
         delay_evaluation_by_seconds: int = 300,
-        cache_ttl_hours: float = 24.0,
         sensor_unit: Optional[str] = "auto",
         target_resolution: int = 60
     ) -> None:
@@ -66,12 +61,11 @@ class ForecastSolarHomeAssistantML(ForecastSolarBaseclass):
             pvinstallations: List of PV installation dicts (for compatibility with baseclass)
                 Each dict should contain 'name' key for logging
             timezone: Timezone object for data processing
-            base_url: HomeAssistant base URL (e.g., "http://192.168.1.100:8123")
+            base_url: HomeAssistant base URL (e.g., "ws://192.168.1.100:8123")
             api_token: HomeAssistant Long-Lived Access Token
             entity_id: Entity ID of forecast sensor (e.g., "sensor.solar_forecast_ml_...")
             min_time_between_api_calls: Minimum seconds between API calls (default: 6 hours)
             delay_evaluation_by_seconds: Delay before first evaluation (default: 5 min)
-            cache_ttl_hours: Time-to-live for cached forecast in hours (default: 24)
             sensor_unit: Optional sensor unit ('auto', 'Wh', or 'kWh').
                         If set to 'Wh' or 'kWh', skips auto-detection.
                         If set to 'auto', queries Home Assistant to detect unit.
@@ -107,16 +101,6 @@ class ForecastSolarHomeAssistantML(ForecastSolarBaseclass):
                 f"Allowed values: 'auto', 'Wh', 'kWh'"
             )
 
-        # Initialize cache with TTL
-        # Cache key format: "hour_N" (e.g., "hour_0", "hour_1")
-        # Cache stores forecast value in Wh for each hour
-        # maxsize: 96 = 4 days * 24 hours (supports up to 96-hour forecast)
-        self.cache_ttl_hours = cache_ttl_hours
-        cache_ttl_seconds = int(cache_ttl_hours * 3600)
-        self.forecast_cache: TTLCache = TTLCache(
-            maxsize=96, ttl=cache_ttl_seconds)
-        self._cache_lock = threading.Lock()
-
         # Query sensor to determine unit and set conversion factor
         if self.sensor_unit and self.sensor_unit != 'auto':
             # User explicitly configured the unit, skip discovery
@@ -137,9 +121,9 @@ class ForecastSolarHomeAssistantML(ForecastSolarBaseclass):
 
         logger.info(
             "Initialized HomeAssistant Solar Forecast ML provider: "
-            "entity_id=%s, cache_ttl=%0.1fh, sensor_unit=%s, "
+            "entity_id=%s, sensor_unit=%s, "
             "unit_conversion_factor=%0.1f",
-            entity_id, cache_ttl_hours, self.sensor_unit or 'auto',
+            entity_id, self.sensor_unit or 'auto',
             self.unit_conversion_factor
         )
 
@@ -318,96 +302,133 @@ class ForecastSolarHomeAssistantML(ForecastSolarBaseclass):
             logger_ha_communication.warning(
                 "Error closing WebSocket connection: %s", e)
 
-    async def _fetch_forecast_async(
-        self,
-        websocket=None
-    ) -> Dict[int, float]:
-        """Fetch solar forecast from HomeAssistant sensor via WebSocket
+    def get_raw_data_from_provider(self, pvinstallation_name: str) -> dict:
+        """Fetch raw entity state from HomeAssistant via WebSocket API
 
         Args:
-            websocket: Optional existing websocket connection to reuse
+            pvinstallation_name: Name of PV installation (for baseclass compatibility)
 
         Returns:
-            Dict mapping hour index to solar generation in Wh
-            (e.g., {0: 879.0, 1: 1265.0, 2: 1688.0, ...})
+            Dict with entity state including attributes
 
         Raises:
             RuntimeError: If WebSocket connection or API request fails
         """
-        # Track if we need to manage the websocket connection
-        should_disconnect = False
+        try:
+            loop = asyncio.get_event_loop()
+        except RuntimeError:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+
+        return loop.run_until_complete(self._fetch_entity_state_async())
+
+    async def _fetch_entity_state_async(self) -> dict:
+        """Async fetch of entity state from HomeAssistant
+
+        Returns:
+            Dict with entity state and attributes
+
+        Raises:
+            RuntimeError: If entity not found or request fails
+        """
+        logger_ha_details.debug(
+            "Fetching entity state for: %s", self.entity_id)
+
+        websocket, message_id = await self._websocket_connect()
 
         try:
-            if websocket is None:
-                websocket, message_id = await self._websocket_connect()
-                should_disconnect = True
+            # Request all states to find our entity
+            states_request = {
+                "id": message_id,
+                "type": "get_states"
+            }
+            logger_ha_details.debug(
+                "Sending get_states request for entity: %s", self.entity_id)
+            await websocket.send(json.dumps(states_request))
+
+            # Receive states response
+            states_response = await websocket.recv()
+            states_result = json.loads(states_response)
+            logger_ha_details.debug(
+                "Received states response: id=%s, type=%s, success=%s",
+                states_result.get("id"),
+                states_result.get("type"),
+                states_result.get("success"))
+
+            if not states_result.get("success"):
+                error_msg = states_result.get(
+                    "error", {}
+                ).get("message", "Unknown error")
+                logger.error("Get states request failed: %s", error_msg)
+                raise RuntimeError(
+                    f"Get states request failed: {error_msg}"
+                )
+
+            # Find our entity in the results
+            states = states_result.get("result", [])
+            entity_state = None
+            for state in states:
+                if state.get("entity_id") == self.entity_id:
+                    entity_state = state
+                    break
+
+            if entity_state is None:
+                raise RuntimeError(
+                    f"Entity '{self.entity_id}' not found in HomeAssistant"
+                )
+
+            logger_ha_details.debug(
+                "Found entity state: %s", json.dumps(entity_state, indent=2))
+
+            return entity_state
+
+        finally:
+            await self._websocket_disconnect(websocket)
+
+    def get_forecast_from_raw_data(self) -> Dict[int, float]:
+        """Parse forecast from cached raw data
+
+        Returns hour-aligned forecast at native 60-minute resolution.
+        Baseclass will handle conversion to 15-min if needed.
+
+        Returns:
+            Dict mapping hour index (0, 1, 2, ...) to generation in Wh
+            Index 0 = start of current hour
+
+        Raises:
+            RuntimeError: If no valid forecast data available
+        """
+        # Get raw data from cache (stored by baseclass)
+        raw_data = self.get_raw_data(self.pvinstallations[0]['name'])
+
+        if not raw_data:
+            logger.warning('No raw data available from cache')
+            return {}
+
+        # Parse forecast data from attributes
+        attributes = raw_data.get("attributes", {})
+        
+        try:
+            forecast_dict = self._parse_forecast_from_attributes(attributes)
+            
+            if forecast_dict:
+                values = list(forecast_dict.values())
+                logger.debug(
+                    "Parsed %d hour forecast: avg=%.1f Wh, min=%.1f Wh, max=%.1f Wh",
+                    len(forecast_dict),
+                    sum(values) / len(values) if values else 0,
+                    min(values) if values else 0,
+                    max(values) if values else 0
+                )
             else:
-                message_id = 1
+                logger.error("Parsed empty forecast from attributes")
+                raise RuntimeError("No solar forecast data available in entity attributes")
 
-            try:
-                # Request all states to find our entity
-                states_request = {
-                    "id": message_id,
-                    "type": "get_states"
-                }
-                logger_ha_details.debug(
-                    "Sending get_states request for entity: %s", self.entity_id)
-                await websocket.send(json.dumps(states_request))
-
-                # Receive states response
-                states_response = await websocket.recv()
-                states_result = json.loads(states_response)
-                logger_ha_details.debug(
-                    "Received states response: id=%s, type=%s, success=%s",
-                    states_result.get("id"),
-                    states_result.get("type"),
-                    states_result.get("success"))
-
-                if not states_result.get("success"):
-                    error_msg = states_result.get(
-                        "error", {}
-                    ).get("message", "Unknown error")
-                    logger.error("Get states request failed: %s", error_msg)
-                    raise RuntimeError(
-                        f"Get states request failed: {error_msg}"
-                    )
-
-                # Find our entity in the results
-                states = states_result.get("result", [])
-                entity_state = None
-                for state in states:
-                    if state.get("entity_id") == self.entity_id:
-                        entity_state = state
-                        break
-
-                if entity_state is None:
-                    raise RuntimeError(
-                        f"Entity '{self.entity_id}' not found in HomeAssistant"
-                    )
-
-                logger_ha_details.debug(
-                    "Found entity state: %s", json.dumps(entity_state, indent=2))
-
-                # Parse forecast data from attributes
-                attributes = entity_state.get("attributes", {})
-                forecast_dict = self._parse_forecast_from_attributes(
-                    attributes)
-
-                logger_ha_details.debug(
-                    "Parsed %d hours of forecast data", len(forecast_dict))
-
-                return forecast_dict
-
-            finally:
-                # Only disconnect if we created the connection
-                if should_disconnect:
-                    await self._websocket_disconnect(websocket)
+            return forecast_dict
 
         except Exception as e:
-            logger.error(
-                "Failed to fetch forecast from HomeAssistant: %s", e)
-            raise RuntimeError(
-                f"HomeAssistant WebSocket request failed: {e}") from e
+            logger.error("Failed to parse forecast from attributes: %s", e)
+            raise RuntimeError(f"Failed to parse forecast: {e}") from e
 
     def _parse_forecast_from_attributes(
         self,
@@ -512,124 +533,3 @@ class ForecastSolarHomeAssistantML(ForecastSolarBaseclass):
             )
 
         return forecast_dict
-
-    def _update_cache(self, forecast_dict: Dict[int, float]) -> int:
-        """Store parsed forecast in cache
-
-        Args:
-            forecast_dict: Dict mapping hour index to generation in Wh
-
-        Returns:
-            Number of cache entries updated
-        """
-        with self._cache_lock:
-            logger.debug(
-                "Updating cache with %d hours of forecast data",
-                len(forecast_dict)
-            )
-            updated_count = 0
-
-            for hour_idx, wh_value in forecast_dict.items():
-                cache_key = f"hour_{hour_idx}"
-                self.forecast_cache[cache_key] = wh_value
-                updated_count += 1
-
-                logger_ha_details.debug(
-                    "Updated cache: key=%s, value=%.2f Wh",
-                    cache_key, wh_value
-                )
-
-        logger.info("Updated %d cache entries", updated_count)
-        return updated_count
-
-    def refresh_data(self) -> None:
-        """Refresh solar forecast data from HomeAssistant
-
-        Fetches the latest forecast from the sensor, parses it, and updates cache.
-        """
-        logger.info("Refreshing solar forecast data from HomeAssistant")
-
-        try:
-            # Run async fetch function
-            loop = asyncio.get_event_loop()
-        except RuntimeError:
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-
-        try:
-            forecast_dict = loop.run_until_complete(
-                self._fetch_forecast_async())
-
-            if forecast_dict:
-                self._update_cache(forecast_dict)
-                logger.info(
-                    "Successfully refreshed solar forecast with %d hours",
-                    len(forecast_dict))
-            else:
-                logger.error(
-                    "No forecast data obtained from HomeAssistant")
-
-        except Exception as e:  # pylint: disable=broad-exception-caught
-            logger.error("Error refreshing forecast: %s", e)
-
-    def _get_forecast_native(self, hours: int) -> Dict[int, float]:
-        """Get hour-aligned forecast at native (60-minute) resolution.
-
-        Args:
-            hours: Number of hours to forecast
-
-        Returns:
-            Dict mapping hour index to energy value (Wh per hour)
-            Index 0 = start of current hour
-
-        Raises:
-            RuntimeError: If no forecast data available
-        """
-        # Check if cache has required data, refresh if needed
-        missing_keys = False
-        with self._cache_lock:
-            for h in range(hours):
-                cache_key = f"hour_{h}"
-                if cache_key not in self.forecast_cache:
-                    missing_keys = True
-                    logger_ha_details.debug(
-                        "Cache miss for key: %s", cache_key)
-                    break
-
-        if missing_keys:
-            logger.info(
-                "Cache missing required keys, refreshing solar forecast data")
-            self.refresh_data()
-
-        # Generate forecast for requested hours
-        prediction = {}
-
-        for h in range(hours):
-            cache_key = f"hour_{h}"
-
-            with self._cache_lock:
-                wh_value = self.forecast_cache.get(cache_key)
-
-            if wh_value is not None:
-                prediction[h] = wh_value
-            else:
-                logger_ha_details.warning(
-                    "No cached data for %s", cache_key
-                )
-                # Break on first cache miss
-                break
-
-        if prediction:
-            values = list(prediction.values())
-            logger.debug(
-                "Generated %d hour forecast: avg=%.1f Wh, min=%.1f Wh, max=%.1f Wh",
-                len(prediction),
-                sum(values) / len(values) if values else 0,
-                min(values) if values else 0,
-                max(values) if values else 0
-            )
-        else:
-            logger.error("Generated empty forecast")
-            raise RuntimeError("No solar forecast data available")
-
-        return prediction

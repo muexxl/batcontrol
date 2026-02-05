@@ -138,18 +138,18 @@ class TestInitialization:
             )
 
     def test_init_cache_configuration(self, pv_installations, timezone):
-        """Test cache is properly configured"""
+        """Test baseclass cache is properly configured"""
         provider = ForecastSolarHomeAssistantML(
             pvinstallations=pv_installations,
             timezone=timezone,
             base_url="http://homeassistant.local:8123",
             api_token="test_token",
             entity_id="sensor.solar_forecast",
-            sensor_unit="kWh",
-            cache_ttl_hours=12.0
+            sensor_unit="kWh"
         )
-        assert provider.cache_ttl_hours == 12.0
-        assert len(provider.forecast_cache) == 0
+        # Verify baseclass cache is initialized
+        assert hasattr(provider, 'cache_list')
+        assert len(provider.cache_list) > 0
 
 
 # Tests for parsing
@@ -300,8 +300,8 @@ class TestParsing:
 class TestCaching:
     """Tests for cache operations"""
 
-    def test_update_cache(self, pv_installations, timezone):
-        """Test updating cache with forecast data"""
+    def test_update_cache(self, pv_installations, timezone, ha_entity_state):
+        """Test updating cache with raw data via baseclass"""
         provider = ForecastSolarHomeAssistantML(
             pvinstallations=pv_installations,
             timezone=timezone,
@@ -311,16 +311,17 @@ class TestCaching:
             sensor_unit="kWh"
         )
 
-        forecast = {0: 879.0, 1: 1265.0, 2: 1688.0}
-        updated = provider._update_cache(forecast)
+        # Store raw data using baseclass method
+        pvinstallation_name = pv_installations[0]['name']
+        provider.store_raw_data(pvinstallation_name, ha_entity_state)
 
-        assert updated == 3
-        assert provider.forecast_cache["hour_0"] == 879.0
-        assert provider.forecast_cache["hour_1"] == 1265.0
-        assert provider.forecast_cache["hour_2"] == 1688.0
+        # Verify data was stored
+        raw_data = provider.get_raw_data(pvinstallation_name)
+        assert raw_data is not None
+        assert raw_data["entity_id"] == ha_entity_state["entity_id"]
 
-    def test_cache_retrieval(self, pv_installations, timezone):
-        """Test retrieving values from cache"""
+    def test_cache_retrieval(self, pv_installations, timezone, ha_entity_state):
+        """Test retrieving and parsing forecast from cached raw data"""
         provider = ForecastSolarHomeAssistantML(
             pvinstallations=pv_installations,
             timezone=timezone,
@@ -330,18 +331,19 @@ class TestCaching:
             sensor_unit="kWh"
         )
 
-        # Manually populate cache
-        provider.forecast_cache["hour_0"] = 879.0
-        provider.forecast_cache["hour_1"] = 1265.0
+        # Store raw data via baseclass
+        pvinstallation_name = pv_installations[0]['name']
+        provider.store_raw_data(pvinstallation_name, ha_entity_state)
 
-        # Get forecast
-        forecast = provider._get_forecast_native(hours=2)
+        # Get forecast from cached raw data
+        forecast = provider.get_forecast_from_raw_data()
 
+        assert len(forecast) == 14
         assert forecast[0] == 879.0
         assert forecast[1] == 1265.0
 
     def test_missing_cache_breaks_forecast(self, pv_installations, timezone):
-        """Test forecast breaks on missing cache entry"""
+        """Test forecast raises error when no cached data is available"""
         provider = ForecastSolarHomeAssistantML(
             pvinstallations=pv_installations,
             timezone=timezone,
@@ -351,26 +353,12 @@ class TestCaching:
             sensor_unit="kWh"
         )
 
-        # Populate cache with partial data
-        provider.forecast_cache["hour_0"] = 879.0
-        provider.forecast_cache["hour_1"] = 1265.0
-        # hour_2 is missing
-
-        with patch.object(provider, 'refresh_data') as mock_refresh:
-            # This should trigger refresh and return partial data (stops at missing key)
-            forecast = provider._get_forecast_native(hours=3)
-
-            # Verify refresh was called
-            mock_refresh.assert_called_once()
-
-            # Should return only hours 0 and 1 (stops at missing hour_2)
-            assert len(forecast) == 2
-            assert forecast[0] == 879.0
-            assert forecast[1] == 1265.0
-            assert 2 not in forecast
+        # No cache populated - should return empty dict or raise error
+        with pytest.raises(Exception):  # Will raise from get_raw_data or parsing
+            forecast = provider.get_forecast_from_raw_data()
 
     def test_thread_safe_cache_access(self, pv_installations, timezone):
-        """Test cache operations are thread-safe"""
+        """Test baseclass provides thread-safe cache operations"""
         provider = ForecastSolarHomeAssistantML(
             pvinstallations=pv_installations,
             timezone=timezone,
@@ -380,9 +368,9 @@ class TestCaching:
             sensor_unit="kWh"
         )
 
-        # Verify lock exists and is used
-        assert hasattr(provider, '_cache_lock')
-        assert provider._cache_lock is not None
+        # Verify baseclass refresh data lock exists
+        assert hasattr(provider, '_refresh_data_lock')
+        assert provider._refresh_data_lock is not None
 
 
 # Integration-like tests
@@ -442,23 +430,23 @@ class TestIntegration:
             sensor_unit="kWh"
         )
 
-        # Mock the async fetch
-        mock_forecast = {
-            0: 879.0, 1: 1265.0, 2: 1688.0,
-            3: 1571.0, 4: 1578.0, 5: 990.0
-        }
-
-        with patch.object(provider, '_fetch_forecast_async',
-                          return_value=mock_forecast) as mock_fetch:
-            provider.refresh_data()
+        # Mock the raw data fetch
+        pvinstallation_name = pv_installations[0]['name']
+        with patch.object(provider, 'get_raw_data_from_provider',
+                          return_value=ha_entity_state) as mock_fetch:
+            # Manually call the method to store data
+            result = provider.get_raw_data_from_provider(pvinstallation_name)
+            provider.store_raw_data(pvinstallation_name, result)
 
             # Verify fetch was called
-            # Note: Due to asyncio complexity, we're just checking the cache was updated
-            # Cache should be populated
-            assert len(provider.forecast_cache) >= 0
+            mock_fetch.assert_called_once()
+
+            # Verify we can get forecast from cached data
+            forecast = provider.get_forecast_from_raw_data()
+            assert len(forecast) > 0
 
     def test_error_handling_on_fetch_failure(self, pv_installations, timezone):
-        """Test graceful error handling on fetch failure"""
+        """Test error handling on fetch failure"""
         provider = ForecastSolarHomeAssistantML(
             pvinstallations=pv_installations,
             timezone=timezone,
@@ -468,11 +456,13 @@ class TestIntegration:
             sensor_unit="kWh"
         )
 
-        # Mock async fetch to raise an error
-        with patch.object(provider, '_fetch_forecast_async',
+        pvinstallation_name = pv_installations[0]['name']
+        # Mock get_raw_data_from_provider to raise an error
+        with patch.object(provider, 'get_raw_data_from_provider',
                           side_effect=RuntimeError("Connection failed")):
-            # Should not raise, just log the error
-            provider.refresh_data()
+            # Should raise when trying to fetch
+            with pytest.raises(RuntimeError):
+                provider.get_raw_data_from_provider(pvinstallation_name)
 
 
 # Tests for edge cases

@@ -16,17 +16,17 @@ class ForecastSolar:
                               api_delay=0,
                               requested_provider='fcsolarapi',
                               target_resolution: int = 60) -> ForecastSolarInterface:
-        """ Select and configure a solar forecast provider based on the given configuration 
+        """ Select and configure a solar forecast provider based on the given configuration
 
         Args:
             config: PV installations configuration (pvinstallations)
             timezone: Timezone for forecast data
             min_time_between_api_calls: Minimum seconds between API calls
             api_delay: Delay for API evaluation
-            requested_provider: Provider name ('fcsolarapi', 'solarprognose', 'evcc-solar', 
+            requested_provider: Provider name ('fcsolarapi', 'solarprognose', 'evcc-solar',
                                 'homeassistant-solar-forecast-ml')
             target_resolution: Target resolution in minutes (15 or 60)
-        
+
         Raises:
             RuntimeError: If provider is unknown
             ValueError: If configuration is invalid for the provider
@@ -47,12 +47,11 @@ class ForecastSolar:
             provider = ForecastSolarHomeAssistantML(
                 pvinstallations=config,
                 timezone=timezone,
-                base_url=_get_config_value(config, 'base_url', 'http://homeassistant.local:8123'),
+                base_url=_get_config_value(config, 'base_url', 'ws://homeassistant.local:8123'),
                 api_token=_get_config_value(config, 'api_token', None),
                 entity_id=_get_config_value(config, 'entity_id', None),
                 min_time_between_api_calls=min_time_between_api_calls,
                 delay_evaluation_by_seconds=api_delay,
-                cache_ttl_hours=_get_config_value(config, 'cache_ttl_hours', 24.0),
                 sensor_unit=_get_config_value(config, 'sensor_unit', 'auto'),
                 target_resolution=target_resolution
             )
@@ -63,12 +62,12 @@ class ForecastSolar:
 
 def _get_config_value(config: list, key: str, default=None):
     """Extract configuration value from pvinstallations list
-    
+
     Args:
         config: List of pvinstallations dicts
         key: Configuration key to find
         default: Default value if key not found
-        
+
     Returns:
         Value from first installation's config, or default if not found
     """
