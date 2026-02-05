@@ -1,5 +1,6 @@
 from .core import Batcontrol
 from .setup import setup_logging, load_config
+from .inverter import InverterOutageError
 import argparse
 import time
 import datetime
@@ -103,6 +104,13 @@ def main() -> int:
             time.sleep(sleeptime)
     except KeyboardInterrupt:
         print("Shutting down")
+    except InverterOutageError as e:
+        logger.critical(
+            "Inverter has been unreachable for too long. "
+            "Terminating batcontrol. Error: %s", e
+        )
+        print(f"FATAL: Inverter outage exceeded tolerance - {e}")
+        return 1
     finally:
         bc.shutdown()
         del bc

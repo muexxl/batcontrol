@@ -7,6 +7,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', '..', 'sr
 
 from batcontrol.inverter.dummy import Dummy
 from batcontrol.inverter.inverter import Inverter
+from batcontrol.inverter.resilient_wrapper import ResilientInverterWrapper
 
 
 class TestDummyInverter:
@@ -58,25 +59,33 @@ class TestDummyInverter:
         dummy.shutdown()
 
     def test_dummy_factory_creation(self):
-        """Test that the factory can create a dummy inverter"""
+        """Test that the factory can create a dummy inverter wrapped in resilient wrapper"""
         config = {
             'type': 'dummy',
-            'max_grid_charge_rate': 3000
+            'max_grid_charge_rate': 3000,
+            'enable_resilient_wrapper': True
         }
         
         inverter = Inverter.create_inverter(config)
-        assert isinstance(inverter, Dummy)
+        # Factory now returns ResilientInverterWrapper
+        assert isinstance(inverter, ResilientInverterWrapper)
+        # Wrapped inverter should be Dummy
+        assert isinstance(inverter.wrapped_inverter, Dummy)
         assert inverter.max_grid_charge_rate == 3000
 
     def test_dummy_factory_creation_case_insensitive(self):
         """Test that the factory works with different case"""
         config = {
             'type': 'DUMMY',
-            'max_grid_charge_rate': 3000
+            'max_grid_charge_rate': 3000,
+            'enable_resilient_wrapper': True
         }
         
         inverter = Inverter.create_inverter(config)
-        assert isinstance(inverter, Dummy)
+        # Factory now returns ResilientInverterWrapper
+        assert isinstance(inverter, ResilientInverterWrapper)
+        # Wrapped inverter should be Dummy
+        assert isinstance(inverter.wrapped_inverter, Dummy)
 
     def test_dummy_energy_calculations(self):
         """Test energy-related calculations work"""
@@ -92,3 +101,30 @@ class TestDummyInverter:
         
         free_capacity = dummy.get_free_capacity()
         assert free_capacity == 3000  # (95% - 65%) of 10000 Wh
+
+    def test_dummy_factory_with_resilient_wrapper_disabled(self):
+        """Test that factory returns unwrapped inverter when resilient wrapper is disabled"""
+        config = {
+            'type': 'dummy',
+            'max_grid_charge_rate': 3000,
+            'enable_resilient_wrapper': False
+        }
+        
+        inverter = Inverter.create_inverter(config)
+        # When disabled, factory returns the raw Dummy inverter
+        assert isinstance(inverter, Dummy)
+        assert not isinstance(inverter, ResilientInverterWrapper)
+        assert inverter.max_grid_charge_rate == 3000
+
+    def test_dummy_factory_with_resilient_wrapper_enabled_explicitly(self):
+        """Test that factory returns wrapped inverter when resilient wrapper is explicitly enabled"""
+        config = {
+            'type': 'dummy',
+            'max_grid_charge_rate': 3000,
+            'enable_resilient_wrapper': True
+        }
+        
+        inverter = Inverter.create_inverter(config)
+        # When enabled, factory returns ResilientInverterWrapper
+        assert isinstance(inverter, ResilientInverterWrapper)
+        assert isinstance(inverter.wrapped_inverter, Dummy)
