@@ -96,19 +96,36 @@ mqtt:
 #  Forecast Solar
 #  See more Details in:  https://github.com/muexxl/batcontrol/wiki/Solar-Forecast
 #
+#  Supported providers:
+#  - fcsolarapi: Third-party solar forecast API (configured below, default)
+#  - solarprognose.de : needs an API key, see https://www.solarprognose.de/solar-api/ for details
+#  - homeassistant-solar-forecast-ml: HomeAssistant Solar Forecast ML integration (HACS)
+#  - evcc: local instance of evcc via REST API
+#
 #  DEMO: This configuration uses a simple PV installation for demonstration.
 #  For real operation, update the values below with your actual PV system details.
 #--------------------------
 solar_forecast_provider: fcsolarapi
+
 pvinstallations:
-  - name: Demo PV System #name - update this for your system
-    lat: 48.4334480    # Update with your actual latitude
-    lon: 8.7654968     # Update with your actual longitude
-    declination: 30    # inclination toward horizon 0..90 0=flat 90=vertical (e.g. wallmounted)
-    azimuth: 0         # -90:East, 0:South, 90:West -180..180
-    kWp: 10.0          # power in kWp - update with your actual system size
-    #horizon: # leave empty for default PVGIS horizon, only modify if solar array is shaded by trees or houses
-    #api: #fcsolarapi
+  # PRIMARY: fcsolarapi provider - Uses PVGIS forecast based on location
+  - name: Demo PV System              # name - update this for your system
+    type: fcsolarapi                  # Optional: explicitly specify provider type
+    lat: 48.4334480                   # Update with your actual latitude
+    lon: 8.7654968                    # Update with your actual longitude
+    declination: 30                   # inclination toward horizon 0..90 0=flat 90=vertical
+    azimuth: 0                        # -90:East, 0:South, 90:West -180..180
+    kWp: 10.0                         # power in kWp - update with your actual system size
+    #horizon:                         # leave empty for default PVGIS horizon
+
+  # ALTERNATIVE: HomeAssistant Solar Forecast ML - Uses ML forecast from HomeAssistant
+  # Uncomment this section to use HomeAssistant Solar Forecast ML integration
+  # - name: HA Solar ML Forecast
+  #   base_url: ws://homeassistant.local:8123  # Your HomeAssistant URL
+  #   api_token: eyJ...                           # Long-lived access token from HA Profile
+  #   entity_id: sensor.solar_forecast_ml_prognose_nachste_stunde  # Forecast sensor entity
+  #   sensor_unit: auto                           # Options: 'auto' (detect), 'Wh', or 'kWh'
+  #   cache_ttl_hours: 24.0                       # Cache duration in hours
 
 #--------------------------
 #  Forecast Consumption
