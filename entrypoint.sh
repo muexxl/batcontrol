@@ -25,9 +25,9 @@ if test ! -f "$CONFIG_FILE" ; then
   echo ""
   echo "       You can download the latest sample config from:"
   if [ "snapshot" = "$BATCONTROL_VERSION" ]; then
-     echo "        https://raw.githubusercontent.com/muexxl/batcontrol/${BATCONTROL_GIT_SHA}/config/batcontrol_config_dummy.yaml"
+     echo "        https://raw.githubusercontent.com/MaStr/batcontrol/${BATCONTROL_GIT_SHA}/config/batcontrol_config_dummy.yaml"
   else
-     echo "        https://raw.githubusercontent.com/muexxl/batcontrol/refs/tags/${BATCONTROL_VERSION}/config/batcontrol_config_dummy.yaml"
+     echo "        https://raw.githubusercontent.com/MaStr/batcontrol/refs/tags/${BATCONTROL_VERSION}/config/batcontrol_config_dummy.yaml"
   fi
   echo ""
 fi

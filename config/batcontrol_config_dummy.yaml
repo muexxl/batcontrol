@@ -1,6 +1,6 @@
 #--------------------------
 #  Batcontrol Configuration
-#  See more Details in: https://github.com/muexxl/batcontrol/wiki/Batcontrol-Configuration
+#  See more Details in: https://github.com/MaStr/batcontrol/wiki/Batcontrol-Configuration
 #--------------------------
 timezone: Europe/Berlin #your time zone. not optional.
 time_resolution_minutes: 60 # Time resolution for forecasts: 15 (quarter-hourly) or 60 (hourly). Default: 60
@@ -21,7 +21,7 @@ battery_control:
 
 #--------------------------
 #  Battery Control Expert Tuning Parameters
-#  See more Details in: https://github.com/muexxl/batcontrol/wiki/battery_control_expert
+#  See more Details in: https://github.com/MaStr/batcontrol/wiki/battery_control_expert
 #--------------------------
 battery_control_expert:
   charge_rate_multiplier: 1.1 # Increase (>1) calculated charge rate to compensate charge inefficencies.
@@ -34,7 +34,7 @@ battery_control_expert:
 
 #--------------------------
 #  Inverter
-#  See more Details in: https://github.com/muexxl/batcontrol/wiki/Inverter-Configuration
+#  See more Details in: https://github.com/MaStr/batcontrol/wiki/Inverter-Configuration
 #
 #  IMPORTANT: This configuration uses a "dummy" inverter for demonstration purposes.
 #  The dummy inverter returns static values to make batcontrol work out of the box.
@@ -61,7 +61,7 @@ inverter:
 
 #--------------------------
 #  Dynamic Tariff Provider
-#  See more Details in: https://github.com/muexxl/batcontrol/wiki/Dynamic-tariff-provider
+#  See more Details in: https://github.com/MaStr/batcontrol/wiki/Dynamic-tariff-provider
 #--------------------------
 utility:
   type: awattar_de # [tibber, awattar_at, awattar_de, evcc, energyforecast]
@@ -72,7 +72,7 @@ utility:
 
 #--------------------------
 #  MQTT API
-#  See more Details in: https://github.com/muexxl/batcontrol/wiki/MQTT-API
+#  See more Details in: https://github.com/MaStr/batcontrol/wiki/MQTT-API
 #--------------------------
 mqtt:
   enabled: false
@@ -94,7 +94,7 @@ mqtt:
 
 #--------------------------
 #  Forecast Solar
-#  See more Details in:  https://github.com/muexxl/batcontrol/wiki/Solar-Forecast
+#  See more Details in:  https://github.com/MaStr/batcontrol/wiki/Solar-Forecast
 #
 #  Supported providers:
 #  - fcsolarapi: Third-party solar forecast API (configured below, default)
@@ -129,7 +129,7 @@ pvinstallations:
 
 #--------------------------
 #  Forecast Consumption
-#  See more Details in: https://github.com/muexxl/batcontrol/wiki/Consumption-forecast
+#  See more Details in: https://github.com/MaStr/batcontrol/wiki/Consumption-forecast
 #
 #  Option 1: CSV-based forecast (default)
 #  Option 2: HomeAssistant API-based forecast
@@ -156,7 +156,7 @@ consumption_forecast:
 #--------------------------
 # evcc connection
 #   listen to evcc mqtt messages to lock the battery if the car is charging
-#   See more Details in: https://github.com/muexxl/batcontrol/wiki/evcc-connection
+#   See more Details in: https://github.com/MaStr/batcontrol/wiki/evcc-connection
 #--------------------------
 evcc:
   enabled: false

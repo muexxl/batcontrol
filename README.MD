@@ -1,11 +1,11 @@
 **Optimize your electricity costs by re-charging your PV battery when electricity is cheap and there is not enough solar power available.**
-To integrate batcontrol with Home Assistant, use the following repository: [ha_addons](https://github.com/muexxl/ha_addons/)
+To integrate batcontrol with Home Assistant, use the following repository: [batcontrol_ha_addon](https://github.com/MaStr/batcontrol_ha_addon)
 
-[![Pylint](https://github.com/muexxl/batcontrol/actions/workflows/pylint.yml/badge.svg?branch=main)](https://github.com/muexxl/batcontrol/actions/workflows/pylint.yml)
-[![Docker Image CI](https://github.com/muexxl/batcontrol/actions/workflows/docker-image.yml/badge.svg?branch=main)](https://github.com/muexxl/batcontrol/actions/workflows/docker-image.yml)
+[![Pylint](https://github.com/MaStr/batcontrol/actions/workflows/pylint.yml/badge.svg?branch=main)](https://github.com/MaStr/batcontrol/actions/workflows/pylint.yml)
+[![Docker Image CI](https://github.com/MaStr/batcontrol/actions/workflows/docker-image.yml/badge.svg?branch=main)](https://github.com/MaStr/batcontrol/actions/workflows/docker-image.yml)
 
 
-[Wiki/Documentation](https://github.com/muexxl/batcontrol/wiki)
+[Wiki/Documentation](https://github.com/MaStr/batcontrol/wiki)
 
 ## Prerequisites:
 
@@ -124,7 +124,7 @@ client.loop_forever()
 
 ## Install:
 ```sh
-git clone https://github.com/muexxl/batcontrol.git
+git clone https://github.com/MaStr/batcontrol.git
 cd batcontrol
 ```
 
@@ -171,7 +171,7 @@ python -m batcontrol # When venv is activated
 mkdir -p ./config -p ./logs
 ```
 
-- Download the the latest [batcontrol_config.yaml](https://raw.githubusercontent.com/muexxl/batcontrol/refs/heads/main/config/batcontrol_config_dummy.yaml) sample, adjust and place it to config/batcontrol_config.yaml.
+- Download the the latest [batcontrol_config.yaml](https://raw.githubusercontent.com/MaStr/batcontrol/refs/heads/main/config/batcontrol_config_dummy.yaml) sample, adjust and place it to config/batcontrol_config.yaml.
 
 - Use the default load_profile (automatically) or create your own.-
 ### Plain Docker
@@ -278,7 +278,7 @@ To uninstall batcontrol and restore the inverter settings follow these steps:
 For running batcontrol off the repository for development puroposes, it is required to uses pip with [Developermode](https://setuptools.pypa.io/en/latest/userguide/development_mode.html)
 
 ```sh
-git clone https://github.com/muexxl/batcontrol.git
+git clone https://github.com/MaStr/batcontrol.git
 cd batcontrol
 python -m venv .venv
 # Activate your environment with:
