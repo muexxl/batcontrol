@@ -291,7 +291,7 @@ class ForecastConsumptionHomeAssistant(ForecastConsumptionBaseclass):
 
         # Set max_size to 4MB to handle large Home Assistant instances
         # Default is 1MB which causes crashes for installations with many entities
-        # See: https://github.com/muexxl/batcontrol/issues/241
+        # See: https://github.com/MaStr/batcontrol/issues/241
         websocket = await connect(ws_url, max_size=4 * 1024 * 1024)
 
         # Step 1: Receive auth_required message
