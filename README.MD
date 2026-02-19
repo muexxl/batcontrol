@@ -1,5 +1,5 @@
 **Optimize your electricity costs by re-charging your PV battery when electricity is cheap and there is not enough solar power available.**
-To integrate batcontrol with Home Assistant, use the following repository: [ha_addons](https://github.com/MaStr/ha_addons/)
+To integrate batcontrol with Home Assistant, use the following repository: [batcontrol_ha_addon](https://github.com/MaStr/batcontrol_ha_addon)
 
 [![Pylint](https://github.com/MaStr/batcontrol/actions/workflows/pylint.yml/badge.svg?branch=main)](https://github.com/MaStr/batcontrol/actions/workflows/pylint.yml)
 [![Docker Image CI](https://github.com/MaStr/batcontrol/actions/workflows/docker-image.yml/badge.svg?branch=main)](https://github.com/MaStr/batcontrol/actions/workflows/docker-image.yml)
