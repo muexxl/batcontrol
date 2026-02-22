@@ -188,6 +188,39 @@ class TestDefaultLogic(unittest.TestCase):
         self.assertGreater(result.charge_rate, 0, "Charge rate should be greater than 0")
         self.assertGreater(calc_output.required_recharge_energy, 0, "Should calculate required recharge energy")
 
+    def test_charge_calculation_when_charging_possible_modified(self):
+        """Test charge calculation when charging is possible due to low SOC"""
+        stored_energy = 2000  # 2 kWh, well below charging limit (79% = 7.9 kWh)
+        stored_usable_energy, free_capacity = self._calculate_battery_values(
+            stored_energy, self.max_capacity
+        )
+
+        # Setup scenario with high future prices to trigger charging
+        consumption = np.array([1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000])  # High future consumption that requires reserves
+        production = np.array([0, 0, 0, 0, 0, 0, 0, 0, 0, 0])  # No production
+
+        calc_input = CalculationInput(
+            consumption=consumption,
+            production=production,
+            prices={0: 0.20, 1: 0.20, 2: .30, 3: 0.30, 4: 0.30, 5: 0.30, 6: 0.30, 7: 0.30, 8: 0.30, 9: 0.30},  # Low current price, high future prices
+            stored_energy=stored_energy,
+            stored_usable_energy=stored_usable_energy,
+            free_capacity=free_capacity,
+        )
+
+        # Test at 30 minutes past the hour to test charge rate calculation
+        # calc_timestamp = datetime.datetime(2025, 6, 20, 12, 30, 0, tzinfo=datetime.timezone.utc)
+        calc_timestamp = datetime.datetime(2025, 6, 20, 12, 50, 0, tzinfo=datetime.timezone.utc)
+        self.assertTrue(self.logic.calculate(calc_input, calc_timestamp))
+        result = self.logic.get_inverter_control_settings()
+        calc_output = self.logic.get_calculation_output()
+
+        # Verify charging is enabled
+        self.assertFalse(result.allow_discharge, "Discharge should not be allowed when charging needed")
+        self.assertTrue(result.charge_from_grid, "Should charge from grid when energy needed for high price hours")
+        self.assertGreater(result.charge_rate, 0, "Charge rate should be greater than 0")
+        self.assertGreater(calc_output.required_recharge_energy, 0, "Should calculate required recharge energy")
+
     def test_charge_calculation_when_charging_not_possible_high_soc(self):
         """Test charge calculation when charging is not possible due to high SOC"""
         # Set SOC above charging limit (79%)

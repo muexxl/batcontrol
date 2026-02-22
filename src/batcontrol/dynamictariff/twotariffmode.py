@@ -1,0 +1,103 @@
+"""TwoTariffMode provider
+
+Simple dynamic tariff provider that returns a repeating day/night tariff.
+Config options (in utility config for provider):
+- type: twotariffmode
+- tariff_day: price for day hours (float)
+- tariff_night: price for night hours (float)
+- day_start: hour when day tariff starts (int, default 7)
+- day_end: hour when day tariff ends (int, default 22)
+
+The class produces hourly prices (native_resolution=60) for the next 48
+hours aligned to the current hour. The baseclass will handle conversion to
+15min if the target resolution is 15.
+
+Note:
+The charge rate is not evenly distributed across the low price hours.
+If you prefer a more even distribution during the low price hours, you can adjust the
+soften_price_difference_on_charging to enabled
+and
+max_grid_charge_rate to a low value, e.g. capacity of the battery divided
+by the hours of low price periods.
+
+If you prefer a late charging start (=optimize effiency, have battery only short
+time at high SOC), you can adjust the
+soften_price_difference_on_charging to disabled
+"""
+import datetime
+import logging
+from .baseclass import DynamicTariffBaseclass
+
+logger = logging.getLogger(__name__)
+
+
+class Twotariffmode(DynamicTariffBaseclass):
+    """Two-tier tariff: day / night fixed prices."""
+
+    def __init__(
+            self,
+            timezone,
+            min_time_between_API_calls=0,
+            delay_evaluation_by_seconds=0,
+            target_resolution: int = 60,
+    ):
+        super().__init__(
+            timezone,
+            min_time_between_API_calls,
+            delay_evaluation_by_seconds,
+            target_resolution=target_resolution,
+            native_resolution=60,
+        )
+
+        # defaults
+        self.tariff_day = 0.20
+        self.tariff_night = 0.10
+        self.day_start = 7
+        self.day_end = 22
+
+    def get_raw_data_from_provider(self) -> dict:
+        """Return the configuration-like raw data stored in cache.
+
+        This provider is purely local and does not call external APIs.
+        We return a dict containing the configured values so that
+        `_get_prices_native` can read from `get_raw_data()` uniformly.
+        """
+        return {
+            'tariff_day': self.tariff_day,
+            'tariff_night': self.tariff_night,
+            'day_start': self.day_start,
+            'day_end': self.day_end,
+        }
+
+    def _get_prices_native(self) -> dict[int, float]:
+        """Build hourly prices for the next 48 hours, hour-aligned.
+
+        Returns a dict mapping interval index (0 = start of current hour)
+        to price (float).
+        """
+        raw = self.get_raw_data()
+        # allow values from raw data (cache) if present
+        tariff_day = raw.get('tariff_day', self.tariff_day)
+        tariff_night = raw.get('tariff_night', self.tariff_night)
+        day_start = int(raw.get('day_start', self.day_start))
+        day_end = int(raw.get('day_end', self.day_end))
+
+        now = datetime.datetime.now().astimezone(self.timezone)
+        # Align to start of current hour
+        current_hour_start = now.replace(minute=0, second=0, microsecond=0)
+
+        prices = {}
+        # produce next 48 hours
+        for rel_hour in range(0, 48):
+            ts = current_hour_start + datetime.timedelta(hours=rel_hour)
+            h = ts.hour
+            if day_start <= day_end:
+                is_day = (h >= day_start and h < day_end)
+            else:
+                # wrap-around (e.g., day_start=20, day_end=6)
+                is_day = not (h >= day_end and h < day_start)
+
+            prices[rel_hour] = tariff_day if is_day else tariff_night
+
+        logger.debug('Twotariffmode: Generated %d hourly prices', len(prices))
+        return prices

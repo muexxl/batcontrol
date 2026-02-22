@@ -19,6 +19,7 @@ from .awattar import Awattar
 from .tibber import Tibber
 from .evcc import Evcc
 from .energyforecast import Energyforecast
+from .twotariffmode import Twotariffmode
 from .dynamictariff_interface import TariffInterface
 
 
@@ -128,6 +129,31 @@ class DynamicTariff:
             selected_tariff.set_price_parameters(vat, fees, markup)
             if provider.lower() == 'energyforecast_96':
                 selected_tariff.upgrade_48h_to_96h()
+
+        elif provider.lower() == 'twotariffmode':
+            # require tariffs for day and night
+            required_fields = ['tariff_day', 'tariff_night']
+            for field in required_fields:
+                if field not in config.keys():
+                    raise RuntimeError(
+                        f'[DynTariff] Please include {field} in your configuration file'
+                    )
+            # read values and optional price parameters
+            tariff_day = float(config.get('tariff_day'))
+            tariff_night = float(config.get('tariff_night'))
+            day_start = int(config.get('day_start', 7))
+            day_end = int(config.get('day_end', 22))
+            selected_tariff = Twotariffmode(
+                timezone,
+                min_time_between_api_calls,
+                delay_evaluation_by_seconds,
+                target_resolution=target_resolution
+            )
+            # store configured values in instance
+            selected_tariff.tariff_day = tariff_day
+            selected_tariff.tariff_night = tariff_night
+            selected_tariff.day_start = day_start
+            selected_tariff.day_end = day_end
 
         else:
             raise RuntimeError(f'[DynamicTariff] Unkown provider {provider}')
