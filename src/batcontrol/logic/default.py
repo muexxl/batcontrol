@@ -29,6 +29,7 @@ class DefaultLogic(LogicInterface):
         self.round_price_digits = 4  # Default rounding for prices
         self.soften_price_difference_on_charging = False
         self.soften_price_difference_on_charging_factor = 5.0  # Default factor
+        self.max_charge_loss_factor = 0.1
         self.timezone = timezone
         self.interval_minutes = interval_minutes
         self.common = CommonLogic.get_instance()
@@ -341,6 +342,7 @@ class DefaultLogic(LogicInterface):
         min_price_difference = self.calculation_parameters.min_price_difference
         min_dynamic_price_difference = self.__calculate_min_dynamic_price_difference(
             current_price)
+        turning_point_hour = None
 
         # evaluation period until price is first time lower then current price
         for h in range(1, max_hour):
@@ -356,6 +358,7 @@ class DefaultLogic(LogicInterface):
 
             if found_lower_price:
                 max_hour = h
+                turning_point_hour = h
                 break
 
         # get high price hours
@@ -416,9 +419,40 @@ class DefaultLogic(LogicInterface):
         else:
             # We are adding that minimum charge energy here, so that we are not stuck between limits.
             recharge_energy = recharge_energy + self.common.min_charge_energy
+            recharge_energy = self.__get_recharge_overhang_energy(
+                recharge_energy,
+                turning_point_hour
+            )
 
         self.calculation_output.required_recharge_energy = recharge_energy
         return recharge_energy
+
+    def __get_recharge_overhang_energy(self, recharge_energy: float, turning_point_hour: Optional[int]) -> float:
+        """ Return recharge overhang if more than one charging slot is needed """
+        if turning_point_hour is None or turning_point_hour < 1:
+            return recharge_energy
+
+        max_grid_charge_rate = self.calculation_parameters.max_grid_charge_rate
+        if max_grid_charge_rate <= 0:
+            return recharge_energy
+
+        slot_hours = self.interval_minutes / 60.0
+        usable_charge_per_slot = max_grid_charge_rate * slot_hours * max(0.0, 1.0-self.max_charge_loss_factor)
+        if usable_charge_per_slot <= 0:
+            return recharge_energy
+
+        required_slots = int(np.ceil(recharge_energy / usable_charge_per_slot))
+        if required_slots <= 1:
+            return recharge_energy
+
+        overhang_energy = recharge_energy - usable_charge_per_slot
+        logger.debug(
+            "[Rule] Recharge overhang detected (%0.1f Wh, %d slots). Charging overhang before turning point in hour %d.",
+            overhang_energy,
+            required_slots,
+            turning_point_hour
+        )
+        return max(overhang_energy, 0.0)
 
     def __calculate_min_dynamic_price_difference(self, price: float) -> float:
         """ Calculate the dynamic limit for the current price """
