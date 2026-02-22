@@ -30,7 +30,7 @@ class DefaultLogic(LogicInterface):
         self.soften_price_difference_on_charging = False
         self.soften_price_difference_on_charging_factor = 5.0  # Default factor
         self.max_charge_loss_factor = 0.1
-        self.enable_precharge_overhang = True
+        self.enable_precharge_overhang = False
         self.timezone = timezone
         self.interval_minutes = interval_minutes
         self.common = CommonLogic.get_instance()

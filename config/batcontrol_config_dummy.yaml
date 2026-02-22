@@ -28,7 +28,7 @@ battery_control_expert:
   soften_price_difference_on_charging: False # enable earlier charging based on a more relaxed calculation
                                              # future_price <= current_price-min_price_difference/soften_price_difference_on_charging_factor
   soften_price_difference_on_charging_factor: 5
-  enable_precharge_overhang: true # Feature flag for charging overflow before the price turning point
+  enable_precharge_overhang: false # Feature flag for charging overflow before the price turning point
   max_charge_loss_factor: 0.1 # Assume up to 10% charging losses for slot planning
   round_price_digits: 4 # round price to n digits after the comma
   production_offset_percent: 1.0 # Adjust production forecast by a percentage (1.0 = 100%, 0.8 = 80%, etc.)

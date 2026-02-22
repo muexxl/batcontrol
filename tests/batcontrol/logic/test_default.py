@@ -328,6 +328,7 @@ class TestDefaultLogic(unittest.TestCase):
 
     def test_recharge_overhang_is_charged_before_turning_point(self):
         """Test that only the overhang is charged when multiple slots are required."""
+        self.logic.enable_precharge_overhang = True
         self.logic.max_charge_loss_factor = 0.1
         self.logic.set_calculation_parameters(
             CalculationParameters(
