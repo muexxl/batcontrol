@@ -423,13 +423,18 @@ class DefaultLogic(LogicInterface):
             if self.enable_precharge_overhang:
                 recharge_energy = self.__get_recharge_overhang_energy(
                     recharge_energy,
-                    turning_point_hour
+                    turning_point_hour,
+                    current_price,
+                    prices,
+                    min_price_difference
                 )
 
         self.calculation_output.required_recharge_energy = recharge_energy
         return recharge_energy
 
-    def __get_recharge_overhang_energy(self, recharge_energy: float, turning_point_hour: Optional[int]) -> float:
+    def __get_recharge_overhang_energy(self, recharge_energy: float, turning_point_hour: Optional[int],
+                                       current_price: float, prices: dict,
+                                       min_price_difference: float) -> float:
         """ Return recharge overhang if more than one charging slot is needed """
         if turning_point_hour is None or turning_point_hour < 1:
             return recharge_energy
@@ -445,6 +450,17 @@ class DefaultLogic(LogicInterface):
 
         required_slots = int(np.ceil(recharge_energy / usable_charge_per_slot))
         if required_slots <= 1:
+            return recharge_energy
+
+        next_lowest_price = min(prices[h] for h in range(1, len(prices)))
+        allowed_price_distance = min_price_difference / 2
+        if abs(current_price - next_lowest_price) > allowed_price_distance:
+            logger.debug(
+                "[Rule] Skip recharge overhang before turning point. Current price %.4f is not within %.4f of next lowest price %.4f.",
+                current_price,
+                allowed_price_distance,
+                next_lowest_price
+            )
             return recharge_energy
 
         overhang_energy = recharge_energy - usable_charge_per_slot
