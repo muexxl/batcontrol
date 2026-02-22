@@ -27,6 +27,8 @@ class Logic:
                     'soften_price_difference_on_charging_factor',
                     'round_price_digits',
                     'charge_rate_multiplier',
+                    'max_charge_loss_factor',
+                    'enable_precharge_overhang',
                 ]
                 for attribute in attribute_list:
                     if attribute in battery_control_expert:

@@ -484,7 +484,8 @@ class Batcontrol:
             self.max_charging_from_grid_limit,
             self.min_price_difference,
             self.min_price_difference_rel,
-            self.get_max_capacity()
+            self.get_max_capacity(),
+            self.inverter.max_grid_charge_rate
         )
 
         self.last_logic_instance = this_logic_run

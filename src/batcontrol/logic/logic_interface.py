@@ -20,6 +20,7 @@ class CalculationParameters:
     min_price_difference: float
     min_price_difference_rel: float
     max_capacity: float # Maximum capacity of the battery in Wh (excludes MAX_SOC)
+    max_grid_charge_rate: float = float('inf')  # Maximum grid charge rate in W
 
 @dataclass
 class CalculationOutput:
