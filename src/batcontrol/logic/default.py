@@ -30,6 +30,7 @@ class DefaultLogic(LogicInterface):
         self.soften_price_difference_on_charging = False
         self.soften_price_difference_on_charging_factor = 5.0  # Default factor
         self.max_charge_loss_factor = 0.1
+        self.enable_precharge_overhang = True
         self.timezone = timezone
         self.interval_minutes = interval_minutes
         self.common = CommonLogic.get_instance()
@@ -419,10 +420,11 @@ class DefaultLogic(LogicInterface):
         else:
             # We are adding that minimum charge energy here, so that we are not stuck between limits.
             recharge_energy = recharge_energy + self.common.min_charge_energy
-            recharge_energy = self.__get_recharge_overhang_energy(
-                recharge_energy,
-                turning_point_hour
-            )
+            if self.enable_precharge_overhang:
+                recharge_energy = self.__get_recharge_overhang_energy(
+                    recharge_energy,
+                    turning_point_hour
+                )
 
         self.calculation_output.required_recharge_energy = recharge_energy
         return recharge_energy

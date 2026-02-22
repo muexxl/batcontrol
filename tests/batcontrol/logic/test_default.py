@@ -365,5 +365,45 @@ class TestDefaultLogic(unittest.TestCase):
             msg="Expected to charge only the overhang before the turning point"
         )
 
+    def test_recharge_overhang_feature_flag_disables_behavior(self):
+        """Test that disabling the feature flag keeps full recharge amount."""
+        self.logic.enable_precharge_overhang = False
+        self.logic.max_charge_loss_factor = 0.1
+        self.logic.set_calculation_parameters(
+            CalculationParameters(
+                max_charging_from_grid_limit=0.79,
+                min_price_difference=0.05,
+                min_price_difference_rel=0.2,
+                max_capacity=self.max_capacity,
+                max_grid_charge_rate=2000
+            )
+        )
+
+        stored_energy = 1000
+        stored_usable_energy, free_capacity = self._calculate_battery_values(
+            stored_energy,
+            self.max_capacity
+        )
+
+        calc_input = CalculationInput(
+            consumption=np.array([100, 3500, 100]),
+            production=np.array([0, 0, 0]),
+            prices={0: 0.20, 1: 0.40, 2: 0.10},
+            stored_energy=stored_energy,
+            stored_usable_energy=stored_usable_energy,
+            free_capacity=free_capacity,
+        )
+
+        calc_timestamp = datetime.datetime(2025, 6, 20, 12, 0, 0, tzinfo=datetime.timezone.utc)
+        self.assertTrue(self.logic.calculate(calc_input, calc_timestamp))
+        calc_output = self.logic.get_calculation_output()
+
+        self.assertAlmostEqual(
+            calc_output.required_recharge_energy,
+            3100.0,
+            delta=0.1,
+            msg="Expected full recharge amount when overhang precharge feature is disabled"
+        )
+
 if __name__ == '__main__':
     unittest.main()
