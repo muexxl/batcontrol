@@ -237,12 +237,14 @@ class DefaultLogic(LogicInterface):
                 )
                 break
 
-        display_minutes = (max_slots * self.interval_minutes) - self.interval_minutes
-
-        dt = datetime.timedelta(minutes=display_minutes)
-        t0 = calc_timestamp
-        t1 = t0 + dt
-        last_time = t1.astimezone(self.timezone).strftime("%H:%M")
+        slot_start = calc_timestamp.replace(
+            minute=(calc_timestamp.minute // self.interval_minutes) * self.interval_minutes,
+            second=0,
+            microsecond=0
+        )
+        last_time = (slot_start + datetime.timedelta(
+            minutes=max_slots * self.interval_minutes
+        )).astimezone(self.timezone).strftime("%H:%M")
 
         logger.debug(
             'Evaluating next %d slots until %s',
