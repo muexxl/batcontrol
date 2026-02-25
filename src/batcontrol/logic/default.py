@@ -348,8 +348,8 @@ class DefaultLogic(LogicInterface):
             current_price)
 
         # evaluation period until price is first time lower then current price
-        for slots in range(1, max_slot):
-            future_price = prices[slots]
+        for slot in range(1, max_slot):
+            future_price = prices[slot]
             found_lower_price = False
             # Soften the price difference to avoid too early charging
             if self.soften_price_difference_on_charging:
@@ -360,7 +360,7 @@ class DefaultLogic(LogicInterface):
                 found_lower_price = future_price <= current_price
 
             if found_lower_price:
-                max_slot = slots
+                max_slot = slot
                 break
 
         logger.debug(
