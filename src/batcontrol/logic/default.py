@@ -363,7 +363,7 @@ class DefaultLogic(LogicInterface):
                 max_slot = slot
                 break
 
-        # As max_slot is 1 at minimum, no protection againt out of range needed.
+        # As max_slot is 1 at minimum, no protection against out of range needed.
         logger.debug(
             "[Rule] Evaluation window for recharge energy until slot %d with price %0.3f",
             max_slot-1,
