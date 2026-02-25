@@ -328,10 +328,10 @@ class DefaultLogic(LogicInterface):
  # %%
     def __get_required_recharge_energy(self, calc_input: CalculationInput ,
                                               net_consumption: list, prices: dict) -> float:
-        """ Calculate the required energy to shift toward high price hours.
+        """ Calculate the required energy to shift toward high price slots.
 
             If a recharge price window is detected, the energy required to
-            recharge the battery to the next high price hours is calculated.
+            recharge the battery to the next high price slots is calculated.
 
             return: float (Energy in Wh)
          """
