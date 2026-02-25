@@ -336,7 +336,7 @@ class DefaultLogic(LogicInterface):
             return: float (Energy in Wh)
          """
         current_price = prices[0]
-        max_hour = len(net_consumption)
+        max_slot = len(net_consumption)
         consumption = np.array(net_consumption)
         consumption[consumption < 0] = 0
 
@@ -347,8 +347,8 @@ class DefaultLogic(LogicInterface):
             current_price)
 
         # evaluation period until price is first time lower then current price
-        for h in range(1, max_hour):
-            future_price = prices[h]
+        for slots in range(1, max_slot):
+            future_price = prices[slots]
             found_lower_price = False
             # Soften the price difference to avoid too early charging
             if self.soften_price_difference_on_charging:
@@ -359,40 +359,40 @@ class DefaultLogic(LogicInterface):
                 found_lower_price = future_price <= current_price
 
             if found_lower_price:
-                max_hour = h
+                max_slot = slots
                 break
 
-        # get high price hours
-        high_price_hours = []
-        for h in range(max_hour):
-            future_price = prices[h]
+        # get high price slots
+        high_price_slots = []
+        for slots in range(max_slot):
+            future_price = prices[slots]
             if future_price > current_price+min_dynamic_price_difference:
-                high_price_hours.append(h)
+                high_price_slots.append(slots)
 
         # start with nearest hour
-        high_price_hours.sort()
+        high_price_slots.sort()
         required_energy = 0.0
-        for high_price_hour in high_price_hours:
-            energy_to_shift = consumption[high_price_hour]
+        for high_price_slot in high_price_slots:
+            energy_to_shift = consumption[high_price_slot]
 
             # correct energy to shift with potential production
             # start with nearest hour
-            for hour in range(1, high_price_hour):
-                if production[hour] == 0:
+            for slot in range(1, high_price_slot):
+                if production[slot] == 0:
                     continue
-                if production[hour] >= energy_to_shift:
-                    production[hour] -= energy_to_shift
+                if production[slot] >= energy_to_shift:
+                    production[slot] -= energy_to_shift
                     energy_to_shift = 0
                 else:
-                    energy_to_shift -= production[hour]
-                    production[hour] = 0
+                    energy_to_shift -= production[slot]
+                    production[slot ] = 0
             # add_remaining energy to shift to recharge amount
             required_energy += energy_to_shift
 
         if required_energy > 0.0:
-            logger.debug("[Rule] Required Energy: %0.1f Wh is based on next 'high price' hours %s",
+            logger.debug("[Rule] Required Energy: %0.1f Wh is based on next 'high price' slots %s",
                          required_energy,
-                         high_price_hours
+                         high_price_slots
                          )
             recharge_energy = required_energy-calc_input.stored_usable_energy
             logger.debug("[Rule] Stored usable Energy: %0.1f , Recharge Energy: %0.1f Wh",
