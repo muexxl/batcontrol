@@ -1,5 +1,6 @@
 import logging
 import datetime
+import math
 import numpy as np
 from typing import Optional
 
@@ -101,7 +102,7 @@ class DefaultLogic(LogicInterface):
             calc_timestamp = datetime.datetime.now().astimezone(self.timezone)
 
         # ensure availability of data
-        max_hour = min(len(net_consumption), len(prices))
+        max_slot = min(len(net_consumption), len(prices))
 
         if self.__is_discharge_allowed(calc_input, net_consumption, prices, calc_timestamp):
             inverter_control_settings.allow_discharge = True
@@ -126,8 +127,8 @@ class DefaultLogic(LogicInterface):
                              )
                 required_recharge_energy = self.__get_required_recharge_energy(
                     calc_input,
-                    net_consumption[:max_hour],
-                    prices
+                    net_consumption[:max_slot],
+                    prices[:max_slot]
                 )
             else:
                 logger.debug('Charging is NOT allowed, because SOC is above %.0f%%',
@@ -220,15 +221,15 @@ class DefaultLogic(LogicInterface):
 
         self.calculation_output.min_dynamic_price_difference = min_dynamic_price_difference
 
-        max_hour = len(net_consumption)
+        max_slots = len(net_consumption)
         # relevant time range : until next recharge possibility
-        for h in range(1, max_hour):
-            future_price = prices[h]
+        for slot in range(1, max_slots):
+            future_price = prices[slot]
             if future_price <= current_price-min_dynamic_price_difference:
-                max_hour = h
+                max_slots = slot
                 logger.debug(
-                    "[Rule] Recharge possible in %d hours, limiting evaluation window.",
-                    h)
+                    "[Rule] Recharge possible in %d slots, limiting evaluation window.",
+                    slot)
                 logger.debug(
                     "[Rule] Future price: %.3f < Current price: %.3f - dyn_price_diff. %.3f ",
                     future_price,
@@ -236,15 +237,18 @@ class DefaultLogic(LogicInterface):
                     min_dynamic_price_difference
                 )
                 break
-        dt = datetime.timedelta(hours=max_hour-1)
+
+        display_minutes = (max_slots * self.interval_minutes) - self.interval_minutes
+
+        dt = datetime.timedelta(minutes=display_minutes)
         t0 = calc_timestamp
-        t1 = t0+dt
-        last_hour = t1.astimezone(self.timezone).strftime("%H:59")
+        t1 = t0 + dt
+        last_time = t1.astimezone(self.timezone).strftime("%H:%M")
 
         logger.debug(
-            'Evaluating next %d hours until %s',
-            max_hour,
-            last_hour
+            'Evaluating next %d slots until %s',
+            max_slots,
+            last_time
         )
         # distribute remaining energy
         consumption = np.array(net_consumption)
@@ -253,45 +257,45 @@ class DefaultLogic(LogicInterface):
         production = -np.array(net_consumption)
         production[production < 0] = 0
 
-        # get hours with higher price
-        higher_price_hours = []
-        for h in range(max_hour):
-            future_price = prices[h]
-            # !!! different formula compared to detect relevant hours
+        # get slots with higher price
+        higher_price_slots = []
+        for slot in range(max_slots):
+            future_price = prices[slot]
+            # !!! different formula compared to detect relevant slots
             if future_price > current_price:
-                higher_price_hours.append(h)
+                higher_price_slots.append(slot  )
 
-        higher_price_hours.sort()
-        higher_price_hours.reverse()
+        higher_price_slots.sort()
+        higher_price_slots.reverse()
 
         reserved_storage = 0
-        for higher_price_hour in higher_price_hours:
-            if consumption[higher_price_hour] == 0:
+        for higher_price_slot in higher_price_slots:
+            if consumption[higher_price_slot] == 0:
                 continue
-            required_energy = consumption[higher_price_hour]
+            required_energy = consumption[higher_price_slot]
 
             # correct reserved_storage with potential production
-            # start with latest hour
-            for hour in list(range(higher_price_hour))[::-1]:
-                if production[hour] == 0:
+            # start with latest slot
+            for slot in list(range(higher_price_slot))[::-1]:
+                if production[slot] == 0:
                     continue
-                if production[hour] >= required_energy:
-                    production[hour] -= required_energy
+                if production[slot] >= required_energy:
+                    production[slot] -= required_energy
                     required_energy = 0
                     break
                 else:
-                    required_energy -= production[hour]
-                    production[hour] = 0
+                    required_energy -= production[slot]
+                    production[slot ] = 0
             # add_remaining required_energy to reserved_storage
             reserved_storage += required_energy
 
         self.calculation_output.reserved_energy = reserved_storage
 
-        if len(higher_price_hours) > 0:
+        if len(higher_price_slots) > 0:
             # This message is somehow confusing, because we are working with an
             # hour offset "the next 2 hours", but people may read "2 o'clock".
-            logger.debug("[Rule] Reserved Energy will be used in the next hours: %s",
-                         higher_price_hours[::-1])
+            logger.debug("[Rule] Reserved Energy will be used in the next slots: %s",
+                         higher_price_slots[::-1])
             logger.debug(
                 "[Rule] Reserved Energy: %0.1f Wh. Usable in Battery: %0.1f Wh",
                 reserved_storage,
@@ -299,7 +303,7 @@ class DefaultLogic(LogicInterface):
             )
         else:
             logger.debug("[Rule] No reserved energy required, because no "
-                         "'high price' hours in evaluation window.")
+                         "'high price' slots in evaluation window.")
 
 
         if calc_input.stored_usable_energy > reserved_storage:
