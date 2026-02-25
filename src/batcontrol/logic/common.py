@@ -110,8 +110,8 @@ class CommonLogic:
 
         logger.debug(
             'Charging needed recharge energy is below threshold(%.0f): %.0f Wh',
-                     round(self.min_charge_energy,0),
-                     round(needed_energy,0))
+            round(self.min_charge_energy, 0),
+            round(needed_energy, 0))
         return False
 
     def calculate_charge_rate(self, charge_rate: float) -> int:
