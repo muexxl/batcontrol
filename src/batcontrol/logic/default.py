@@ -128,7 +128,7 @@ class DefaultLogic(LogicInterface):
                 required_recharge_energy = self.__get_required_recharge_energy(
                     calc_input,
                     net_consumption[:max_slot],
-                    prices[:max_slot]
+                    prices
                 )
             else:
                 logger.debug('Charging is NOT allowed, because SOC is above %.0f%%',
