@@ -284,7 +284,7 @@ class DefaultLogic(LogicInterface):
                     break
                 else:
                     required_energy -= production[slot]
-                    production[slot ] = 0
+                    production[slot] = 0
             # add_remaining required_energy to reserved_storage
             reserved_storage += required_energy
 
