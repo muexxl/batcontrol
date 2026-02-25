@@ -1,6 +1,5 @@
 import logging
 import datetime
-import math
 import numpy as np
 from typing import Optional
 
