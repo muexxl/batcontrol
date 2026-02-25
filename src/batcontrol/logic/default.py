@@ -262,7 +262,7 @@ class DefaultLogic(LogicInterface):
             future_price = prices[slot]
             # !!! different formula compared to detect relevant slots
             if future_price > current_price:
-                higher_price_slots.append(slot  )
+                higher_price_slots.append(slot)
 
         higher_price_slots.sort()
         higher_price_slots.reverse()
