@@ -391,7 +391,7 @@ class DefaultLogic(LogicInterface):
                     energy_to_shift = 0
                 else:
                     energy_to_shift -= production[slot]
-                    production[slot ] = 0
+                    production[slot] = 0
             # add_remaining energy to shift to recharge amount
             required_energy += energy_to_shift
 
