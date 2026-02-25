@@ -371,10 +371,10 @@ class DefaultLogic(LogicInterface):
 
         # get high price slots
         high_price_slots = []
-        for slots in range(max_slot):
-            future_price = prices[slots]
+        for slot in range(max_slot):
+            future_price = prices[slot]
             if future_price > current_price+min_dynamic_price_difference:
-                high_price_slots.append(slots)
+                high_price_slots.append(slot)
 
         # start with nearest slot
         high_price_slots.sort()
@@ -427,7 +427,8 @@ class DefaultLogic(LogicInterface):
         if not self.common.is_charging_above_minimum(recharge_energy):
             recharge_energy = 0.0
         else:
-            # We are adding that minimum charge energy here, so that we are not stuck between limits.
+            # We are adding that minimum charge energy here, so that we are not stuck
+            #   between limits.
             recharge_energy = recharge_energy + self.common.min_charge_energy
 
         self.calculation_output.required_recharge_energy = recharge_energy
