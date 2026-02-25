@@ -327,7 +327,7 @@ class DefaultLogic(LogicInterface):
         return False
 
  # %%
-    def __get_required_recharge_energy(self, calc_input: CalculationInput ,
+    def __get_required_recharge_energy(self, calc_input: CalculationInput,
                                               net_consumption: list, prices: dict) -> float:
         """ Calculate the required energy to shift toward high price slots.
 
@@ -408,17 +408,14 @@ class DefaultLogic(LogicInterface):
                          recharge_energy
                          )
         else:
-            recharge_energy = 0.0
-
-        free_capacity = calc_input.free_capacity
-
-        if recharge_energy <= 0.0:
             logger.debug(
                 "[Rule] No additional energy required, because stored energy is sufficient."
             )
             recharge_energy = 0.0
             self.calculation_output.required_recharge_energy = recharge_energy
             return recharge_energy
+
+        free_capacity = calc_input.free_capacity
 
         if recharge_energy > free_capacity:
             recharge_energy = free_capacity
