@@ -72,7 +72,7 @@ class CommonLogic:
         return self.always_allow_discharge_limit
 
     def is_discharge_always_allowed_soc(self, soc: float) -> bool:
-        """ Check if discharge is always allowed based on the state of charge (SOC). 
+        """ Check if discharge is always allowed based on the state of charge (SOC).
         Args:
             soc (float): State of charge as a percentage (0-100).
         Returns:
@@ -92,11 +92,11 @@ class CommonLogic:
 
         if capacity >= self.max_capacity * self.always_allow_discharge_limit:
             logger.debug(
-                'Discharge is \'always allowed\' for current capacity: %s Wh', round(capacity,0))
+                'Discharge is \'always allowed\' for current capacity: %.0f Wh', round(capacity,0))
             return True
 
         logger.debug(
-            'Discharge is NOT \'always allowed\' for current capacity: %s Wh', round(capacity,0))
+            'Discharge is NOT \'always allowed\' for current capacity: %.0f Wh', round(capacity,0))
         return False
 
     def is_charging_above_minimum(self, needed_energy: float) -> bool:
@@ -109,8 +109,9 @@ class CommonLogic:
             return True
 
         logger.debug(
-            'Charging needed recharge energy is below threshold(%s): %s Wh', round(self.min_charge_energy,0),
-                     round(needed_energy,0))
+            'Charging needed recharge energy is below threshold(%.0f): %.0f Wh',
+            round(self.min_charge_energy, 0),
+            round(needed_energy, 0))
         return False
 
     def calculate_charge_rate(self, charge_rate: float) -> int:
@@ -118,7 +119,7 @@ class CommonLogic:
         Args:
             charge_rate (float): The initial charge rate in W.
         Returns:
-            float: The adjusted charge rate in W."""
+            int: The adjusted charge rate in W."""
         logger.debug('Calculating charge rate: %s', charge_rate)
         adjusted_charge_rate = charge_rate * self.charge_rate_multiplier
         if adjusted_charge_rate < MIN_CHARGE_RATE:
@@ -127,6 +128,6 @@ class CommonLogic:
                 MIN_CHARGE_RATE, adjusted_charge_rate)
             adjusted_charge_rate = MIN_CHARGE_RATE
 
-        adjusted_charge_rate = int(round(adjusted_charge_rate, 0))  
-        logger.debug('Adjusted charge rate: %s W', adjusted_charge_rate)
+        adjusted_charge_rate = int(round(adjusted_charge_rate, 0))
+        logger.debug('Adjusted charge rate: %d W', adjusted_charge_rate)
         return adjusted_charge_rate
