@@ -337,7 +337,6 @@ class Batcontrol:
 
     def run(self):
         """ Main calculation & control loop """
-        logger.debug('Running Batcontrol evaluation cycle')
         logger.debug('Timeslots are in %d-minute intervals', self.time_resolution)
 
         # Reset some values
