@@ -292,8 +292,8 @@ class DefaultLogic(LogicInterface):
         self.calculation_output.reserved_energy = reserved_storage
 
         if len(higher_price_slots) > 0:
-            # This message is somehow confusing, because we are working with an
-            # hour offset "the next 2 hours", but people may read "2 o'clock".
+            # This message refers to relative slots (e.g. "next 2 slots"),
+            # not specific clock times (e.g. "at 2 o'clock").
             logger.debug("[Rule] Reserved Energy will be used in the next slots: %s",
                          higher_price_slots[::-1])
             logger.debug(
