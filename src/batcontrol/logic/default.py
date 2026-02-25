@@ -362,6 +362,12 @@ class DefaultLogic(LogicInterface):
                 max_slot = slots
                 break
 
+        logger.debug(
+            "[Rule] Evaluation window for recharge energy until slot %d with price %0.3f",
+            max_slot,
+            prices[max_slot-1]
+        )
+
         # get high price slots
         high_price_slots = []
         for slots in range(max_slot):
@@ -369,14 +375,14 @@ class DefaultLogic(LogicInterface):
             if future_price > current_price+min_dynamic_price_difference:
                 high_price_slots.append(slots)
 
-        # start with nearest hour
+        # start with nearest slot
         high_price_slots.sort()
         required_energy = 0.0
         for high_price_slot in high_price_slots:
             energy_to_shift = consumption[high_price_slot]
 
             # correct energy to shift with potential production
-            # start with nearest hour
+            # start with nearest slot
             for slot in range(1, high_price_slot):
                 if production[slot] == 0:
                     continue
@@ -409,6 +415,8 @@ class DefaultLogic(LogicInterface):
                 "[Rule] No additional energy required, because stored energy is sufficient."
             )
             recharge_energy = 0.0
+            self.calculation_output.required_recharge_energy = recharge_energy
+            return recharge_energy
 
         if recharge_energy > free_capacity:
             recharge_energy = free_capacity
