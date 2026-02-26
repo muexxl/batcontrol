@@ -19,7 +19,7 @@ from .awattar import Awattar
 from .tibber import Tibber
 from .evcc import Evcc
 from .energyforecast import Energyforecast
-from .twotariffmode import Twotariffmode
+from .tariffzones import Tariff_zones
 from .dynamictariff_interface import TariffInterface
 
 
@@ -130,30 +130,30 @@ class DynamicTariff:
             if provider.lower() == 'energyforecast_96':
                 selected_tariff.upgrade_48h_to_96h()
 
-        elif provider.lower() == 'twotariffmode':
-            # require tariffs for day and night
-            required_fields = ['tariff_day', 'tariff_night']
+        elif provider.lower() == 'tariff_zones':
+            # require tariffs for zone 1 and zone 2
+            required_fields = ['tariff_zone_1', 'tariff_zone_2']
             for field in required_fields:
                 if field not in config.keys():
                     raise RuntimeError(
                         f'[DynTariff] Please include {field} in your configuration file'
                     )
             # read values and optional price parameters
-            tariff_day = float(config.get('tariff_day'))
-            tariff_night = float(config.get('tariff_night'))
-            day_start = int(config.get('day_start', 7))
-            day_end = int(config.get('day_end', 22))
-            selected_tariff = Twotariffmode(
+            tariff_zone_1 = float(config.get('tariff_zone_1'))
+            tariff_zone_2 = float(config.get('tariff_zone_2'))
+            zone_1_start = int(config.get('zone_1_start', 7))
+            zone_1_end = int(config.get('zone_1_end', 22))
+            selected_tariff = Tariff_zones(
                 timezone,
                 min_time_between_api_calls,
                 delay_evaluation_by_seconds,
                 target_resolution=target_resolution
             )
             # store configured values in instance
-            selected_tariff.tariff_day = tariff_day
-            selected_tariff.tariff_night = tariff_night
-            selected_tariff.day_start = day_start
-            selected_tariff.day_end = day_end
+            selected_tariff.tariff_zone_1 = tariff_zone_1
+            selected_tariff.tariff_zone_2 = tariff_zone_2
+            selected_tariff.zone_1_start = zone_1_start
+            selected_tariff.zone_1_end = zone_1_end
 
         else:
             raise RuntimeError(f'[DynamicTariff] Unkown provider {provider}')

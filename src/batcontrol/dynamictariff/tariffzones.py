@@ -1,12 +1,12 @@
-"""TwoTariffMode provider
+"""Tariff_zones provider
 
 Simple dynamic tariff provider that returns a repeating day/night tariff.
 Config options (in utility config for provider):
-- type: twotariffmode
-- tariff_day: price for day hours (float)
-- tariff_night: price for night hours (float)
-- day_start: hour when day tariff starts (int, default 7)
-- day_end: hour when day tariff ends (int, default 22)
+- type: tariff_zones
+- tariff_zone_1: price for day hours (float)
+- tariff_zone_2: price for night hours (float)
+- zone_1_start: hour when tariff zone 1 starts (int, default 7)
+- zone_1_end: hour when tariff zone 1 ends (int, default 22)
 
 The class produces hourly prices (native_resolution=60) for the next 48
 hours aligned to the current hour. The baseclass will handle conversion to
@@ -31,7 +31,7 @@ from .baseclass import DynamicTariffBaseclass
 logger = logging.getLogger(__name__)
 
 
-class Twotariffmode(DynamicTariffBaseclass):
+class Tariff_zones(DynamicTariffBaseclass):
     """Two-tier tariff: day / night fixed prices."""
 
     def __init__(
@@ -50,10 +50,10 @@ class Twotariffmode(DynamicTariffBaseclass):
         )
 
         # defaults
-        self.tariff_day = 0.20
-        self.tariff_night = 0.10
-        self.day_start = 7
-        self.day_end = 22
+        self.tariff_zone_1 = 0.20
+        self.tariff_zone_2 = 0.10
+        self.zone_1_start = 7
+        self.zone_1_end = 22
 
     def get_raw_data_from_provider(self) -> dict:
         """Return the configuration-like raw data stored in cache.
@@ -63,10 +63,10 @@ class Twotariffmode(DynamicTariffBaseclass):
         `_get_prices_native` can read from `get_raw_data()` uniformly.
         """
         return {
-            'tariff_day': self.tariff_day,
-            'tariff_night': self.tariff_night,
-            'day_start': self.day_start,
-            'day_end': self.day_end,
+            'tariff_zone_1': self.tariff_zone_1,
+            'tariff_zone_2': self.tariff_zone_2,
+            'zone_1_start': self.zone_1_start,
+            'zone_1_end': self.zone_1_end,
         }
 
     def _get_prices_native(self) -> dict[int, float]:
@@ -77,10 +77,10 @@ class Twotariffmode(DynamicTariffBaseclass):
         """
         raw = self.get_raw_data()
         # allow values from raw data (cache) if present
-        tariff_day = raw.get('tariff_day', self.tariff_day)
-        tariff_night = raw.get('tariff_night', self.tariff_night)
-        day_start = int(raw.get('day_start', self.day_start))
-        day_end = int(raw.get('day_end', self.day_end))
+        tariff_zone_1 = raw.get('tariff_zone_1', self.tariff_zone_1)
+        tariff_zone_2 = raw.get('tariff_zone_2', self.tariff_zone_2)
+        zone_1_start = int(raw.get('zone_1_start', self.zone_1_start))
+        zone_1_end = int(raw.get('zone_1_end', self.zone_1_end))
 
         now = datetime.datetime.now().astimezone(self.timezone)
         # Align to start of current hour
@@ -91,13 +91,13 @@ class Twotariffmode(DynamicTariffBaseclass):
         for rel_hour in range(0, 48):
             ts = current_hour_start + datetime.timedelta(hours=rel_hour)
             h = ts.hour
-            if day_start <= day_end:
-                is_day = (h >= day_start and h < day_end)
+            if zone_1_start <= zone_1_end:
+                is_day = (h >= zone_1_start and h < zone_1_end)
             else:
-                # wrap-around (e.g., day_start=20, day_end=6)
-                is_day = not (h >= day_end and h < day_start)
+                # wrap-around (e.g., zone_1_start=20, zone_1_end=6)
+                is_day = not (h >= zone_1_end and h < zone_1_start)
 
-            prices[rel_hour] = tariff_day if is_day else tariff_night
+            prices[rel_hour] = tariff_zone_1 if is_day else tariff_zone_2
 
-        logger.debug('Twotariffmode: Generated %d hourly prices', len(prices))
+        logger.debug('tariff_zones: Generated %d hourly prices', len(prices))
         return prices
