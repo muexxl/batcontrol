@@ -202,14 +202,14 @@ class TestDefaultLogic(unittest.TestCase):
         calc_input = CalculationInput(
             consumption=consumption,
             production=production,
-            prices={0: 0.20, 1: 0.20, 2: .30, 3: 0.30, 4: 0.30, 5: 0.30, 6: 0.30, 7: 0.30, 8: 0.30, 9: 0.30},  # Low current price, high future prices
+            prices={0: 0.20, 1: 0.20, 2: 0.30, 3: 0.30, 4: 0.30, 5: 0.30, 6: 0.30, 7: 0.30, 8: 0.30, 9: 0.30},  # Low current price, high future prices
             stored_energy=stored_energy,
             stored_usable_energy=stored_usable_energy,
             free_capacity=free_capacity,
         )
 
         # Test at 30 minutes past the hour to test charge rate calculation
-        # calc_timestamp = datetime.datetime(2025, 6, 20, 12, 30, 0, tzinfo=datetime.timezone.utc)
+
         calc_timestamp = datetime.datetime(2025, 6, 20, 12, 50, 0, tzinfo=datetime.timezone.utc)
         self.assertTrue(self.logic.calculate(calc_input, calc_timestamp))
         result = self.logic.get_inverter_control_settings()

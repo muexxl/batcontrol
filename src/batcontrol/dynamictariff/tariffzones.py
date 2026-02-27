@@ -20,7 +20,7 @@ and
 max_grid_charge_rate to a low value, e.g. capacity of the battery divided
 by the hours of low price periods.
 
-If you prefer a late charging start (=optimize effiency, have battery only short
+If you prefer a late charging start (=optimize efficiency, have battery only short
 time at high SOC), you can adjust the
 soften_price_difference_on_charging to disabled
 """

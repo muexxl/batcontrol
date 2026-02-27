@@ -156,5 +156,5 @@ class DynamicTariff:
             selected_tariff.zone_1_end = zone_1_end
 
         else:
-            raise RuntimeError(f'[DynamicTariff] Unkown provider {provider}')
+            raise RuntimeError(f'[DynamicTariff] Unknown provider {provider}')
         return selected_tariff
