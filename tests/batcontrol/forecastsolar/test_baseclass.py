@@ -341,7 +341,7 @@ class TestForecastSolarBaseclass:
             mock_forecast_func=mock_forecast
         )
 
-        with pytest.raises(RuntimeError, match="Less than 18 hours"):
+        with pytest.raises(RuntimeError, match="Less than 12 hours"):
             instance.get_forecast()
 
     def test_base_class_not_implemented_errors(self, single_installation, timezone):
