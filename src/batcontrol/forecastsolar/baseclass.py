@@ -155,10 +155,10 @@ class ForecastSolarBaseclass(ForecastSolarInterface):
         else:  # 15 minutes
             min_intervals = 48  # 12 hours * 4 = 48 intervals
 
-        max_interval = max(current_aligned_forecast.keys()) if current_aligned_forecast else 0
-        if max_interval < min_intervals:
+        num_intervals = len(current_aligned_forecast)
+        if num_intervals < min_intervals:
             logger.error('Less than 12 hours of forecast data. Got %d intervals, need %d.',
-                         max_interval, min_intervals)
+                         num_intervals, min_intervals)
             raise RuntimeError('Less than 12 hours of forecast data.')
 
         return current_aligned_forecast
