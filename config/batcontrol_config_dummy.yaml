@@ -69,7 +69,7 @@ utility:
   fees: 0.015 # only required for awattar and energyforecast
   markup: 0.03 # only required for awattar and energyforecast
   # tariff_zone_1: 0.2733 # only required for tariff_zones, Euro/kWh incl. vat/fees
-  # tariff_zone_2: 0.1734 # only required for tariff_zones, Euro/kWh incl. vat/fees 
+  # tariff_zone_2: 0.1734 # only required for tariff_zones, Euro/kWh incl. vat/fees
   # zone_1_start: 5 # only required for tariff_zones, hour of day when zone 1 tariff starts
   # zone_1_end: 0 # only required for tariff_zones, hour of day when zone 1 tariff ends
   # apikey: YOUR_API_KEY # MANDATORY for energyforecast and tibber. Uncomment and set if using those providers.

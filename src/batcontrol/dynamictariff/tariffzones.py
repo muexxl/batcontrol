@@ -1,10 +1,10 @@
 """Tariff_zones provider
 
-Simple dynamic tariff provider that returns a repeating day/night tariff.
+Simple dynamic tariff provider that returns a repeating two zone tariff.
 Config options (in utility config for provider):
 - type: tariff_zones
-- tariff_zone_1: price for day hours (float)
-- tariff_zone_2: price for night hours (float)
+- tariff_zone_1: price for zone 1 hours (float)
+- tariff_zone_2: price for zone 2 hours (float)
 - zone_1_start: hour when tariff zone 1 starts (int, default 7)
 - zone_1_end: hour when tariff zone 1 ends (int, default 22)
 
@@ -20,7 +20,7 @@ and
 max_grid_charge_rate to a low value, e.g. capacity of the battery divided
 by the hours of low price periods.
 
-If you prefer a late charging start (=optimize effiency, have battery only short
+If you prefer a late charging start (=optimize efficiency, have battery only short
 time at high SOC), you can adjust the
 soften_price_difference_on_charging to disabled
 """
@@ -31,8 +31,8 @@ from .baseclass import DynamicTariffBaseclass
 logger = logging.getLogger(__name__)
 
 
-class Tariff_zones(DynamicTariffBaseclass):
-    """Two-tier tariff: day / night fixed prices."""
+class TariffZones(DynamicTariffBaseclass):
+    """Two-tier tariff: zone 1 / zone 2 fixed prices."""
 
     def __init__(
             self,
@@ -49,25 +49,7 @@ class Tariff_zones(DynamicTariffBaseclass):
             native_resolution=60,
         )
 
-        # defaults
-        self.tariff_zone_1 = 0.20
-        self.tariff_zone_2 = 0.10
-        self.zone_1_start = 7
-        self.zone_1_end = 22
 
-    def get_raw_data_from_provider(self) -> dict:
-        """Return the configuration-like raw data stored in cache.
-
-        This provider is purely local and does not call external APIs.
-        We return a dict containing the configured values so that
-        `_get_prices_native` can read from `get_raw_data()` uniformly.
-        """
-        return {
-            'tariff_zone_1': self.tariff_zone_1,
-            'tariff_zone_2': self.tariff_zone_2,
-            'zone_1_start': self.zone_1_start,
-            'zone_1_end': self.zone_1_end,
-        }
 
     def _get_prices_native(self) -> dict[int, float]:
         """Build hourly prices for the next 48 hours, hour-aligned.
@@ -99,5 +81,5 @@ class Tariff_zones(DynamicTariffBaseclass):
 
             prices[rel_hour] = tariff_zone_1 if is_day else tariff_zone_2
 
-        logger.debug('tariff_zones: Generated %d hourly prices', len(prices))
+        logger.debug('tariffZones: Generated %d hourly prices', len(prices))
         return prices

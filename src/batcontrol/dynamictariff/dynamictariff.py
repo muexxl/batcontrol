@@ -19,7 +19,7 @@ from .awattar import Awattar
 from .tibber import Tibber
 from .evcc import Evcc
 from .energyforecast import Energyforecast
-from .tariffzones import Tariff_zones
+from .tariffzones import TariffZones
 from .dynamictariff_interface import TariffInterface
 
 
@@ -143,7 +143,7 @@ class DynamicTariff:
             tariff_zone_2 = float(config.get('tariff_zone_2'))
             zone_1_start = int(config.get('zone_1_start', 7))
             zone_1_end = int(config.get('zone_1_end', 22))
-            selected_tariff = Tariff_zones(
+            selected_tariff = TariffZones(
                 timezone,
                 min_time_between_api_calls,
                 delay_evaluation_by_seconds,
@@ -156,5 +156,5 @@ class DynamicTariff:
             selected_tariff.zone_1_end = zone_1_end
 
         else:
-            raise RuntimeError(f'[DynamicTariff] Unkown provider {provider}')
+            raise RuntimeError(f'[DynamicTariff] Unknown provider {provider}')
         return selected_tariff
