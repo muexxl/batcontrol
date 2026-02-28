@@ -317,7 +317,7 @@ class TestFullGetForecastIntegration:
             mock_datetime.timezone = datetime.timezone
 
             with patch.object(provider, 'refresh_data'):
-                with pytest.raises(RuntimeError, match="Less than 18 hours"):
+                with pytest.raises(RuntimeError, match="Less than 12 hours"):
                     provider.get_forecast()
 
     def test_minimum_forecast_validation_15min(self, pvinstallations, timezone):
@@ -327,8 +327,8 @@ class TestFullGetForecastIntegration:
             target_resolution=15, native_resolution=15
         )
 
-        # Set insufficient data (less than 72 intervals = 18 hours)
-        data_15min = {i: 250 for i in range(50)}
+        # Set insufficient data (less than 48 intervals = 12 hours)
+        data_15min = {i: 250 for i in range(40)}
         provider.set_mock_data(data_15min)
 
         mock_time = datetime.datetime(2024, 1, 1, 10, 0, 0, tzinfo=timezone)
@@ -338,7 +338,7 @@ class TestFullGetForecastIntegration:
             mock_datetime.timezone = datetime.timezone
 
             with patch.object(provider, 'refresh_data'):
-                with pytest.raises(RuntimeError, match="Less than 18 hours"):
+                with pytest.raises(RuntimeError, match="Less than 12 hours"):
                     provider.get_forecast()
 
 
@@ -394,8 +394,8 @@ class TestRealWorldScenario:
         assert 0 in result
         assert result[0] > 0  # Should have some solar production
 
-        # Result should have many intervals (at least 72 for 18 hours)
-        assert len(result) >= 72
+        # Result should have many intervals (at least 48 for 12 hours)
+        assert len(result) >= 48
 
     def test_scenario_matching_doc_example(self, pvinstallations, timezone):
         """
