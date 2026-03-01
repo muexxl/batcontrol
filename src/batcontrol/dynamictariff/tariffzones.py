@@ -49,6 +49,10 @@ class TariffZones(DynamicTariffBaseclass):
             native_resolution=60,
         )
 
+        # default zone boundaries
+        self._zone_1_start = 7
+        self._zone_1_end = 22
+
 
 
     def _get_prices_native(self) -> dict[int, float]:
@@ -63,6 +67,10 @@ class TariffZones(DynamicTariffBaseclass):
         tariff_zone_2 = raw.get('tariff_zone_2', self.tariff_zone_2)
         zone_1_start = int(raw.get('zone_1_start', self.zone_1_start))
         zone_1_end = int(raw.get('zone_1_end', self.zone_1_end))
+
+        # validate hours are integers in range [0, 23]
+        zone_1_start = self._validate_hour(zone_1_start, 'zone_1_start')
+        zone_1_end = self._validate_hour(zone_1_end, 'zone_1_end')
 
         now = datetime.datetime.now().astimezone(self.timezone)
         # Align to start of current hour
@@ -83,3 +91,28 @@ class TariffZones(DynamicTariffBaseclass):
 
         logger.debug('tariffZones: Generated %d hourly prices', len(prices))
         return prices
+
+    def _validate_hour(self, val: int, name: str) -> int:
+        try:
+            ival = int(val)
+        except Exception:
+            raise ValueError(f'[{name}] must be an integer between 0 and 23')
+        if ival < 0 or ival > 23:
+            raise ValueError(f'[{name}] must be between 0 and 23 (got {ival})')
+        return ival
+
+    @property
+    def zone_1_start(self) -> int:
+        return self._zone_1_start
+
+    @zone_1_start.setter
+    def zone_1_start(self, value: int) -> None:
+        self._zone_1_start = self._validate_hour(value, 'zone_1_start')
+
+    @property
+    def zone_1_end(self) -> int:
+        return self._zone_1_end
+
+    @zone_1_end.setter
+    def zone_1_end(self, value: int) -> None:
+        self._zone_1_end = self._validate_hour(value, 'zone_1_end')
